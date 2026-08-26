@@ -1,0 +1,142 @@
+/* =============================================================
+   Matchmaker Admin Portal — admin-matchmaker.css
+   Loaded on matchmaking-pool and matchmaking-matches pages
+   ============================================================= */
+
+.mm-admin-wrap {
+    margin-top: 20px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #000000;
+}
+
+.mm-admin-wrap h1,
+.mm-admin-wrap h2,
+.mm-admin-wrap h3 {
+    font-family: 'Cormorant SC', serif;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.mm-filter-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 15px 0;
+}
+.mm-filter-bar input[type="search"] {
+    width: 280px;
+}
+
+.mm-avatar-thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mm-avatar-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mm-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.mm-badge-monthly   { background: #e0f2fe; color: #0369a1; }
+.mm-badge-one_on_one{ background: #fef3c7; color: #92400e; }
+.mm-badge-free      { background: #f3f4f6; color: #4b5563; }
+.mm-badge-event     { background: #f3e8ff; color: #6b21a8; }
+
+.mm-status {
+    font-weight: 600;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+.mm-status-pending_review {
+    background-color: #F8F2ED;
+    color: #CC723F;
+    border: 1px solid #CC723F;
+}
+.mm-status-approved,
+.mm-status-matched {
+    background-color: #F0F4EC;
+    color: #829067;
+    border: 1px solid #829067;
+}
+.mm-status-rejected,
+.mm-status-admin_rejected {
+    background-color: #FDECEB;
+    color: #A4302A;
+    border: 1px solid #A4302A;
+}
+
+.mm-count-pending  { color: #CC723F; font-weight: 600; }
+.mm-count-approved { color: #829067; font-weight: 600; }
+
+.mm-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ccd0d4;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+.mm-grid-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+.mm-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 8px;
+    padding: 20px;
+}
+.mm-card h3 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.mm-kv-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.mm-kv-table th {
+    width: 35%;
+    text-align: left;
+    padding: 7px 0;
+    color: #555;
+    font-size: 13px;
+    vertical-align: top;
+}
+.mm-kv-table td {
+    padding: 7px 0;
+    color: #000;
+    font-size: 13px;
+}
+
+.mm-photos-grid {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+.mm-photos-grid img {
+    width: 90px;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+}
