@@ -134,20 +134,42 @@ class Matching_Engine {
     // -------------------------------------------------------------------------
 
     /**
-     * Fired by the daily recurring AS cron.
-     * Finds monthly users idle for configured recurrence days and re-queues their matching job.
-     */
     public function check_weekly_queue(): void
     {
         global $wpdb;
 
-        $pool_table      = $wpdb->prefix . 'matchmaking_pool';
-        $recurrence_days = (int) get_option('mm_auto_match_recurrence_days', self::IDLE_DAYS);
+        $pool_table        = $wpdb->prefix . 'matchmaking_pool';
+        $matches_table     = $wpdb->prefix . 'matches';
+        $recurrence_days   = (int) get_option('mm_auto_match_recurrence_days', self::IDLE_DAYS);
         if ($recurrence_days < 1) {
             $recurrence_days = 7;
         }
 
-        $cutoff = gmdate('Y-m-d H:i:s', strtotime('-' . $recurrence_days . ' days'));
+        $cutoff            = gmdate('Y-m-d H:i:s', strtotime('-' . $recurrence_days . ' days'));
+        $expiration_cutoff = gmdate('Y-m-d H:i:s', strtotime('-7 days'));
+
+        // 1. Auto-expire unanswered matches > 7 days old
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$matches_table}
+                 SET user_one_response = 'rejected', status = 'rejected'
+                 WHERE status IN ('pending_review', 'approved')
+                   AND user_one_response = 'pending'
+                   AND created_at < %s",
+                $expiration_cutoff
+            )
+        );
+
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$matches_table}
+                 SET user_two_response = 'rejected', status = 'rejected'
+                 WHERE status IN ('pending_review', 'approved')
+                   AND user_two_response = 'pending'
+                   AND created_at < %s",
+                $expiration_cutoff
+            )
+        );
 
         $sql = $wpdb->prepare(
             "SELECT p.user_id

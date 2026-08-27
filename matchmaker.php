@@ -61,6 +61,40 @@ add_action('plugins_loaded', function () : void {
     if (class_exists('\Matchmaker\Matching_Engine')) {
         \Matchmaker\Matching_Engine::instance();
     }
+    if (class_exists('\Matchmaker\Notification_Manager')) {
+        \Matchmaker\Notification_Manager::instance();
+    }
+    if (class_exists('\Matchmaker\Match_Flow_Handler')) {
+        \Matchmaker\Match_Flow_Handler::instance();
+    }
+});
+
+// Enqueue portal assets and Heartbeat API scripts
+add_action('wp_enqueue_scripts', function () : void {
+    if (is_user_logged_in()) {
+        // Enqueue core Heartbeat script
+        wp_enqueue_script('heartbeat');
+
+        wp_enqueue_style(
+            'mm-member-portal-css',
+            MATCHMAKER_URL . 'assets/css/member-portal.css',
+            [],
+            MATCHMAKER_VERSION
+        );
+
+        wp_enqueue_script(
+            'mm-member-portal-js',
+            MATCHMAKER_URL . 'assets/js/member-portal.js',
+            ['jquery', 'heartbeat'],
+            MATCHMAKER_VERSION,
+            true
+        );
+
+        wp_localize_script('mm-member-portal-js', 'mmPortalData', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('mm_portal_nonce'),
+        ]);
+    }
 });
 
 // Activation / Deactivation hooks

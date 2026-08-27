@@ -181,3 +181,33 @@ This document maintains a chronological, step-by-step history of all features, a
     2. AS Async Deduplication: `as_enqueue_async_action` ignored new jobs if an identical action was already pending.
   - Updated `Form_Handler.php` to resolve `$effective_type` (checking usermeta, PMPro, and admin capabilities).
   - Refactored `mm_enqueue_user_matching_job()` in `Matching_Engine.php` to use `as_schedule_single_action(time(), ...)` with stale action clearing via `as_unschedule_all_actions()`.
+
+---
+
+### Task 19: Member Dashboard, 5-State Interactive Match Flow, Heartbeat Notifications & Email Approval Alerts
+- **Objective**: Implement unified tabbed Member Dashboard (`[matchmaker_member_portal]`), 5-State Interactive Match Flow (`match-steps.php`), Heartbeat API Notification System (`new-features.md`), and Email Approval Notifications with Admin Template Editor.
+- **Implemented**:
+  - Created `Notification_Manager.php`: Handles WordPress Heartbeat pulse processing, 60s transient caching (`mm_unread_count_{$user_id}`), and automated HTML email dispatch on match approval.
+  - Created `Match_Flow_Handler.php`: Renders shortcode `[matchmaker_member_portal]`, Profile tab, Matches tab (5-State view step views for premium members or Free tier upsell banner), and handles AJAX endpoint `wp_ajax_mm_submit_match_response` for match Accept & Decline actions.
+  - Updated `Admin_Portal.php`: Added Email Subject input and Rich Email Template Editor (`wp_editor`) in **Matchmaking -> Settings** with dynamic placeholders (`{user_name}`, `{candidate_name}`, `{candidate_age}`, `{candidate_location}`, `{dashboard_url}`). Triggered email notifications upon match approval.
+  - Updated `Matching_Engine.php`: Added 7-day auto-expiration worker in `check_weekly_queue()` to auto-reject unanswered matches after 168 hours.
+  - Created `member-portal.css` and `member-portal.js`: Handled tab navigation, 5-state view step switching, AJAX match response, Heartbeat bell badge counter, and top-right slide-out toast alerts (`#mm-toast-box`).
+
+---
+
+### Task 22: Dual Step 1 CTAs, Inside-Canvas Footer Dock, Back Arrow Navigation, AJAX Tab Reloading & Mobile Responsiveness
+- **Objective**: Implement 2 CTAs on Step 1 ("View Match" & "View Status"), position Step 2 footer dock inside canvas, render top back arrow navigation, enable dynamic AJAX tab content reloading, ensure 100% mobile responsiveness, and eliminate green hover/active button colors.
+- **Implemented**:
+  - Updated `Match_Flow_Handler.php`:
+    - Added dual CTAs (`View Match →` & `View Status`) to Step 1 discovery card.
+    - Moved Step 2 footer action dock inside the `.mm-portal-canvas` container at the bottom.
+    - Added dynamic state check to Step 2 footer: shows `Decline Match` & `Accept Match →` if pending, or `View Status →` if already responded.
+    - Added top navigation back button (`← Back to Matches`) to Step 2 profile view.
+    - Added `handle_ajax_reload_tab()` endpoint (`wp_ajax_mm_reload_tab_content`) to re-render tab HTML dynamically via AJAX.
+  - Updated `member-portal.css`:
+    - Changed `.floating-action-footer` to `position: relative; width: 100%; border-radius: 0 0 36px 36px;` inside the canvas bottom.
+    - Removed all green hover/active colors from buttons, replacing them with primary brand color `#CC723F` or primary hover `#b6602f`.
+    - Added comprehensive `@media (max-width: 900px)`, `@media (max-width: 768px)`, and `@media (max-width: 480px)` responsive breakpoints for mobile & tablet support.
+  - Updated `member-portal.js`:
+    - Added `MM_Portal.goBackStep()` navigation helper with history stack.
+    - Updated `MM_Portal.switchTab()` to trigger `MM_Portal.reloadTabAJAX()` for dynamic content updates on tab clicks.

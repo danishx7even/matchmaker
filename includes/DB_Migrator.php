@@ -32,15 +32,16 @@ class DB_Migrator {
     {
         global $wpdb;
 
-        // Backwards compatibility: if legacy numeric option indicates installed, skip migration.
+        $option_name = 'mm_matchmaking_db_v2_version';
+        $new_version = '2.1.0';
+        $installed_version = (string) get_option($option_name, '0.0.0');
+        
+        // Handle legacy versioning correctly without blocking upgrades
         $legacy_installed = (int) get_option('mm_matchmaking_db_version', 0);
-        if ($legacy_installed >= 1) {
-            return;
+        if ($legacy_installed >= 1 && $installed_version === '0.0.0') {
+            $installed_version = '2.0.0'; // Assume 2.0.0 if legacy is set but v2 is not
         }
 
-        $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.0.0';
-        $installed_version = (string) get_option($option_name, '0.0.0');
         if (version_compare($installed_version, $new_version, '>=')) {
             return;
         }
@@ -49,8 +50,9 @@ class DB_Migrator {
 
         $charset_collate = $wpdb->get_charset_collate();
 
-        $pool_table = $wpdb->prefix . 'matchmaking_pool';
-        $matches_table = $wpdb->prefix . 'matches';
+        $pool_table          = $wpdb->prefix . 'matchmaking_pool';
+        $matches_table       = $wpdb->prefix . 'matches';
+        $notifications_table = $wpdb->prefix . 'matchmaker_notifications';
 
         $sql_pool = "CREATE TABLE {$pool_table} (
             user_id bigint(20) unsigned NOT NULL,
@@ -112,11 +114,26 @@ class DB_Migrator {
             KEY idx_status (status)
         ) {$charset_collate};";
 
+        $sql_notifications = "CREATE TABLE {$notifications_table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            user_id bigint(20) unsigned NOT NULL,
+            match_id bigint(20) unsigned NOT NULL,
+            type varchar(50) NOT NULL DEFAULT 'match_approved',
+            title varchar(255) NOT NULL,
+            message text DEFAULT NULL,
+            is_read tinyint(1) NOT NULL DEFAULT 0,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_user_read (user_id, is_read),
+            KEY idx_match_id (match_id)
+        ) {$charset_collate};";
+
         dbDelta($sql_pool);
         dbDelta($sql_matches);
+        dbDelta($sql_notifications);
 
         update_option($option_name, $new_version);
         // Maintain legacy numeric option for older code/tests expecting this.
-        update_option('mm_matchmaking_db_version', 1);
+        update_option('mm_matchmaking_db_version', 2);
     }
 }

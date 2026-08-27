@@ -190,12 +190,18 @@ class Admin_Portal {
 
             if ($updated !== false) {
                 update_user_meta($initiator_id, 'cycle_matches_count', $current_quota + 1);
+
+                // Trigger email notifications and flush heartbeat transients
+                if (class_exists('\Matchmaker\Notification_Manager')) {
+                    Notification_Manager::instance()->send_approval_emails($match_id);
+                }
+
                 add_settings_error(
                     'mm_admin_notices',
                     'match_approved',
                     sprintf(
                         /* translators: 1: match ID, 2: quota count */
-                        __('Match #%1$d approved. Quota used: %2$d/10.', 'matchmaker'),
+                        __('Match #%1$d approved and notification emails sent to both members. Quota used: %2$d/10.', 'matchmaker'),
                         $match_id,
                         $current_quota + 1
                     ),
@@ -251,10 +257,18 @@ class Admin_Portal {
             update_option('mm_auto_match_recurrence_days', $recurrence_days);
             update_option('mm_max_candidates_per_run', $max_candidates);
 
+            if (isset($_POST['mm_email_approval_subject'])) {
+                update_option('mm_email_approval_subject', sanitize_text_field(wp_unslash((string) $_POST['mm_email_approval_subject'])));
+            }
+
+            if (isset($_POST['mm_email_approval_template'])) {
+                update_option('mm_email_approval_template', wp_kses_post(wp_unslash((string) $_POST['mm_email_approval_template'])));
+            }
+
             add_settings_error(
                 'mm_admin_notices',
                 'settings_saved',
-                __('Matchmaking settings saved successfully.', 'matchmaker'),
+                __('Matchmaking and email settings saved successfully.', 'matchmaker'),
                 'success'
             );
         }
@@ -1466,20 +1480,26 @@ class Admin_Portal {
             wp_die(__('Access denied.', 'matchmaker'));
         }
 
-        $recurrence_days = (int) get_option('mm_auto_match_recurrence_days', 7);
-        $max_candidates  = (int) get_option('mm_max_candidates_per_run', 10);
-        $save_url        = admin_url('admin.php?page=matchmaking-settings&mm_action=save_settings');
-        $nonce           = wp_create_nonce('mm_save_settings');
+        $recurrence_days  = (int) get_option('mm_auto_match_recurrence_days', 7);
+        $max_candidates   = (int) get_option('mm_max_candidates_per_run', 10);
+        $default_subject  = "You Have a New Match Available on Arab Zawaj!";
+        $default_template = "<p>Dear {user_name},</p>\n<p>We are excited to inform you that our matchmaking team has approved a new match for you!</p>\n<p><strong>Candidate Details:</strong></p>\n<ul>\n    <li><strong>Name:</strong> {candidate_name}</li>\n    <li><strong>Age:</strong> {candidate_age} Years Old</li>\n    <li><strong>Location:</strong> {candidate_location}</li>\n</ul>\n<p>Please log in to your dashboard to review this candidate's full profile and submit your response within 7 days.</p>\n<p><a href='{dashboard_url}' style='background-color: #CC723F; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;'>View Your Match Now →</a></p>\n<p>Warm regards,<br>The Arab Zawaj Matchmaking Team</p>";
+        $email_subject    = (string) get_option('mm_email_approval_subject', $default_subject);
+        $email_template   = (string) get_option('mm_email_approval_template', $default_template);
+
+        $save_url         = admin_url('admin.php?page=matchmaking-settings&mm_action=save_settings');
+        $nonce            = wp_create_nonce('mm_save_settings');
         ?>
         <div class="wrap mm-admin-wrap">
-            <h1 class="wp-heading-inline"><?php esc_html_e('Matchmaking Settings', 'matchmaker'); ?></h1>
+            <h1 class="wp-heading-inline"><?php esc_html_e('Matchmaking & Email Settings', 'matchmaker'); ?></h1>
             <hr class="wp-header-end">
             <?php settings_errors('mm_admin_notices'); ?>
 
-            <div class="mm-card" style="max-width:700px;margin-top:20px;">
+            <div class="mm-card" style="max-width:850px;margin-top:20px;">
                 <form method="post" action="<?php echo esc_url($save_url); ?>">
                     <input type="hidden" name="_wpnonce" value="<?php echo esc_attr($nonce); ?>">
 
+                    <h2><?php esc_html_e('Engine & Queue Settings', 'matchmaker'); ?></h2>
                     <table class="form-table" role="presentation">
                         <tbody>
                             <tr>
@@ -1513,8 +1533,58 @@ class Admin_Portal {
                         </tbody>
                     </table>
 
+                    <hr style="margin:30px 0;border:0;border-top:1px solid #ddd;">
+
+                    <h2><?php esc_html_e('Match Approval Email Notification Settings', 'matchmaker'); ?></h2>
+                    <p class="description">
+                        <?php esc_html_e('This email is sent automatically to both members when an admin approves a match.', 'matchmaker'); ?>
+                    </p>
+
+                    <table class="form-table" role="presentation">
+                        <tbody>
+                            <tr>
+                                <th scope="row">
+                                    <label for="mm_email_approval_subject">
+                                        <?php esc_html_e('Email Subject Line', 'matchmaker'); ?>
+                                    </label>
+                                </th>
+                                <td>
+                                    <input type="text" name="mm_email_approval_subject" id="mm_email_approval_subject"
+                                           value="<?php echo esc_attr($email_subject); ?>" class="large-text">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="mm_email_approval_template">
+                                        <?php esc_html_e('Email Body Template', 'matchmaker'); ?>
+                                    </label>
+                                </th>
+                                <td>
+                                    <?php
+                                    wp_editor($email_template, 'mm_email_approval_template', [
+                                        'textarea_name' => 'mm_email_approval_template',
+                                        'textarea_rows' => 12,
+                                        'media_buttons' => false,
+                                        'teeny'         => false,
+                                    ]);
+                                    ?>
+                                    <div style="background:#f9f9f9;border:1px solid #e5e5e5;padding:12px 16px;border-radius:6px;margin-top:12px;">
+                                        <strong><?php esc_html_e('Available Placeholder Variables:', 'matchmaker'); ?></strong>
+                                        <ul style="margin:6px 0 0 18px;list-style:disc;">
+                                            <code>{user_name}</code> — <?php esc_html_e("Recipient member's full name", 'matchmaker'); ?><br>
+                                            <code>{candidate_name}</code> — <?php esc_html_e("Matched candidate's display name", 'matchmaker'); ?><br>
+                                            <code>{candidate_age}</code> — <?php esc_html_e("Matched candidate's age", 'matchmaker'); ?><br>
+                                            <code>{candidate_location}</code> — <?php esc_html_e("Matched candidate's location", 'matchmaker'); ?><br>
+                                            <code>{dashboard_url}</code> — <?php esc_html_e("Direct link to member match dashboard (/dashboard/)", 'matchmaker'); ?>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
                     <p class="submit">
-                        <button type="submit" class="button button-primary"><?php esc_html_e('Save Matchmaking Settings', 'matchmaker'); ?></button>
+                        <button type="submit" class="button button-primary"><?php esc_html_e('Save Matchmaking & Email Settings', 'matchmaker'); ?></button>
                     </p>
                 </form>
             </div>
