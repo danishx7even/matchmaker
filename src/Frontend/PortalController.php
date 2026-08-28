@@ -101,9 +101,16 @@ class PortalController
     public function render_portal(array|string $atts = []): string
     {
         if (!is_user_logged_in()) {
-            return '<div class="mm-portal-wrap"><div class="az-card"><p>'
-                . esc_html__('Please log in to view your matchmaking member portal.', 'matchmaker')
-                . '</p></div></div>';
+            $login_url = function_exists('pmpro_url') ? pmpro_url('login') : home_url('/login/');
+            return '<div class="mm-portal-wrap"><div class="az-card" style="text-align:center; padding: 48px 24px;">'
+                . '<div style="font-size:42px; margin-bottom:12px;">🔒</div>'
+                . '<h2 style="font-family:\'Cormorant SC\', serif; font-size:24px; font-weight:700; color:#1e293b; margin-bottom:10px;">'
+                . esc_html__('Member Access Required', 'matchmaker') . '</h2>'
+                . '<p style="max-width:480px; margin:0 auto 20px; color:#64748b; font-size:15px; line-height:1.6;">'
+                . esc_html__('Please log in to your account to view your matchmaking portal and recommendations.', 'matchmaker') . '</p>'
+                . '<a href="' . esc_url($login_url) . '" class="btn btn-primary" style="display:inline-block; padding:12px 28px; background:#CC723F; color:#fff; text-decoration:none; border-radius:8px; font-weight:600;">'
+                . esc_html__('Log In to Portal →', 'matchmaker') . '</a>'
+                . '</div></div>';
         }
 
         $user_id  = get_current_user_id();
@@ -114,9 +121,16 @@ class PortalController
         $pool = $repo->get_user_pool($user_id);
 
         if (!$pool) {
-            return '<div class="mm-portal-wrap"><div class="az-card"><p>'
-                . esc_html__('Your matchmaking profile has not been set up yet. Please complete your registration questionnaire.', 'matchmaker')
-                . '</p></div></div>';
+            $form_url = \Matchmaker\Service\ProfileService::instance()->get_form_url();
+            return '<div class="mm-portal-wrap"><div class="az-card" style="text-align:center; padding: 48px 24px;">'
+                . '<div style="font-size:42px; margin-bottom:12px;">📋</div>'
+                . '<h2 style="font-family:\'Cormorant SC\', serif; font-size:24px; font-weight:700; color:#1e293b; margin-bottom:10px;">'
+                . esc_html__('Complete Your Questionnaire', 'matchmaker') . '</h2>'
+                . '<p style="max-width:520px; margin:0 auto 20px; color:#64748b; font-size:15px; line-height:1.6;">'
+                . esc_html__('Your matchmaking profile has not been completed yet. Please fill out your profile questionnaire to start receiving curated matches.', 'matchmaker') . '</p>'
+                . '<a href="' . esc_url($form_url) . '" class="btn btn-primary" style="display:inline-block; padding:12px 28px; background:#CC723F; color:#fff; text-decoration:none; border-radius:8px; font-weight:600;">'
+                . esc_html__('Complete Questionnaire →', 'matchmaker') . '</a>'
+                . '</div></div>';
         }
 
         // Determine user membership tier
