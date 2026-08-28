@@ -211,16 +211,61 @@
 }
 
 .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 20px;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 16px !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-.header-icon-btn {
-    color: var(--text-dark);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
+.header-actions p,
+.az-about-header p {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+.header-actions .mm-bell-wrapper,
+.header-actions .header-icon-btn,
+.header-actions .header-avatar-box {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 40px !important;
+    vertical-align: middle !important;
+}
+
+.header-actions a.header-icon-btn,
+.header-actions .header-icon-btn {
+    all: unset !important;
+    box-sizing: border-box !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    color: var(--text-dark) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    transition: background 0.2s ease, color 0.2s ease !important;
+}
+
+.header-actions a.header-icon-btn:hover,
+.header-actions .header-icon-btn:hover {
+    background: var(--secondary) !important;
+    color: var(--primary) !important;
+}
+
+.header-actions a.header-icon-btn svg,
+.header-actions .mm-bell-wrapper svg {
+    display: block !important;
+    margin: auto !important;
 }
 
 .mm-bell-wrapper {
@@ -304,25 +349,46 @@
 
 .az-about-info { flex: 1; }
 .az-about-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 12px !important;
 }
 
+.az-about-header h2 {
+    margin: 0 !important;
+}
+
+.mm-portal-canvas a.az-edit-btn,
+a.az-edit-btn,
 .az-edit-btn {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 13px;
-    color: #333;
-    text-decoration: none;
-    transition: color 0.2s;
+    all: unset !important;
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 8px 18px !important;
+    background: #ffffff !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    text-decoration: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    line-height: 1 !important;
+    margin: 0 !important;
 }
 
-.az-edit-btn:hover {
-    color: var(--primary);
-    border-color: var(--primary);
+.mm-portal-canvas a.az-edit-btn:hover,
+a.az-edit-btn:hover {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 12px rgba(204, 114, 63, 0.25) !important;
 }
 
 .az-user-name {

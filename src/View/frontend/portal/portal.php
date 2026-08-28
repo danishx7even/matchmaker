@@ -58,34 +58,7 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
             </button>
         </nav>
 
-        <div class="header-actions">
-            <div class="mm-bell-wrapper" title="<?php esc_attr_e('Notifications', 'matchmaker'); ?>">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-                <span class="mm-bell-badge <?php echo $unread_count > 0 ? '' : 'mm-hidden'; ?>" <?php echo $unread_count > 0 ? '' : 'style="display:none;"'; ?>>
-                    <?php echo (int) $unread_count; ?>
-                </span>
-            </div>
-
-            <a href="<?php echo esc_url($mem_url); ?>" type="button" class="header-icon-btn" title="<?php esc_attr_e('Settings', 'matchmaker'); ?>">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-            </a>
-
-            <div class="header-avatar-box">
-                <?php if (!empty($photos['user_photo1'])) : ?>
-                    <img src="<?php echo esc_url($photos['user_photo1']); ?>" alt="<?php echo esc_attr($user->display_name); ?>" class="header-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">
-                <?php else : ?>
-                    <div class="header-avatar-placeholder" style="width:40px;height:40px;border-radius:50%;background:#CC723F;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;">
-                        <?php echo esc_html(strtoupper(substr($user->display_name ?: 'U', 0, 1))); ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
+        <div class="header-actions"><div class="mm-bell-wrapper" title="<?php esc_attr_e('Notifications', 'matchmaker'); ?>"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="mm-bell-badge <?php echo $unread_count > 0 ? '' : 'mm-hidden'; ?>" <?php echo $unread_count > 0 ? '' : 'style="display:none;"'; ?>><?php echo (int) $unread_count; ?></span></div><a href="<?php echo esc_url($mem_url); ?>" class="header-icon-btn" title="<?php esc_attr_e('Settings', 'matchmaker'); ?>"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></a><div class="header-avatar-box"><?php if (!empty($photos['user_photo1'])) : ?><img src="<?php echo esc_url($photos['user_photo1']); ?>" alt="<?php echo esc_attr($user->display_name); ?>" class="header-avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;"><?php else : ?><div class="header-avatar-placeholder" style="width:40px;height:40px;border-radius:50%;background:#CC723F;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;"><?php echo esc_html(strtoupper(substr($user->display_name ?: 'U', 0, 1))); ?></div><?php endif; ?></div></div>
     </header>
 
     <!-- TAB 1: PROFILE VIEW -->

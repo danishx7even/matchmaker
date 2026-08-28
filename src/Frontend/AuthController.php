@@ -51,6 +51,7 @@ class AuthController
         add_filter('login_url',                            [$this, 'custom_pmpro_login_url'], 10, 3);
         add_action('login_init',                           [$this, 'custom_pmpro_redirect_wp_login']);
         add_shortcode('logout_url',                        [$this, 'custom_logout_url_shortcode']);
+        add_action('wp_logout',                            [$this, 'custom_logout_redirect']);
         add_filter('login_redirect',                       [$this, 'custom_role_based_login_redirect'], 10, 3);
         add_filter('pmpro_confirmation_url',               [$this, 'custom_pmpro_level_based_registration_redirect'], 10, 3);
         add_filter('show_admin_bar',                       [$this, 'custom_hide_admin_bar_for_subscribers']);
@@ -120,7 +121,7 @@ class AuthController
     }
 
     /**
-     * [logout_url] shortcode — outputs the WordPress logout URL.
+     * [logout_url] shortcode — outputs the WordPress logout URL pointing to PMPro login page.
      *
      * @param array<string, string>|string $atts Shortcode attributes. Accepts 'redirect'.
      * @return string Escaped logout URL or empty string if not logged in.
@@ -130,25 +131,38 @@ class AuthController
         if (!is_user_logged_in()) {
             return '';
         }
-        $atts = shortcode_atts(['redirect' => home_url()], $atts, 'logout_url');
+        $pmpro_login = function_exists('pmpro_url') ? pmpro_url('login') : home_url('/login/');
+        $atts = shortcode_atts(['redirect' => $pmpro_login], $atts, 'logout_url');
         return esc_url(wp_logout_url($atts['redirect']));
+    }
+
+    /**
+     * Force redirect to PMPro login page upon logout.
+     *
+     * @return void
+     */
+    public function custom_logout_redirect(): void
+    {
+        $pmpro_login = function_exists('pmpro_url') ? pmpro_url('login') : home_url('/login/');
+        wp_safe_redirect($pmpro_login);
+        exit;
     }
 
     /**
      * Redirect users to the appropriate destination after login.
      *
-     * - Administrators → /wp-admin/
-     * - All other logged-in users → /dashboard/ (with /membership-account/ as fallback)
+     * - Administrators / manage_options → /wp-admin/
+     * - All other logged-in members → /dashboard/
      *
-     * @param string          $redirect_to The originally requested redirect URL.
-     * @param string          $request     The raw requested redirect URL.
-     * @param \WP_User|\WP_Error $user     The authenticated user object.
+     * @param string             $redirect_to The originally requested redirect URL.
+     * @param string             $request     The raw requested redirect URL.
+     * @param \WP_User|\WP_Error $user        The authenticated user object.
      * @return string Redirect destination URL.
      */
     public function custom_role_based_login_redirect(string $redirect_to, string $request, \WP_User|\WP_Error $user): string
     {
-        if (isset($user->roles) && is_array($user->roles)) {
-            if (in_array('administrator', $user->roles, true)) {
+        if ($user instanceof \WP_User) {
+            if (in_array('administrator', (array) $user->roles, true) || user_can($user, 'manage_options')) {
                 return admin_url();
             }
             return home_url('/dashboard/');
