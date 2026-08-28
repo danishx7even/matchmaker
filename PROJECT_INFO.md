@@ -3,13 +3,69 @@
 ## 1. Executive Summary & Overview
 The **Matchmaker Plugin** is a high-performance, tier-gated WordPress matchmaking engine designed for high-touch Islamic & matrimony platforms (specifically Arab Zawaj). It decouples frontend user interactions from intensive matching logic by utilizing **Action Scheduler** background processing, custom indexed SQL tables, WordPress **Heartbeat API** real-time polling, and an admin management portal.
 
+The plugin features a clean, layered architecture with PSR-4 autoloading (`src/`), a centralized Repository database layer (`MatchRepository`), dedicated Service domain classes, plain PHP template Views, and strict PHP 8.1+ typing.
+
 ---
 
-## 2. Database Schema & Architecture
+## 2. Directory & Component Structure (`src/`)
 
-All core matchmaker data is segregated from standard WordPress posts into three custom tables created via `DB_Migrator.php` (`dbDelta`):
+```
+matchmaker/
+├── matchmaker.php                           # Main plugin bootstrap & autoloader
+├── AGENTS.md
+├── PLAN.md
+├── BUILD_PLAN.md
+├── HISTORY.md
+├── Design.md
+├── PROJECT_BUILD.md
+├── PROJECT_INFO.md
+│
+├── src/                                     # PSR-4 Root Namespace: Matchmaker\
+│   ├── Repository/
+│   │   └── MatchRepository.php              # SINGLE DB AUTHORITY (all $wpdb calls live here)
+│   │
+│   ├── Service/
+│   │   ├── MatchService.php                 # Matching business rules, flexible scoring & responses
+│   │   ├── ProfileService.php               # Profile data assembly & URL helpers
+│   │   └── NotificationService.php          # Email dispatch, Heartbeat API & notifications
+│   │
+│   ├── Core/
+│   │   ├── DBMigrator.php                   # Database schema installer & dbDelta migration
+│   │   ├── MatchingEngine.php               # Async matching calculation & Action Scheduler jobs
+│   │   ├── PMProSync.php                    # PMPro level synchronization
+│   │   ├── FreeRegHandler.php               # Elementor Free Registration handler
+│   │   └── TestSeeder.php                   # Mock test data generator
+│   │
+│   ├── Frontend/
+│   │   ├── AuthController.php              # Auth redirects, PMPro login design & logout shortcode
+│   │   ├── FieldGenerator.php              # Matchmaking form HTML input generator primitives
+│   │   ├── FormController.php               # [matchmaking_form] & [matchmaking_field] shortcodes
+│   │   └── PortalController.php             # [matchmaker_member_portal] / [az_profile] shortcode
+│   │
+│   ├── Admin/
+│   │   └── AdminPortal.php                  # Admin dashboard menu, matches queue & settings
+│   │
+│   ├── View/                                # Pure PHP presentation template views
+│   │   └── frontend/
+│   │       └── portal/
+│   │           ├── portal.php               # Portal canvas & navigation
+│   │           ├── tab-profile.php          # Member profile tab
+│   │           └── tab-matches.php          # 5-step interactive matches flow
+│   │
+│   └── functions.php                        # Global helper wrappers (mm_enqueue_user_matching_job)
+│
+├── assets/
+│   ├── css/                                 # admin-matchmaker.css, member-portal.css, matchmaking-form.css
+│   └── js/                                  # admin-matchmaker.js, member-portal.js, matchmaking-form.js, phone-mask.js
+```
 
-### 2.1 Profile Criteria Table (`wp_matchmaking_pool`)
+---
+
+## 3. Database Schema & Architecture
+
+All core matchmaker data is segregated from standard WordPress posts into three custom tables created via `DBMigrator.php` (`dbDelta`):
+
+### 3.1 Profile Criteria Table (`wp_matchmaking_pool`)
 Stores normalized matching criteria for instant SQL indexing without `wp_usermeta` key-value JOIN overhead.
 - `user_id` (PK): User ID.
 - `gender` / `pref_gender`: `'male'` | `'female'`.
@@ -23,7 +79,7 @@ Stores normalized matching criteria for instant SQL indexing without `wp_usermet
 - `user_type`: Tier classification (`'monthly'`, `'one_on_one'`, `'free'`, `'event'`).
 - `is_active`: Binary active status (`1` or `0`).
 
-### 2.2 Matches Table (`wp_matches`)
+### 3.2 Matches Table (`wp_matches`)
 Tracks generated candidate pairs, approval lifecycle, and mutual responses.
 - `id` (PK): Match ID.
 - `user_one_id` / `user_two_id`: Member IDs enforcing canonical ordering ($\min(\text{ID}_A, \text{ID}_B) = \text{user\_one\_id}$, $\max(\text{ID}_A, \text{ID}_B) = \text{user\_two\_id}$).
@@ -35,10 +91,10 @@ Tracks generated candidate pairs, approval lifecycle, and mutual responses.
   - `matched`: Mutual acceptance (both users accepted).
   - `rejected`: Declined by one or both users, or auto-expired after 7 days.
 - `user_one_response` / `user_two_response`: `'pending'`, `'accepted'`, `'rejected'`.
-- `score`: Dynamic bi-directional compatibility score ($0 - 100$).
+- `score`: Dynamic bi-directional compatibility score ($0 - 6$).
 - `contact_revealed`: `1` if mutual match achieved and contact info revealed.
 
-### 2.3 Persistent Notifications Table (`wp_matchmaker_notifications`)
+### 3.3 Persistent Notifications Table (`wp_matchmaker_notifications`)
 Logs user-specific notifications for instant toast popups and unread badge counters.
 - `id` (PK): Notification ID.
 - `user_id`: Target recipient member ID.
@@ -49,7 +105,7 @@ Logs user-specific notifications for instant toast popups and unread badge count
 
 ---
 
-## 3. End-to-End Operational Lifecycle & Flow
+## 4. End-to-End Operational Lifecycle & Flow
 
 ```
 [ User Registration / Questionnaire ]
@@ -67,7 +123,7 @@ Logs user-specific notifications for instant toast popups and unread badge count
 [ 4. Insert Candidate Pairs into wp_matches (status = pending_review) ]
                   │
                   ▼
-[ 5. Admin Portal Review (Matchmaking -> Admin Review) ]
+[ 5. Admin Portal Review (Matchmaking -> Candidate Pool / Matches) ]
          ┌────────┴────────┐
   (Approve)             (Reject)
          │                 │
@@ -77,7 +133,7 @@ Logs user-specific notifications for instant toast popups and unread badge count
   = approved ]
          │
          ├───> [ Insert row in wp_matchmaker_notifications ]
-         └───> [ Dispatch Email Alerts via WP Mail & Rich Editor ]
+         └───> [ Dispatch Email Alerts via WP Mail ]
          │
          ▼
 [ 6. Member Portal Dashboard ([matchmaker_member_portal]) ]
@@ -88,47 +144,40 @@ Logs user-specific notifications for instant toast popups and unread badge count
 [ 7. 5-State Interactive Match Flow ]
   ├── State 1: New Match Discovery Card (Countdown Timer)
   ├── State 2: Full Profile Review + Floating Action Dock
-  ├── State 3: Response Submitted (Accepted / Declined)
+  ├── State 3: Response Submitted (Accepted / Declined - Dynamic Status)
   ├── State 4: Decline Confirmation Modal
   └── State 5: Mutual Match Revealed (Contact Details Unveiled)
 ```
 
 ---
 
-## 4. Subsystem Detailed Breakdown
+## 5. Subsystem Detailed Breakdown
 
-### 4.1 Tier System & Billing Quotas (Paid Memberships Pro)
-- Managed via `PMPro_Sync.php` listening to `pmpro_after_change_membership_level`.
-- **Free (`free`) & Event (`event`)**: Upsell banner shown on dashboard; matching engine bypassed.
-- **Monthly Matchmaker (`monthly`) & 1-on-1 (`one_on_one`)**: Full access to matching queue up to **10 approved matches per cycle**.
-- Admin approval increments `cycle_matches_count` in user meta. If count reaches 10, admin approval is gated until cycle renewal.
+### 5.1 Repository Layer (`MatchRepository.php`)
+- **Single Authority**: Centralizes all database transactions (`$wpdb`) and raw meta accesses.
+- Enforces canonical pair ordering, user pool upserts, meta blocks, match statistics, and raw searches.
 
-### 4.2 Async Matching Engine (`Matching_Engine.php`)
-- Submitted questionnaires enqueue an asynchronous task via `as_enqueue_async_action('mm_run_async_matching_job', [$user_id])`.
-- **Daily Queue Worker**: `mm_daily_check_weekly_matching_queue` scans for idle active members ($\ge 7$ days without new matches).
-- **Auto-Expiration Worker**: Unanswered approved matches auto-expire after 7 days ($168$ hours), setting `status = 'rejected'`.
+### 5.2 Service Layer (`MatchService`, `ProfileService`, `NotificationService`)
+- Encapsulates domain business rules.
+- Computes 6-point flexible scoring (Origin, Languages, Height, Job, Smoking, Drinking).
+- Manages user tier routing (`monthly`, `one_on_one`, `free`, `event`).
+- Dispatches approval emails with dynamic template placeholders (`{user_name}`, `{candidate_name}`, `{candidate_age}`, `{candidate_location}`, `{dashboard_url}`).
 
-### 4.3 Admin Portal (`Admin_Portal.php`)
-- Custom admin dashboard under **Matchmaking** top-level menu (`priority 30`).
-- Features match approval queue, manual match creation, criteria search, and **Email Settings** with WordPress rich text editor (`wp_editor`) supporting dynamic placeholders (`{user_name}`, `{candidate_name}`, `{candidate_age}`, `{candidate_location}`, `{dashboard_url}`).
+### 5.3 Member Dashboard & 5-State UI (`PortalController.php`, `View/frontend/portal/`)
+- Enqueued via shortcodes `[matchmaker_member_portal]` and `[az_profile]`.
+- Renders rounded user photo image instead of Gravatar.
+- Displays dynamic status for both "Your Response" and "Their Response" in Step 3.
+- Event listeners for tab switching, match navigation, and AJAX actions.
 
-### 4.4 Heartbeat API & Notification Manager (`Notification_Manager.php`)
-- Configures 15-second Heartbeat polling on `/dashboard/`.
-- Client pulse sends `mm_poll_notifications: true`.
-- Server queries `wp_matchmaker_notifications` for `is_read = 0` for the current user.
-- Returning or active members instantly see top-right slide-out toast alerts (`#mm-toast-box`) and header bell badge updates.
-- Viewing a match or opening the Matches tab triggers `wp_ajax_mm_mark_notifications_read` AJAX request, updating `is_read = 1` and flushing transients.
-
-### 4.5 Member Dashboard & 5-State UI (`Match_Flow_Handler.php`, `member-portal.css`, `member-portal.js`)
-- Enqueued via shortcode `[matchmaker_member_portal]`.
-- Top navigation bar featuring `<button>` elements with `all: unset !important` theme overrides to prevent theme CSS pollution.
-- Interactive 5-state step navigation for candidate review, detailed meta grid, lifestyle pills, match countdown timers, decline confirmation modals, and mutual contact unveiling.
+### 5.4 Admin Portal (`AdminPortal.php`)
+- Custom admin dashboard under **Matchmaking** top-level menu.
+- Lists candidate pool with search/filter capabilities, approval queue, manual matchmaker, settings, and shortcode documentation.
 
 ---
 
-## 5. Security & Performance Rules
-1. **PHP 8.1 Strict Types**: All PHP files declare `declare(strict_types=1);`.
-2. **Prepared Queries**: Every SQL call uses `$wpdb->prepare()`.
-3. **Nonces**: AJAX requests validated with `wp_verify_nonce($nonce, 'mm_portal_nonce')`.
+## 6. Security & Coding Guidelines
+1. **Strict Typing**: `declare(strict_types=1);` on all PHP files.
+2. **Prepared Queries**: All SQL execution isolated in `MatchRepository.php` with `$wpdb->prepare()`.
+3. **Nonces**: Validated for all AJAX (`mm_portal_nonce`) and admin actions (`_wpnonce`).
 4. **No Direct CPT Bloat**: Matching data kept strictly in custom indexed tables.
-5. **No Full-Table Scans on HTTP**: Async background execution guarantees sub-50ms HTTP form submission responses.
+5. **No Full-Table Scans on HTTP**: Async background execution via Action Scheduler guarantees sub-50ms HTTP form submission responses.

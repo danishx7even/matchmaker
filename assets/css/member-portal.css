@@ -20,17 +20,34 @@
     --danger-border: #D93025;
 }
 
+  a {
+    box-shadow: none !important;
+   }
+
 .mm-portal-canvas {
     width: 100%;
     max-width: 1100px;
     margin: 30px auto;
-    background: var(--white);
+    background: #ffffff !important;
     border-radius: 36px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.04);
     overflow: hidden;
     position: relative;
     font-family: 'Inter', sans-serif;
     color: var(--text-dark);
+}
+
+.portal-tab-panel {
+    background: #ffffff !important;
+}
+
+.mm-flow-container {
+    background: #ffffff !important;
+    border-radius: 24px;
+    border: 1px solid #ece7de;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
+    margin: 24px 32px 32px;
+    overflow: hidden;
 }
 
 /* Typography */
@@ -372,6 +389,7 @@
 .view-state.active { display: block; }
 
 .dashboard-body {
+    background: #ffffff !important;
     padding: 36px 48px;
 }
 
@@ -525,7 +543,7 @@
 
 .btn-primary {
     background-color: var(--primary);
-    color: var(--white);
+    color: var(--white) !important;
 }
 
 .btn-primary:hover {
@@ -845,6 +863,12 @@
     font-size: 13px;
 }
 
+.res-tag-declined {
+    color: var(--danger-icon);
+    font-weight: 600;
+    font-size: 13px;
+}
+
 .res-tag-waiting {
     color: var(--text-muted);
     font-size: 13px;
@@ -950,6 +974,11 @@
 .mm-upsell-card {
     text-align: center;
     padding: 48px 30px;
+}
+
+.az-card.mm-upsell-card.profile-card {
+    border: none;
+    padding: 20px;
 }
 
 .mm-upsell-badge {

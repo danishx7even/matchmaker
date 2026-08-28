@@ -1,12 +1,18 @@
 <?php
 declare(strict_types=1);
-namespace Matchmaker;
+
+namespace Matchmaker\Core;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class DB_Migrator {
+/**
+ * Class DBMigrator
+ *
+ * Handles database schema creation and migration for the matchmaking tables.
+ */
+class DBMigrator {
     private static ?self $instance = null;
 
     public static function instance(): self
@@ -33,7 +39,7 @@ class DB_Migrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.1.0';
+        $new_version = '2.2.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -96,7 +102,7 @@ class DB_Migrator {
             user_one_id bigint(20) unsigned NOT NULL,
             user_two_id bigint(20) unsigned NOT NULL,
             initiator_user_id bigint(20) unsigned NOT NULL,
-            status enum('pending_review','approved','admin_rejected','matched','rejected') NOT NULL DEFAULT 'pending_review',
+            status enum('pending_review','approved','admin_rejected','matched','rejected','expired') NOT NULL DEFAULT 'pending_review',
             user_one_response enum('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
             user_two_response enum('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
             match_source enum('auto','manual') NOT NULL DEFAULT 'auto',
@@ -131,6 +137,11 @@ class DB_Migrator {
         dbDelta($sql_pool);
         dbDelta($sql_matches);
         dbDelta($sql_notifications);
+
+        // Direct schema patch: dbDelta does NOT modify existing ENUM definitions
+        $wpdb->query(
+            "ALTER TABLE {$matches_table} MODIFY COLUMN status ENUM('pending_review','approved','admin_rejected','matched','rejected','expired') NOT NULL DEFAULT 'pending_review'"
+        );
 
         update_option($option_name, $new_version);
         // Maintain legacy numeric option for older code/tests expecting this.

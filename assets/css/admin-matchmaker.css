@@ -3,6 +3,10 @@
    Loaded on matchmaking-pool and matchmaking-matches pages
    ============================================================= */
 
+   a {
+    box-shadow: none !important;
+   }
+
 .mm-admin-wrap {
     margin-top: 20px;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

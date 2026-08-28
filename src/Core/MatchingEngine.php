@@ -1,19 +1,20 @@
 <?php
 declare(strict_types=1);
-namespace Matchmaker;
+
+namespace Matchmaker\Core;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
 /**
- * Class Matching_Engine
+ * Class MatchingEngine
  *
  * Handles asynchronous bi-directional matchmaking via Action Scheduler.
  *
  * Triggers:
  *   - form_submit / form_update  : fired by Form_Handler after profile save
- *   - tier_upgrade               : fired by PMPro_Sync on membership upgrade
+ *   - tier_upgrade               : fired by PMProSync on membership upgrade
  *   - admin_manual_trigger       : fired from Admin_Portal for any user type
  *   - weekly_recurring           : fired by the weekly idle-user cron
  *
@@ -23,22 +24,25 @@ if (!defined('ABSPATH')) {
  * Flexible scoring (1 pt each, max 6):
  *   origin match, language overlap, height in range, job provided, smoking pref, drinking pref
  */
-class Matching_Engine {
+class MatchingEngine {
 
     private static ?self $instance = null;
 
     /** Action Scheduler hook for the per-user matching job. */
-    const AS_MATCH_ACTION = 'mm_run_async_matching_job';
+    public const AS_MATCH_ACTION = 'mm_run_async_matching_job';
 
     /** Action Scheduler hook for the weekly idle-user cron. */
-    const AS_WEEKLY_ACTION = 'mm_daily_check_weekly_matching_queue';
+    public const AS_WEEKLY_ACTION = 'mm_daily_check_weekly_matching_queue';
 
     /** How many idle days before the weekly cron re-queues a monthly user. */
-    const IDLE_DAYS = 7;
+    public const IDLE_DAYS = 7;
 
     /** Maximum candidates to insert per matching run. */
-    const MAX_CANDIDATES = 10;
+    public const MAX_CANDIDATES = 10;
 
+    /**
+     * @return self
+     */
     public static function instance(): self
     {
         if (self::$instance === null) {
@@ -115,6 +119,7 @@ class Matching_Engine {
      *
      * @param mixed $user_id  The user to run matching for (cast to int).
      * @param mixed $trigger  Context string (cast to string).
+     * @throws \Exception
      */
     public function handle_as_matching_job(mixed $user_id, mixed $trigger = 'auto'): void
     {
@@ -134,42 +139,24 @@ class Matching_Engine {
     // -------------------------------------------------------------------------
 
     /**
+     * Checks the queue for idle users and auto-expires old matches.
+     * 
+     * @throws \Exception
+     */
     public function check_weekly_queue(): void
     {
         global $wpdb;
 
-        $pool_table        = $wpdb->prefix . 'matchmaking_pool';
-        $matches_table     = $wpdb->prefix . 'matches';
-        $recurrence_days   = (int) get_option('mm_auto_match_recurrence_days', self::IDLE_DAYS);
+        $pool_table      = $wpdb->prefix . 'matchmaking_pool';
+        $recurrence_days = (int) get_option('mm_auto_match_recurrence_days', self::IDLE_DAYS);
         if ($recurrence_days < 1) {
             $recurrence_days = 7;
         }
 
-        $cutoff            = gmdate('Y-m-d H:i:s', strtotime('-' . $recurrence_days . ' days'));
-        $expiration_cutoff = gmdate('Y-m-d H:i:s', strtotime('-7 days'));
+        $cutoff = gmdate('Y-m-d H:i:s', strtotime('-' . $recurrence_days . ' days'));
 
-        // 1. Auto-expire unanswered matches > 7 days old
-        $wpdb->query(
-            $wpdb->prepare(
-                "UPDATE {$matches_table}
-                 SET user_one_response = 'rejected', status = 'rejected'
-                 WHERE status IN ('pending_review', 'approved')
-                   AND user_one_response = 'pending'
-                   AND created_at < %s",
-                $expiration_cutoff
-            )
-        );
-
-        $wpdb->query(
-            $wpdb->prepare(
-                "UPDATE {$matches_table}
-                 SET user_two_response = 'rejected', status = 'rejected'
-                 WHERE status IN ('pending_review', 'approved')
-                   AND user_two_response = 'pending'
-                   AND created_at < %s",
-                $expiration_cutoff
-            )
-        );
+        // 1. Auto-expire unanswered approved matches > 7 days old and send email alerts to admin
+        \Matchmaker\Repository\MatchRepository::instance()->check_7day_match_expirations();
 
         $sql = $wpdb->prepare(
             "SELECT p.user_id
@@ -217,30 +204,31 @@ class Matching_Engine {
      *
      * @param int    $user_id
      * @param string $trigger
+     * @throws \Exception
      */
     public function run_matching_for_user(int $user_id, string $trigger): void
     {
-        global $wpdb;
-        $pool_table = $wpdb->prefix . 'matchmaking_pool';
-
         // 1. Load the user's pool row.
-        $user = $wpdb->get_row(
-            $wpdb->prepare("SELECT * FROM {$pool_table} WHERE user_id = %d AND is_active = 1", $user_id),
-            ARRAY_A
-        );
+        $user = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
 
         if (empty($user)) {
             error_log("[Matchmaker] run_matching_for_user: user #{$user_id} not found or inactive in pool.");
             return;
         }
 
-        // 2. Tier gate — only monthly users get auto-matching UNLESS admin triggers it.
-        if ($trigger !== 'admin_manual_trigger' && $user['user_type'] !== 'monthly') {
+        // 2. Tier gate — only paid users (monthly / 1-on-1) get auto-matching UNLESS admin triggers it.
+        if ($trigger !== 'admin_manual_trigger' && !in_array($user['user_type'], ['monthly', 'one_on_one'], true)) {
             error_log("[Matchmaker] Skipping user #{$user_id} — user_type={$user['user_type']}, trigger={$trigger}.");
             return;
         }
 
-        // 3. Compute user's current age.
+        // 3. Mutual match gate — if user already has an accepted mutual match this month, skip generating more matches.
+        if (\Matchmaker\Repository\MatchRepository::instance()->has_mutual_match_this_month($user_id)) {
+            error_log("[Matchmaker] Skipping user #{$user_id} — user already has a mutually accepted match this month.");
+            return;
+        }
+
+        // 4. Compute user's current age.
         $user_age = (int) (new \DateTime())->diff(new \DateTime($user['birth_date']))->y;
 
         // 4. Run the bi-directional hard-gate SQL query.
@@ -248,7 +236,7 @@ class Matching_Engine {
 
         if (empty($candidates)) {
             error_log("[Matchmaker] user #{$user_id}: no qualifying candidates found.");
-            update_user_meta($user_id, 'mm_last_match_run', current_time('mysql'));
+            \Matchmaker\Repository\MatchRepository::instance()->set_last_match_run($user_id);
             return;
         }
 
@@ -267,7 +255,7 @@ class Matching_Engine {
         $inserted = 0;
         foreach ($top as $entry) {
             $candidate_id = (int) $entry['row']['user_id'];
-            $score        = $entry['score'];
+            $score        = (int) $entry['score'];
             $success      = $this->insert_match_pair($user_id, $candidate_id, $score);
             if ($success) {
                 $inserted++;
@@ -275,7 +263,7 @@ class Matching_Engine {
         }
 
         // 8. Record the last run timestamp.
-        update_user_meta($user_id, 'mm_last_match_run', current_time('mysql'));
+        \Matchmaker\Repository\MatchRepository::instance()->set_last_match_run($user_id);
 
         error_log("[Matchmaker] user #{$user_id} (trigger={$trigger}): {$inserted} new pairs inserted from " . count($candidates) . " qualifying candidates.");
     }
@@ -360,6 +348,14 @@ class Matching_Engine {
                    SELECT 1 FROM {$matches_table} m
                    WHERE m.user_one_id = LEAST(%d, c.user_id)
                      AND m.user_two_id = GREATEST(%d, c.user_id)
+               )
+
+               -- Exclude candidates who already have a mutually accepted match this month
+               AND NOT EXISTS (
+                   SELECT 1 FROM {$matches_table} m2
+                   WHERE (m2.user_one_id = c.user_id OR m2.user_two_id = c.user_id)
+                     AND m2.status = 'matched'
+                     AND m2.updated_at >= %s
                )",
             $user_id,
             $pref_gender,
@@ -374,7 +370,8 @@ class Matching_Engine {
             $user_modesty,
             $pref_modesty, $pref_modesty, $pref_modesty,
             $user_id,
-            $user_id
+            $user_id,
+            gmdate('Y-m-01 00:00:00')
         );
 
         return $wpdb->get_results($sql, ARRAY_A) ?: [];
@@ -476,7 +473,7 @@ class Matching_Engine {
     // -------------------------------------------------------------------------
 
     /**
-     * Insert a canonical pair into wp_matches using INSERT IGNORE.
+     * Insert a canonical pair into wp_matches using MatchRepository.
      *
      * Canonical ordering: user_one_id = LEAST(A,B), user_two_id = GREATEST(A,B)
      * Quota ownership:    initiator_user_id = the user whose job triggered this run.
@@ -488,25 +485,13 @@ class Matching_Engine {
      */
     private function insert_match_pair(int $user_id, int $candidate_id, int $score): bool
     {
-        global $wpdb;
-
-        $matches_table = $wpdb->prefix . 'matches';
-        $user_one_id   = min($user_id, $candidate_id);
-        $user_two_id   = max($user_id, $candidate_id);
-
-        $sql = $wpdb->prepare(
-            "INSERT IGNORE INTO {$matches_table}
-                (user_one_id, user_two_id, initiator_user_id, status, match_source, score)
-             VALUES (%d, %d, %d, 'pending_review', 'auto', %d)",
-            $user_one_id,
-            $user_two_id,
+        return \Matchmaker\Repository\MatchRepository::instance()->create_match(
             $user_id,
+            $candidate_id,
+            $user_id,
+            'pending_review',
+            'auto',
             $score
         );
-
-        $result = $wpdb->query($sql);
-
-        // query() returns number of affected rows (1 = inserted, 0 = ignored by IGNORE clause).
-        return $result === 1;
     }
 }

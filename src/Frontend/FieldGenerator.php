@@ -1,14 +1,25 @@
 <?php
 declare(strict_types=1);
-namespace Matchmaker;
+
+namespace Matchmaker\Frontend;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class Field_Generator {
+/**
+ * Class FieldGenerator
+ *
+ * Generates form fields for matchmaking forms.
+ */
+class FieldGenerator {
     private static ?self $instance = null;
 
+    /**
+     * Get singleton instance
+     *
+     * @return self
+     */
     public static function instance(): self
     {
         if (self::$instance === null) {
@@ -21,19 +32,95 @@ class Field_Generator {
     {
     }
 
-    /* Options lists (copied from legacy) */
+    /**
+     * Get location options
+     *
+     * @return array
+     */
     public function options_location(): array { return ['Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'Jordan', 'Lebanon', 'Egypt', 'Iraq', 'Syria', 'Palestine', 'Yemen', 'United States', 'Canada', 'United Kingdom', 'Australia', 'Pakistan', 'India', 'Any Location', 'Other']; }
+    
+    /**
+     * Get citizenship options
+     *
+     * @return array
+     */
     public function options_citizenship(): array { return ['Select', 'Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'Jordan', 'Lebanon', 'Egypt', 'Iraq', 'Syria', 'Palestine', 'Yemen', 'United States', 'Canada', 'United Kingdom', 'Australia', 'Pakistan', 'India', 'Bangladesh', 'Other']; }
+    
+    /**
+     * Get origin options
+     *
+     * @return array
+     */
     public function options_origin(): array { return ['Arab', 'South Asian', 'Middle Eastern', 'North African', 'African', 'European', 'North American', 'South American', 'Central American', 'Caribbean', 'Central Asian', 'Southeast Asian', 'East Asian', 'Australian / Oceanian', 'Other']; }
+    
+    /**
+     * Get religion options
+     *
+     * @return array
+     */
     public function options_religion(): array { return ['Islam', 'Christianity', 'Judaism', 'Hinduism', 'Sikhism', 'Buddhism', 'Other', 'Prefer not to say']; }
+    
+    /**
+     * Get marital status options
+     *
+     * @return array
+     */
     public function options_marital(): array { return ['Select status', 'Never Married', 'Divorced', 'Widowed', 'Separated', 'Annulled']; }
+    
+    /**
+     * Get children options
+     *
+     * @return array
+     */
     public function options_children(): array { return ['Select status', 'Yes', 'No']; }
+    
+    /**
+     * Get modesty options
+     *
+     * @return array
+     */
     public function options_modesty(): array { return ['Select preference', 'Modest', 'Hijab', 'No Hijab', 'Sometimes', 'Niqab', 'Prefer not to say']; }
+    
+    /**
+     * Get drinking options
+     *
+     * @return array
+     */
     public function options_drinking(): array { return ['Select preference', 'Yes', 'No', 'Occasionally', 'Prefer not to say']; }
+    
+    /**
+     * Get smoking options
+     *
+     * @return array
+     */
     public function options_smoking(): array { return ['Select preference', 'Non-Smoker', 'Occasional Smoker', 'Regular Smoker', 'Former Smoker', 'Prefer not to say']; }
+    
+    /**
+     * Get prayer options
+     *
+     * @return array
+     */
     public function options_prayer(): array { return ['Select preference', 'Pray 5 Times a Day', 'Pray Regularly', 'Pray Occasionally', 'Rarely Pray', 'Do Not Pray', 'Prefer not to say']; }
+    
+    /**
+     * Get education options
+     *
+     * @return array
+     */
     public function options_education(): array { return ['Select education', 'High School', 'Some College', 'Associate Degree', "Bachelor's Degree", "Master's Degree", 'Doctorate (PhD)', 'Professional Degree', 'Other']; }
+    
+    /**
+     * Get income options
+     *
+     * @return array
+     */
     public function options_income(): array { return ['Select range', 'Prefer not to say', 'SAR 5,000 – 7,499', 'SAR 7,500 – 9,999', 'SAR 10,000 – 12,499', 'SAR 12,500 – 14,999', 'SAR 15,000 – 19,999', 'SAR 20,000 – 24,999', 'SAR 25,000 – 29,999', 'SAR 30,000 – 39,999', 'SAR 40,000 – 49,999', 'SAR 50,000+']; }
+    
+    /**
+     * Get height options
+     *
+     * @return array
+     */
     public function options_height(): array {
         return [
             '4\'6" (137 cm)', '4\'7" (140 cm)', '4\'8" (142 cm)', '4\'9" (145 cm)', '4\'10" (147 cm)', '4\'11" (150 cm)',
@@ -43,6 +130,12 @@ class Field_Generator {
             '6\'6" (198 cm)', '6\'7" (201 cm)', '6\'8" (203 cm) or taller',
         ];
     }
+    
+    /**
+     * Get age options
+     *
+     * @return array
+     */
     public function options_age(): array { $out = []; for ($a = 18; $a <= 80; $a++) { $out[] = (string)$a; } return $out; }
 
     /* Low-level render primitives — return HTML strings */
@@ -160,6 +253,12 @@ class Field_Generator {
         return $html;
     }
 
+    /**
+     * Get SVG icon by name
+     *
+     * @param string $name Icon name
+     * @return string
+     */
     public function icon(string $name): string {
         $icons = [
             'user'   => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1.5-4 4-6 7.5-6s6 2 7.5 6"/></svg>',
@@ -173,6 +272,15 @@ class Field_Generator {
         return $icons[$name] ?? '';
     }
 
+    /**
+     * Open a form section
+     *
+     * @param string $icon Icon name
+     * @param string $title Section title
+     * @param string $subtitle Optional subtitle
+     * @param string $extra_class Optional extra class
+     * @return string
+     */
     public function section_open(string $icon, string $title, string $subtitle = '', string $extra_class = ''): string {
         $html = '<div class="form-section' . ($extra_class ? ' ' . esc_attr($extra_class) : '') . '">';
         $html .= '<div class="form-section-title">';
@@ -183,9 +291,20 @@ class Field_Generator {
         return $html;
     }
 
+    /**
+     * Close a form section
+     *
+     * @return string
+     */
     public function section_close(): string { return '</div></div>'; }
 
-    /* Render a single named field using configurations copied from legacy */
+    /**
+     * Render a single field by name
+     *
+     * @param string $name Field name
+     * @param array $values Current values array
+     * @return string
+     */
     public function render_single_field(string $name, array $values = []): string {
         $val = $values[$name] ?? '';
 
@@ -283,10 +402,13 @@ class Field_Generator {
         return $html;
     }
 
-    /* Assets printing (returns string) */
+    /**
+     * Print required inline assets for fields
+     *
+     * @return string
+     */
     public function print_assets(): string
     {
-        // For brevity reuse a minimal subset of styles and scripts from legacy
         ob_start();
         ?>
 <style>

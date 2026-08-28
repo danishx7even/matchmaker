@@ -1,26 +1,28 @@
 <?php
 declare(strict_types=1);
-namespace Matchmaker;
+namespace Matchmaker\Frontend;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
 /**
- * Class Form_Handler
+ * Class FormController
  *
  * Registers [matchmaking_form] and [matchmaking_field] shortcodes.
  * Handles the wp_ajax_mmf_submit_form AJAX endpoint.
  * Conditionally enqueues assets only on pages that contain the shortcode.
  */
-class Form_Handler {
+class FormController {
 
     private static ?self $instance = null;
-    private Field_Generator $fg;
+    private FieldGenerator $fg;
 
-    /* -------------------------------------------------------
-       Singleton
-    ------------------------------------------------------- */
+    /**
+     * Get singleton instance
+     *
+     * @return self
+     */
     public static function instance(): self
     {
         if (self::$instance === null) {
@@ -31,10 +33,15 @@ class Form_Handler {
 
     private function __construct()
     {
-        $this->fg = Field_Generator::instance();
+        $this->fg = FieldGenerator::instance();
         $this->boot();
     }
 
+    /**
+     * Initialize hooks
+     *
+     * @return void
+     */
     private function boot(): void
     {
         add_shortcode('matchmaking_form',  [$this, 'render_form']);
@@ -48,9 +55,11 @@ class Form_Handler {
         add_action('wp_enqueue_scripts', [$this, 'maybe_enqueue_assets']);
     }
 
-    /* -------------------------------------------------------
-       Asset Enqueue (only on pages that have the shortcode)
-    ------------------------------------------------------- */
+    /**
+     * Asset Enqueue (only on pages that have the shortcode)
+     *
+     * @return void
+     */
     public function maybe_enqueue_assets(): void
     {
         global $post;
@@ -67,8 +76,8 @@ class Form_Handler {
             return;
         }
 
-        $plugin_url = plugin_dir_url(dirname(__FILE__));
-        $version    = defined('MM_VERSION') ? MM_VERSION : '1.0.0';
+        $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
+        $version    = defined('MM_VERSION') ? MM_VERSION : '2.0.0';
 
         wp_enqueue_style(
             'mm-form-styles',
@@ -92,9 +101,12 @@ class Form_Handler {
         ]);
     }
 
-    /* -------------------------------------------------------
-       Data Hydration — pull saved values for pre-filling form
-    ------------------------------------------------------- */
+    /**
+     * Data Hydration — pull saved values for pre-filling form
+     *
+     * @param int $user_id
+     * @return array
+     */
     private function get_user_form_values(int $user_id): array
     {
         $values = [];
@@ -108,12 +120,7 @@ class Form_Handler {
             $values['email']     = $current_user->user_email;
         }
 
-        global $wpdb;
-        $pool_table = $wpdb->prefix . 'matchmaking_pool';
-        $pool = $wpdb->get_row(
-            $wpdb->prepare("SELECT * FROM {$pool_table} WHERE user_id = %d", $user_id),
-            ARRAY_A
-        );
+        $pool = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
 
         if ($pool) {
             $values['user_gender']          = !empty($pool['gender'])      ? ucfirst($pool['gender'])      : '';
@@ -160,7 +167,7 @@ class Form_Handler {
         ];
 
         foreach ($meta_keys as $k) {
-            $meta_val = get_user_meta($user_id, $k, true);
+            $meta_val = \Matchmaker\Repository\MatchRepository::instance()->get_meta($user_id, $k, true);
             if ($meta_val !== '') {
                 $values[$k] = $meta_val;
             }
@@ -169,9 +176,12 @@ class Form_Handler {
         return $values;
     }
 
-    /* -------------------------------------------------------
-       Shortcode: [matchmaking_form]
-    ------------------------------------------------------- */
+    /**
+     * Shortcode: [matchmaking_form]
+     *
+     * @param array|string $atts Shortcode attributes
+     * @return string
+     */
     public function render_form(array|string $atts = []): string
     {
         if (!is_user_logged_in()) {
@@ -342,9 +352,12 @@ class Form_Handler {
         return (string) ob_get_clean();
     }
 
-    /* -------------------------------------------------------
-       Shortcode: [matchmaking_field name="field_name"]
-    ------------------------------------------------------- */
+    /**
+     * Shortcode: [matchmaking_field name="field_name"]
+     *
+     * @param array|string $atts Shortcode attributes
+     * @return string
+     */
     public function render_standalone_field(array|string $atts = []): string
     {
         $atts = shortcode_atts(['name' => ''], $atts, 'matchmaking_field');
@@ -366,9 +379,11 @@ class Form_Handler {
             . '</div>';
     }
 
-    /* -------------------------------------------------------
-       AJAX: wp_ajax_mmf_submit_form
-    ------------------------------------------------------- */
+    /**
+     * AJAX: wp_ajax_mmf_submit_form
+     *
+     * @return void
+     */
     public function handle_ajax(): void
     {
         // 1. Nonce verification
@@ -436,8 +451,8 @@ class Form_Handler {
         };
 
         // 5. Resolve user_type from PMPro or usermeta
-        $user_type = class_exists('\Matchmaker\PMPro_Sync')
-            ? PMPro_Sync::instance()->get_current_user_type($user_id)
+        $user_type = class_exists('\Matchmaker\Core\PMProSync')
+            ? \Matchmaker\Core\PMProSync::instance()->get_current_user_type($user_id)
             : (string) get_user_meta($user_id, 'user_type', true);
 
         if (!in_array($user_type, ['monthly', 'one_on_one', 'free', 'event'], true)) {
@@ -480,16 +495,11 @@ class Form_Handler {
             'is_active'            => 1,
         ];
 
-        // 7. Upsert pool record
-        global $wpdb;
-        $pool_table = $wpdb->prefix . 'matchmaking_pool';
+        // 7. Check if user is updating an existing profile (vs filling for the first time)
+        $existing_pool      = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
+        $is_update_profile  = !empty($existing_pool) && !empty($existing_pool['gender']);
 
-        $inserted = $wpdb->replace(
-            $pool_table,
-            $pool_payload,
-            ['%d', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s',
-             '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d']
-        );
+        $inserted = \Matchmaker\Repository\MatchRepository::instance()->upsert_pool($pool_payload);
 
         if ($inserted === false) {
             wp_send_json_error(['message' => __('Database error while updating match pool. Please try again.', 'matchmaker')]);
@@ -522,9 +532,7 @@ class Form_Handler {
             'pref_additional_info'=> sanitize_textarea_field((string) ($f['pref_additional_info'] ?? '')),
         ];
 
-        foreach ($meta_map as $mk => $mv) {
-            update_user_meta($user_id, $mk, $mv);
-        }
+        \Matchmaker\Repository\MatchRepository::instance()->save_meta_block($user_id, $meta_map);
 
         // 10. Handle photo uploads via WP Media Library
         if (!empty($_FILES['form_fields']) && is_array($_FILES['form_fields']['name'] ?? null)) {
@@ -578,12 +586,18 @@ class Form_Handler {
             }
         }
 
-        wp_send_json_success([
+        $response_data = [
             'message' => sprintf(
                 /* translators: %s: user's full name */
                 __('Thank you, %s! Your matchmaking profile has been saved successfully.', 'matchmaker'),
                 esc_html($full_name)
             ),
-        ]);
+        ];
+
+        if ($is_update_profile) {
+            $response_data['redirect_url'] = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
+        }
+
+        wp_send_json_success($response_data);
     }
 }

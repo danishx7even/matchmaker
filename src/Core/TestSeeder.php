@@ -1,19 +1,25 @@
 <?php
 declare(strict_types=1);
-namespace Matchmaker;
+
+namespace Matchmaker\Core;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
 /**
- * Class Test_Seeder
+ * Class TestSeeder
  *
  * Creates 10 test users across various tiers (monthly, 1-on-1, free, event),
  * populates their matchmaking pool profiles & usermeta, and executes auto-matching for monthly users.
+ *
+ * @internal Dev-only.
  */
-class Test_Seeder {
+class TestSeeder {
 
+    /**
+     * @return array
+     */
     public static function run(): array
     {
         global $wpdb;
@@ -491,7 +497,9 @@ class Test_Seeder {
 
             // 3. Trigger auto-matching ONLY for monthly users on profile creation
             if ($data['user_type'] === 'monthly') {
-                Matching_Engine::instance()->run_matching_for_user($user_id, 'form_submit');
+                if (function_exists('mm_enqueue_user_matching_job')) {
+                    mm_enqueue_user_matching_job($user_id, 'form_submit');
+                }
             }
 
             $created_users[] = [

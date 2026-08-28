@@ -3,6 +3,10 @@
    Loaded conditionally only on pages containing [matchmaking_form]
    ============================================================= */
 
+   a {
+    box-shadow: none !important;
+   }
+
 #matchmaking_form .form-section{width:100%;box-sizing:border-box;display:block;background:#ffffff;border:1px solid #e8ded0;border-radius:14px;padding:26px 28px;margin-bottom:22px;}
 #matchmaking_form .form-section-title{letter-spacing:1.5px;text-transform:uppercase;color:#2e2e2e;margin:0 0 6px 0;display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;}
 #matchmaking_form .section-icon{display:inline-flex;width:17px;height:17px;color:#a8895a;flex-shrink:0;}

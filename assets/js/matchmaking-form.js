@@ -219,7 +219,10 @@
                     data.data && data.data.message ? data.data.message : 'Profile updated successfully!',
                     'success'
                 );
-                var redirectTo = form.getAttribute('data-redirect');
+                var redirectTo = (data.data && data.data.redirect_url)
+                    ? data.data.redirect_url
+                    : form.getAttribute('data-redirect');
+
                 if (redirectTo) {
                     window.setTimeout(function () {
                         window.location.href = redirectTo;

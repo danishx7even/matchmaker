@@ -156,7 +156,10 @@
             .then(function (resData) {
                 if (resData.success) {
                     MM_Portal.markNotificationsRead();
-                    if (resData.data && resData.data.next_step) {
+                    if (responseAction === 'decline') {
+                        // Immediately reload the matches tab content via AJAX to display hand-curated queue card
+                        MM_Portal.reloadTabAJAX('matches');
+                    } else if (resData.data && resData.data.next_step) {
                         MM_Portal.navigateStep(resData.data.next_step);
                     }
                 } else {
@@ -228,6 +231,50 @@
 
     /* Document Ready Initialization */
     document.addEventListener('DOMContentLoaded', function () {
+
+        // Global Event Delegation Listener for JS Redirections and Actions (replacing inline onclick)
+        document.addEventListener('click', function (e) {
+            // 1. JS Redirect handling
+            var redirectBtn = e.target.closest('[data-mm-redirect]');
+            if (redirectBtn) {
+                e.preventDefault();
+                var targetUrl = redirectBtn.getAttribute('data-mm-redirect');
+                if (targetUrl) {
+                    window.location.href = targetUrl;
+                }
+                return;
+            }
+
+            // 2. Dynamic Action handling
+            var actionBtn = e.target.closest('[data-mm-action]');
+            if (actionBtn) {
+                e.preventDefault();
+                var action = actionBtn.getAttribute('data-mm-action');
+
+                if (action === 'close-toast') {
+                    MM_Portal.closeToast();
+                } else if (action === 'navigate-step') {
+                    var stepNum = parseInt(actionBtn.getAttribute('data-step'), 10);
+                    if (stepNum) {
+                        MM_Portal.navigateStep(stepNum);
+                    }
+                } else if (action === 'goback-step') {
+                    MM_Portal.goBackStep();
+                } else if (action === 'switch-tab') {
+                    var tab = actionBtn.getAttribute('data-tab');
+                    if (tab) {
+                        MM_Portal.switchTab(tab);
+                    }
+                } else if (action === 'submit-response') {
+                    var matchId = actionBtn.getAttribute('data-match-id');
+                    var decision = actionBtn.getAttribute('data-decision');
+                    if (matchId && decision) {
+                        MM_Portal.submitResponse(matchId, decision);
+                    }
+                }
+                return;
+            }
+        });
 
         // 1. Tab click listeners (re-click triggers AJAX reload)
         document.querySelectorAll('.nav-tab[data-tab]').forEach(function (btn) {
