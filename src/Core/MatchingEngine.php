@@ -153,7 +153,7 @@ class MatchingEngine {
             $recurrence_days = 7;
         }
 
-        $cutoff = gmdate('Y-m-d H:i:s', strtotime('-' . $recurrence_days . ' days'));
+        $cutoff_timestamp = current_time('timestamp') - ($recurrence_days * DAY_IN_SECONDS);
 
         // 1. Auto-expire unanswered approved matches > 7 days old and send email alerts to admin
         \Matchmaker\Repository\MatchRepository::instance()->check_7day_match_expirations();
@@ -162,7 +162,7 @@ class MatchingEngine {
             "SELECT p.user_id
              FROM {$pool_table} p
              WHERE p.user_type = 'monthly'
-               AND p.is_active = 1
+               AND (p.is_active = 1 OR p.is_active IS NULL)
                AND (
                    NOT EXISTS (
                        SELECT 1 FROM {$wpdb->usermeta} um
@@ -170,13 +170,13 @@ class MatchingEngine {
                          AND um.meta_key = 'mm_last_match_run'
                    )
                    OR (
-                       SELECT um2.meta_value FROM {$wpdb->usermeta} um2
+                       SELECT CAST(um2.meta_value AS UNSIGNED) FROM {$wpdb->usermeta} um2
                        WHERE um2.user_id = p.user_id
                          AND um2.meta_key = 'mm_last_match_run'
                        LIMIT 1
-                   ) < %s
+                   ) < %d
                )",
-            $cutoff
+            $cutoff_timestamp
         );
 
         $user_ids = $wpdb->get_col($sql);
@@ -216,8 +216,11 @@ class MatchingEngine {
             return;
         }
 
-        // 2. Tier gate — only paid users (monthly / 1-on-1) get auto-matching UNLESS admin triggers it.
-        if ($trigger !== 'admin_manual_trigger' && !in_array($user['user_type'], ['monthly', 'one_on_one'], true)) {
+        // 2. Tier gate & trigger check — run matching for paid tiers or explicit triggers
+        $allowed_triggers = ['admin_manual_trigger', 'form_submit', 'form_update', 'tier_upgrade', 'idle_recurring'];
+        $is_paid_tier     = in_array(($user['user_type'] ?? 'free'), ['monthly', 'one_on_one'], true);
+
+        if (!$is_paid_tier && !in_array($trigger, $allowed_triggers, true)) {
             error_log("[Matchmaker] Skipping user #{$user_id} — user_type={$user['user_type']}, trigger={$trigger}.");
             return;
         }
@@ -228,10 +231,17 @@ class MatchingEngine {
             return;
         }
 
-        // 4. Compute user's current age.
-        $user_age = (int) (new \DateTime())->diff(new \DateTime($user['birth_date']))->y;
+        // 4. Compute user's current age safely.
+        $user_age = 28;
+        if (!empty($user['birth_date']) && $user['birth_date'] !== '0000-00-00') {
+            try {
+                $user_age = (int) (new \DateTime())->diff(new \DateTime($user['birth_date']))->y;
+            } catch (\Throwable $e) {
+                $user_age = 28;
+            }
+        }
 
-        // 4. Run the bi-directional hard-gate SQL query.
+        // 5. Run the bi-directional SQL candidate query.
         $candidates = $this->query_candidates($user, $user_age);
 
         if (empty($candidates)) {
@@ -240,18 +250,18 @@ class MatchingEngine {
             return;
         }
 
-        // 5. Score each candidate in PHP.
+        // 6. Score each candidate in PHP.
         $scored = [];
         foreach ($candidates as $candidate) {
             $score    = $this->compute_flexible_score($user, $candidate);
             $scored[] = ['row' => $candidate, 'score' => $score];
         }
 
-        // 6. Sort by score descending, take top MAX_CANDIDATES.
+        // 7. Sort by score descending, take top MAX_CANDIDATES.
         usort($scored, static fn($a, $b) => $b['score'] <=> $a['score']);
         $top = array_slice($scored, 0, self::MAX_CANDIDATES);
 
-        // 7. Insert pairs into wp_matches.
+        // 8. Insert pairs into wp_matches.
         $inserted = 0;
         foreach ($top as $entry) {
             $candidate_id = (int) $entry['row']['user_id'];
@@ -262,18 +272,18 @@ class MatchingEngine {
             }
         }
 
-        // 8. Record the last run timestamp.
+        // 9. Record the last run timestamp.
         \Matchmaker\Repository\MatchRepository::instance()->set_last_match_run($user_id);
 
         error_log("[Matchmaker] user #{$user_id} (trigger={$trigger}): {$inserted} new pairs inserted from " . count($candidates) . " qualifying candidates.");
     }
 
     // -------------------------------------------------------------------------
-    // SQL — bi-directional hard-gate candidate query
+    // SQL — bi-directional candidate query
     // -------------------------------------------------------------------------
 
     /**
-     * Query the pool for candidates passing ALL bi-directional hard gates.
+     * Query the pool for candidates passing bi-directional criteria.
      *
      * @param array<string,mixed> $user     Associative array of the user's pool row.
      * @param int                 $user_age Computed age of the user.
@@ -299,51 +309,72 @@ class MatchingEngine {
         $user_age_min  = (int) ($user['preferred_age_min'] ?? 18);
         $user_age_max  = (int) ($user['preferred_age_max'] ?? 99);
 
+        // Prepare bi-directional parameters
+        $target_cand_gender = ($pref_gender !== '' && $pref_gender !== 'any') ? $pref_gender : '';
+        $target_user_gender = ($user_gender !== '' && $user_gender !== 'any') ? $user_gender : '';
+
         $sql = $wpdb->prepare(
             "SELECT c.*
              FROM {$pool_table} c
              WHERE c.user_id != %d
-               AND c.is_active = 1
+               AND (c.is_active = 1 OR c.is_active IS NULL)
 
-               -- Gender gates
-               AND LOWER(TRIM(c.gender)) = %s
-               AND (c.pref_gender IS NULL OR c.pref_gender = '' OR LOWER(TRIM(c.pref_gender)) = %s OR LOWER(TRIM(c.pref_gender)) = 'any')
+               -- Gender bi-directional gate
+               AND (%s = '' OR LOWER(TRIM(c.gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.gender), ', ', ',')) > 0)
+               AND (c.pref_gender IS NULL OR c.pref_gender = '' OR LOWER(TRIM(c.pref_gender)) = 'any' OR %s = '' OR LOWER(TRIM(c.pref_gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.pref_gender), ', ', ',')) > 0)
 
-               -- Age gates
-               AND %d BETWEEN c.preferred_age_min AND c.preferred_age_max
-               AND TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d
+               -- Age bi-directional gate
+               AND (c.preferred_age_min IS NULL OR c.preferred_age_min <= 0 OR %d >= c.preferred_age_min)
+               AND (c.preferred_age_max IS NULL OR c.preferred_age_max <= 0 OR %d <= c.preferred_age_max)
+               AND (
+                   c.birth_date IS NULL 
+                   OR c.birth_date = '0000-00-00' 
+                   OR (TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)
+               )
 
-               -- Location gates
+               -- Location bi-directional gate
                AND (
                    c.pref_location IS NULL OR c.pref_location = '' OR LOWER(TRIM(c.pref_location)) = 'any'
+                   OR %s = '' OR LOWER(%s) = 'any'
                    OR FIND_IN_SET(%s, REPLACE(c.pref_location, ', ', ',')) > 0
+                   OR LOWER(c.pref_location) LIKE CONCAT('%%', %s, '%%')
                )
                AND (
                    %s = '' OR LOWER(%s) = 'any'
+                   OR c.location IS NULL OR c.location = ''
                    OR FIND_IN_SET(c.location, REPLACE(%s, ', ', ',')) > 0
+                   OR (%s != '' AND %s LIKE CONCAT('%%', c.location, '%%'))
                )
 
-               -- Religion gates
+               -- Religion bi-directional gate
                AND (
                    c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) = 'any'
+                   OR %s = '' OR LOWER(%s) = 'any'
                    OR FIND_IN_SET(%s, REPLACE(c.pref_religion, ', ', ',')) > 0
+                   OR LOWER(c.pref_religion) LIKE CONCAT('%%', %s, '%%')
                )
                AND (
                    %s = '' OR LOWER(%s) = 'any'
+                   OR c.religion IS NULL OR c.religion = ''
                    OR FIND_IN_SET(c.religion, REPLACE(%s, ', ', ',')) > 0
+                   OR (%s != '' AND %s LIKE CONCAT('%%', c.religion, '%%'))
                )
 
-               -- Modesty gates
+               -- Modesty bi-directional gate
                AND (
                    c.pref_modesty IS NULL OR c.pref_modesty = '' OR LOWER(TRIM(c.pref_modesty)) = 'any'
+                   OR %s = '' OR LOWER(%s) = 'any'
                    OR FIND_IN_SET(%s, REPLACE(c.pref_modesty, ', ', ',')) > 0
+                   OR LOWER(c.pref_modesty) LIKE CONCAT('%%', %s, '%%')
                )
                AND (
                    %s = '' OR LOWER(%s) = 'any'
+                   OR c.modesty IS NULL OR c.modesty = ''
                    OR FIND_IN_SET(c.modesty, REPLACE(%s, ', ', ',')) > 0
+                   OR (%s != '' AND %s LIKE CONCAT('%%', c.modesty, '%%'))
                )
 
-               -- Exclude pairs that already exist in wp_matches (any status)
+               -- Exclude pairs that ALREADY exist in wp_matches (any status)
                AND NOT EXISTS (
                    SELECT 1 FROM {$matches_table} m
                    WHERE m.user_one_id = LEAST(%d, c.user_id)
@@ -358,17 +389,23 @@ class MatchingEngine {
                      AND m2.updated_at >= %s
                )",
             $user_id,
-            $pref_gender,
-            $user_gender,
+            // Gender
+            $target_cand_gender, $target_cand_gender, $target_cand_gender,
+            $target_user_gender, $target_user_gender, $target_user_gender,
+            // Age
             $user_age,
-            $user_age_min,
-            $user_age_max,
-            $user_location,
-            $pref_location, $pref_location, $pref_location,
-            $user_religion,
-            $pref_religion, $pref_religion, $pref_religion,
-            $user_modesty,
-            $pref_modesty, $pref_modesty, $pref_modesty,
+            $user_age,
+            $user_age_min, $user_age_max,
+            // Location
+            $user_location, $user_location, $user_location, strtolower($user_location),
+            $pref_location, $pref_location, $pref_location, $pref_location, strtolower($pref_location),
+            // Religion
+            $user_religion, $user_religion, $user_religion, strtolower($user_religion),
+            $pref_religion, $pref_religion, $pref_religion, $pref_religion, strtolower($pref_religion),
+            // Modesty
+            $user_modesty, $user_modesty, $user_modesty, strtolower($user_modesty),
+            $pref_modesty, $pref_modesty, $pref_modesty, $pref_modesty, strtolower($pref_modesty),
+            // Existing match checks
             $user_id,
             $user_id,
             gmdate('Y-m-01 00:00:00')
@@ -485,7 +522,7 @@ class MatchingEngine {
      */
     private function insert_match_pair(int $user_id, int $candidate_id, int $score): bool
     {
-        return \Matchmaker\Repository\MatchRepository::instance()->create_match(
+        $result = \Matchmaker\Repository\MatchRepository::instance()->create_match(
             $user_id,
             $candidate_id,
             $user_id,
@@ -493,5 +530,8 @@ class MatchingEngine {
             'auto',
             $score
         );
+
+        // create_match returns int|false — convert to bool for strict_types
+        return ($result !== false && $result > 0);
     }
 }

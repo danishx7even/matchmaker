@@ -50,9 +50,10 @@ class AuthController
     {
         add_filter('login_url',                            [$this, 'custom_pmpro_login_url'], 10, 3);
         add_action('login_init',                           [$this, 'custom_pmpro_redirect_wp_login']);
+        add_action('template_redirect',                    [$this, 'custom_redirect_logged_in_user_from_login']);
         add_shortcode('logout_url',                        [$this, 'custom_logout_url_shortcode']);
         add_action('wp_logout',                            [$this, 'custom_logout_redirect']);
-        add_filter('login_redirect',                       [$this, 'custom_role_based_login_redirect'], 10, 3);
+        add_filter('login_redirect',                       [$this, 'custom_role_based_login_redirect'], 99, 3);
         add_filter('pmpro_confirmation_url',               [$this, 'custom_pmpro_level_based_registration_redirect'], 10, 3);
         add_filter('show_admin_bar',                       [$this, 'custom_hide_admin_bar_for_subscribers']);
         add_action('wp_footer',                            [$this, 'custom_pmpro_login_page_design']);
@@ -87,10 +88,18 @@ class AuthController
      *
      * @return void
      */
+    /**
+     * Redirect GET requests to wp-login.php to the PMPro login page.
+     * Redirects already logged-in users visiting wp-login.php to the home page.
+     *
+     * Allows pass-through for logout, password reset, and registration actions.
+     *
+     * @return void
+     */
     public function custom_pmpro_redirect_wp_login(): void
     {
         global $pagenow;
-        if ('wp-login.php' !== $pagenow || 'GET' !== $_SERVER['REQUEST_METHOD']) {
+        if ('wp-login.php' !== $pagenow) {
             return;
         }
 
@@ -98,7 +107,20 @@ class AuthController
             ? sanitize_text_field(wp_unslash($_REQUEST['action']))
             : '';
 
-        $allowed_actions = ['logout', 'lostpassword', 'rp', 'resetpass', 'register', 'postpass'];
+        if ('logout' === $action) {
+            return;
+        }
+
+        if (is_user_logged_in()) {
+            wp_safe_redirect(home_url('/'));
+            exit;
+        }
+
+        if ('GET' !== $_SERVER['REQUEST_METHOD']) {
+            return;
+        }
+
+        $allowed_actions = ['lostpassword', 'rp', 'resetpass', 'register', 'postpass'];
         if (in_array($action, $allowed_actions, true)) {
             return;
         }
@@ -117,6 +139,30 @@ class AuthController
                 wp_safe_redirect($pmpro_login);
                 exit;
             }
+        }
+    }
+
+    /**
+     * Redirect already logged-in users visiting frontend login pages to the home page.
+     *
+     * @return void
+     */
+    public function custom_redirect_logged_in_user_from_login(): void
+    {
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        $is_login_page = false;
+        if (function_exists('pmpro_is_login_page') && pmpro_is_login_page()) {
+            $is_login_page = true;
+        } elseif (is_page('login')) {
+            $is_login_page = true;
+        }
+
+        if ($is_login_page) {
+            wp_safe_redirect(home_url('/'));
+            exit;
         }
     }
 
@@ -151,23 +197,33 @@ class AuthController
     /**
      * Redirect users to the appropriate destination after login.
      *
-     * - Administrators / manage_options → /wp-admin/
+     * - Administrators / manage_options → /wp-admin/ (or requested wp-admin URL)
      * - All other logged-in members → /dashboard/
      *
-     * @param string             $redirect_to The originally requested redirect URL.
-     * @param string             $request     The raw requested redirect URL.
-     * @param \WP_User|\WP_Error $user        The authenticated user object.
+     * @param string                  $redirect_to Default redirect destination URL.
+     * @param string                  $request     Requested redirect destination URL passed via query string.
+     * @param \WP_User|\WP_Error|null $user        WP_User object if login was successful.
      * @return string Redirect destination URL.
      */
-    public function custom_role_based_login_redirect(string $redirect_to, string $request, \WP_User|\WP_Error $user): string
+    public function custom_role_based_login_redirect($redirect_to, $request = '', $user = null): string
     {
-        if ($user instanceof \WP_User) {
+        if ($user instanceof \WP_User && $user->exists()) {
             if (in_array('administrator', (array) $user->roles, true) || user_can($user, 'manage_options')) {
+                if (!empty($request) && strpos((string) $request, 'wp-admin') !== false) {
+                    return (string) $request;
+                }
                 return admin_url();
             }
+
+            // Check if member has completed their profile in wp_matchmaking_pool
+            $pool = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool((int) $user->ID);
+            if (empty($pool) || empty($pool['gender'])) {
+                return home_url('/personal-matchmaking-questionnaire/');
+            }
+
             return home_url('/dashboard/');
         }
-        return $redirect_to;
+        return (string) $redirect_to;
     }
 
     /**

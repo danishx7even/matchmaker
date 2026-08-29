@@ -91,6 +91,9 @@ class PMProSync {
                 return $this->get_user_type_by_level_id((int) $membership->id);
             }
         }
+
+        $meta_type = (string) get_user_meta($user_id, 'user_type', true);
+        return !empty($meta_type) ? $meta_type : 'free';
     }
 
     /**

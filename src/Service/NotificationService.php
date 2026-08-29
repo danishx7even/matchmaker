@@ -76,10 +76,10 @@ class NotificationService {
         $user_id = get_current_user_id();
         $user_type = 'free';
         
-        if (class_exists('\Matchmaker\PMPro_Sync')) {
-            $user_type = \Matchmaker\PMPro_Sync::get_user_type($user_id);
+        if (class_exists('\Matchmaker\Core\PMProSync')) {
+            $user_type = \Matchmaker\Core\PMProSync::instance()->get_current_user_type($user_id);
         } else {
-            $meta_type = get_user_meta($user_id, 'user_type', true);
+            $meta_type = (string) get_user_meta($user_id, 'user_type', true);
             if (!empty($meta_type)) {
                 $user_type = $meta_type;
             }
@@ -90,7 +90,10 @@ class NotificationService {
         }
 
         $repo = MatchRepository::instance();
-        $response['mm_unread_count'] = $repo->get_unread_count($user_id);
+        $unread_count = $repo->get_unread_count($user_id);
+
+        $response['mm_unread_count']         = $unread_count;
+        $response['matchmaker_unread_count'] = $unread_count;
 
         return $response;
     }

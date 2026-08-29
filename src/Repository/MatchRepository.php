@@ -435,24 +435,27 @@ class MatchRepository
         $pool_table    = $wpdb->prefix . 'matchmaking_pool';
         $matches_table = $wpdb->prefix . 'matches';
 
-        $where = ['c.user_id != %d AND c.is_active = 1'];
+        $where = ['(c.user_id != %d AND (c.is_active = 1 OR c.is_active IS NULL))'];
         $args  = [$user_id];
 
         if (!empty($filters['f_gender'])) {
-            $where[] = 'c.gender = %s';
-            $args[]  = strtolower(trim($filters['f_gender']));
+            $where[] = '(LOWER(TRIM(c.gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.gender), \', \', \',\')) > 0)';
+            $gender_val = strtolower(trim($filters['f_gender']));
+            $args[]  = $gender_val;
+            $args[]  = $gender_val;
         }
 
         $f_age_min = (int) ($filters['f_age_min'] ?? 18);
         $f_age_max = (int) ($filters['f_age_max'] ?? 80);
-        $where[] = 'TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d';
+        $where[] = '(c.birth_date IS NULL OR c.birth_date = \'0000-00-00\' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)';
         $args[]  = $f_age_min;
         $args[]  = $f_age_max;
 
         foreach (['f_location', 'f_religion', 'f_modesty', 'f_origin'] as $filter_key) {
             $col = str_replace('f_', '', $filter_key);
             if (!empty($filters[$filter_key]) && strtolower($filters[$filter_key]) !== 'any') {
-                $where[] = "FIND_IN_SET(c.{$col}, REPLACE(%s, ', ', ',')) > 0";
+                $where[] = "(c.{$col} IS NULL OR c.{$col} = '' OR FIND_IN_SET(c.{$col}, REPLACE(%s, ', ', ',')) > 0 OR c.{$col} LIKE CONCAT('%%', %s, '%%'))";
+                $args[]  = $filters[$filter_key];
                 $args[]  = $filters[$filter_key];
             }
         }
@@ -460,14 +463,17 @@ class MatchRepository
         // Bi-directional preference checks
         foreach (['location', 'religion', 'modesty'] as $field) {
             if (!empty($pool[$field]) && strtolower($pool[$field]) !== 'any') {
-                $where[] = "(c.pref_{$field} IS NULL OR c.pref_{$field} = '' OR LOWER(TRIM(c.pref_{$field})) = 'any' OR FIND_IN_SET(%s, REPLACE(c.pref_{$field}, ', ', ',')) > 0)";
+                $where[] = "(c.pref_{$field} IS NULL OR c.pref_{$field} = '' OR LOWER(TRIM(c.pref_{$field})) = 'any' OR FIND_IN_SET(%s, REPLACE(c.pref_{$field}, ', ', ',')) > 0 OR LOWER(c.pref_{$field}) LIKE CONCAT('%%', %s, '%%'))";
                 $args[]  = $pool[$field];
+                $args[]  = strtolower($pool[$field]);
             }
         }
 
         if (!empty($pool['gender'])) {
-            $where[] = "(c.pref_gender IS NULL OR c.pref_gender = '' OR LOWER(TRIM(c.pref_gender)) = %s OR LOWER(TRIM(c.pref_gender)) = 'any')";
-            $args[]  = strtolower(trim($pool['gender']));
+            $user_g = strtolower(trim($pool['gender']));
+            $where[] = "(c.pref_gender IS NULL OR c.pref_gender = '' OR LOWER(TRIM(c.pref_gender)) = 'any' OR LOWER(TRIM(c.pref_gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.pref_gender), ', ', ',')) > 0)";
+            $args[]  = $user_g;
+            $args[]  = $user_g;
         }
 
         $where[] = "NOT EXISTS (
@@ -785,7 +791,7 @@ class MatchRepository
         int    $user_b,
         int    $initiator_id,
         string $status = 'pending_review',
-        string $match_source = 'algorithm',
+        string $match_source = 'auto',
         int    $score = 0
     ): int|false {
         global $wpdb;
@@ -795,16 +801,35 @@ class MatchRepository
         $u1 = min($user_a, $user_b);
         $u2 = max($user_a, $user_b);
 
-        $result = $wpdb->query(
+        // Check for existing pair first to avoid duplicate errors
+        $existing = $wpdb->get_var(
             $wpdb->prepare(
-                "INSERT IGNORE INTO {$table}
-                    (user_one_id, user_two_id, initiator_user_id, status, match_source, score)
-                 VALUES (%d, %d, %d, %s, %s, %d)",
-                $u1, $u2, $initiator_id, $status, $match_source, $score
+                "SELECT id FROM {$table} WHERE user_one_id = %d AND user_two_id = %d LIMIT 1",
+                $u1, $u2
             )
         );
+        if (!empty($existing)) {
+            return false;
+        }
 
-        if ($result === false || $result === 0) {
+        $result = $wpdb->insert(
+            $table,
+            [
+                'user_one_id'       => $u1,
+                'user_two_id'       => $u2,
+                'initiator_user_id' => $initiator_id,
+                'status'            => $status,
+                'user_one_response' => 'pending',
+                'user_two_response' => 'pending',
+                'match_source'      => $match_source,
+                'score'             => $score,
+                'contact_revealed'  => 0,
+            ],
+            ['%d', '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%d']
+        );
+
+        if ($result === false) {
+            error_log('[Matchmaker] create_match failed: ' . $wpdb->last_error);
             return false;
         }
 
@@ -999,7 +1024,7 @@ class MatchRepository
             return ['success' => false, 'message' => __('Database error. Please try again.', 'matchmaker')];
         }
 
-        $this->increment_cycle_count($initiator_id, $current_quota);
+        $this->increment_quota($initiator_id);
 
         return [
             'success'       => true,
