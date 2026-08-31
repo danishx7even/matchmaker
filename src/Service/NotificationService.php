@@ -110,6 +110,23 @@ class NotificationService {
      */
     public function create_notification(int $user_id, int $match_id, string $type, string $title, string $message): void {
         MatchRepository::instance()->create_notification($user_id, $match_id, $type, $title, $message);
+
+        MatchRepository::instance()->log_event(
+            'notification',
+            $type,
+            sprintf(__('In-App Notification: %s (User #%d)', 'matchmaker'), $title, $user_id),
+            $message,
+            [
+                'user_id'  => $user_id,
+                'match_id' => $match_id,
+                'type'     => $type,
+                'title'    => $title,
+            ],
+            $match_id,
+            $user_id,
+            null,
+            'info'
+        );
     }
 
     /**
@@ -211,9 +228,47 @@ class NotificationService {
         $this->create_notification((int) $user_b->ID, $match_id, 'match_approved', __('New Match Available!', 'matchmaker'), __('You have a new approved match awaiting your review.', 'matchmaker'));
 
         add_filter('wp_mail_content_type', static fn() => 'text/html');
-        wp_mail($user_a->user_email, $subject, wpautop($body_a));
-        wp_mail($user_b->user_email, $subject, wpautop($body_b));
+        $mail_a_sent = wp_mail($user_a->user_email, $subject, wpautop($body_a));
+        $mail_b_sent = wp_mail($user_b->user_email, $subject, wpautop($body_b));
         remove_filter('wp_mail_content_type', static fn() => 'text/html');
+
+        $repo->log_event(
+            'email',
+            'email_sent',
+            sprintf(__('Approval Email Sent: %s (Match #%d)', 'matchmaker'), $user_a->user_email, $match_id),
+            $subject,
+            [
+                'match_id'      => $match_id,
+                'user_id'       => (int) $user_a->ID,
+                'recipient'     => $user_a->user_email,
+                'subject'       => $subject,
+                'body_html'     => wpautop($body_a),
+                'delivery_stat' => $mail_a_sent ? 'delivered' : 'failed',
+            ],
+            $match_id,
+            (int) $user_a->ID,
+            $user_a->user_email,
+            $mail_a_sent ? 'success' : 'error'
+        );
+
+        $repo->log_event(
+            'email',
+            'email_sent',
+            sprintf(__('Approval Email Sent: %s (Match #%d)', 'matchmaker'), $user_b->user_email, $match_id),
+            $subject,
+            [
+                'match_id'      => $match_id,
+                'user_id'       => (int) $user_b->ID,
+                'recipient'     => $user_b->user_email,
+                'subject'       => $subject,
+                'body_html'     => wpautop($body_b),
+                'delivery_stat' => $mail_b_sent ? 'delivered' : 'failed',
+            ],
+            $match_id,
+            (int) $user_b->ID,
+            $user_b->user_email,
+            $mail_b_sent ? 'success' : 'error'
+        );
     }
 
     /**
@@ -275,7 +330,26 @@ class NotificationService {
             . "<p><a href=\"" . esc_url($admin_pool_url) . "\" style=\"background:#CC723F;color:#fff;padding:10px 18px;text-decoration:none;border-radius:5px;display:inline-block;\">" . esc_html__('Open Candidate Pool &rarr;', 'matchmaker') . "</a></p>";
 
         add_filter('wp_mail_content_type', static fn() => 'text/html');
-        wp_mail($admin_email, $subject, $body);
+        $admin_sent = wp_mail($admin_email, $subject, $body);
         remove_filter('wp_mail_content_type', static fn() => 'text/html');
+
+        $repo->log_event(
+            'email',
+            'admin_alert_email',
+            sprintf(__('Admin Match Expiry Alert Sent: Match #%d', 'matchmaker'), $match_id),
+            $subject,
+            [
+                'match_id'      => $match_id,
+                'recipient'     => $admin_email,
+                'reason'        => $reason,
+                'subject'       => $subject,
+                'body_html'     => $body,
+                'delivery_stat' => $admin_sent ? 'delivered' : 'failed',
+            ],
+            $match_id,
+            null,
+            $admin_email,
+            $admin_sent ? 'success' : 'error'
+        );
     }
 }

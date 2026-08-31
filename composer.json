@@ -5,8 +5,10 @@
     "phpunit/phpunit": "^9.5"
   },
   "autoload": {
-    "psr-4": { "Matchmaker\\": "includes/" },
-    "files": [ "includes/functions.php" ]
+    "psr-4": {
+      "Matchmaker\\": ["src/", "includes/"]
+    },
+    "files": [ "src/functions.php" ]
   },
   "require": {
     "woocommerce/action-scheduler": "^4.1"

@@ -32,7 +32,7 @@ $drinking = !empty($pool['drinking']) ? $pool['drinking'] : '—';
 $form_url   = \Matchmaker\Service\ProfileService::instance()->get_form_url();
 $events_url = \Matchmaker\Service\ProfileService::instance()->get_events_url();
 $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
-$pmpro_url = home_url('/membership-checkout/?pmpro_level=3');
+$pmpro_url  = \Matchmaker\Service\ProfileService::instance()->get_membership_checkout_url();
 
 $badge_label = $repo->format_tier_label($user_type);
 ?>

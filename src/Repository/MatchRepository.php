@@ -129,6 +129,28 @@ class MatchRepository
     }
 
     /**
+     * Get maximum matches allowed per billing cycle from settings.
+     *
+     * @return int
+     */
+    public function get_max_cycle_matches(): int
+    {
+        $quota = (int) get_option('mm_max_cycle_matches', 10);
+        return $quota > 0 ? $quota : 10;
+    }
+
+    /**
+     * Get match review expiry duration in days from settings.
+     *
+     * @return int
+     */
+    public function get_match_expiry_days(): int
+    {
+        $days = (int) get_option('mm_match_expiry_days', 7);
+        return $days > 0 ? $days : 7;
+    }
+
+    /**
      * Parse a height option string and extract the centimetre value.
      *
      * Supports formats like "5'10" (178 cm)" or plain "178".
@@ -632,6 +654,11 @@ class MatchRepository
             ARRAY_A
         );
 
+        if (empty($rows)) {
+            return [];
+        }
+
+        $expiry_days = $this->get_match_expiry_days();
         $out = [];
         foreach ((array) $rows as $row) {
             $is_user_one    = ((int) $row['user_one_id'] === $user_id);
@@ -647,8 +674,9 @@ class MatchRepository
 
             // Days remaining to respond
             $days_remaining = 0;
-            if ($my_response === 'pending') {
-                $deadline       = strtotime($row['created_at'] . ' +7 days');
+            if ($my_response === 'pending' && $row['status'] === 'approved') {
+                $ref_date       = !empty($row['approved_at']) ? $row['approved_at'] : $row['updated_at'];
+                $deadline       = strtotime($ref_date . ' +' . $expiry_days . ' days');
                 $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
             }
 
@@ -944,24 +972,29 @@ class MatchRepository
     }
 
     /**
-     * Check for approved matches that have not been responded to for 7 days, and expire them.
+     * Check for approved matches that have not been responded to for the configured expiry duration, and expire them.
      *
      * @return int Number of matches expired.
      */
     public function check_7day_match_expirations(): int
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'matches';
+        $table       = $wpdb->prefix . 'matches';
+        $expiry_days = $this->get_match_expiry_days();
 
         $expired_rows = $wpdb->get_results(
-            "SELECT id FROM {$table} WHERE status = 'approved' AND updated_at < DATE_SUB(NOW(), INTERVAL 7 DAY)",
+            $wpdb->prepare(
+                "SELECT id FROM {$table} WHERE status = 'approved' AND (COALESCE(approved_at, updated_at) < DATE_SUB(NOW(), INTERVAL %d DAY) OR updated_at < DATE_SUB(NOW(), INTERVAL %d DAY))",
+                $expiry_days,
+                $expiry_days
+            ),
             ARRAY_A
         );
 
         $count = 0;
         foreach ((array) $expired_rows as $row) {
             $match_id = (int) $row['id'];
-            $this->expire_match($match_id, '7_day_idle_timeout');
+            $this->expire_match($match_id, $expiry_days . '_day_idle_timeout');
             $count++;
         }
 
@@ -1000,12 +1033,13 @@ class MatchRepository
             return ['success' => false, 'message' => __('Approval blocked: Matches involving a Free or Event tier user are informational only and cannot be approved.', 'matchmaker')];
         }
 
-        // Quota gate: max 10 matches per cycle per initiator (resets on new PMPro cycle month)
+        // Quota gate: max matches per cycle per initiator (resets on new PMPro cycle month)
         $initiator_id  = (int) $match['initiator_user_id'];
         $current_quota = $this->maybe_reset_monthly_quota($initiator_id);
+        $max_quota     = $this->get_max_cycle_matches();
 
-        if ($current_quota >= 10) {
-            return ['success' => false, 'message' => __('Approval blocked: This user has already used their 10-match monthly quota.', 'matchmaker')];
+        if ($current_quota >= $max_quota) {
+            return ['success' => false, 'message' => sprintf(__('Approval blocked: This user has already used their %d-match monthly quota.', 'matchmaker'), $max_quota)];
         }
 
         $updated = $wpdb->update(
@@ -1095,8 +1129,9 @@ class MatchRepository
             $is_u1   = ((int) $active_row['user_one_id'] === $user_id);
             $my_resp = $is_u1 ? $active_row['user_one_response'] : $active_row['user_two_response'];
             if ($my_resp === 'pending') {
+                $expiry_days    = $this->get_match_expiry_days();
                 $ref_date       = !empty($active_row['approved_at']) ? $active_row['approved_at'] : $active_row['updated_at'];
-                $deadline       = strtotime($ref_date . ' +7 days');
+                $deadline       = strtotime($ref_date . ' +' . $expiry_days . ' days');
                 $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
             }
         }
@@ -1278,5 +1313,281 @@ class MatchRepository
         );
 
         return $count > 0;
+    }
+
+    // =========================================================================
+    // ENVIRONMENT MODE & TEST RESET
+    // =========================================================================
+
+    /**
+     * Get the current environment mode ('test' or 'live').
+     *
+     * @return string
+     */
+    public function get_environment_mode(): string
+    {
+        $mode = (string) get_option('mm_environment_mode', 'live');
+        return in_array($mode, ['test', 'live'], true) ? $mode : 'live';
+    }
+
+    /**
+     * Check if the plugin is currently running in test mode.
+     *
+     * @return bool
+     */
+    public function is_test_mode(): bool
+    {
+        return $this->get_environment_mode() === 'test';
+    }
+
+    /**
+     * Reset matchmaking test data (matches, notifications, logs, cycle counters).
+     * Strictly preserves all user profiles in wp_matchmaking_pool and wp_users.
+     *
+     * @return array{matches_deleted: int, notifications_deleted: int, logs_deleted: int, profiles_preserved: int}
+     */
+    public function reset_test_matchmaking_data(): array
+    {
+        global $wpdb;
+
+        $matches_table       = $wpdb->prefix . 'matches';
+        $notifications_table = $wpdb->prefix . 'matchmaker_notifications';
+        $logs_table          = $wpdb->prefix . 'matchmaker_logs';
+        $pool_table          = $wpdb->prefix . 'matchmaking_pool';
+
+        $matches_deleted       = (int) $wpdb->query("TRUNCATE TABLE {$matches_table}");
+        $notifications_deleted = (int) $wpdb->query("TRUNCATE TABLE {$notifications_table}");
+        $logs_deleted          = (int) $wpdb->query("TRUNCATE TABLE {$logs_table}");
+
+        // If truncate returns false or 0, fallback to DELETE
+        if ($matches_deleted === 0) {
+            $matches_deleted = (int) $wpdb->query("DELETE FROM {$matches_table}");
+        }
+        if ($notifications_deleted === 0) {
+            $notifications_deleted = (int) $wpdb->query("DELETE FROM {$notifications_table}");
+        }
+        if ($logs_deleted === 0) {
+            $logs_deleted = (int) $wpdb->query("DELETE FROM {$logs_table}");
+        }
+
+        // Reset cycle counters and match run timestamps in usermeta
+        $usermeta_table = !empty($wpdb->usermeta) ? $wpdb->usermeta : ($wpdb->prefix . 'usermeta');
+        $wpdb->query("DELETE FROM {$usermeta_table} WHERE meta_key IN ('cycle_matches_count', 'mm_cycle_matches_count', 'mm_last_match_run')");
+
+        // Preserve count from pool
+        $profiles_preserved = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$pool_table}");
+
+        // Log this reset event into the fresh logs table
+        $this->log_event(
+            'match_lifecycle',
+            'test_data_reset',
+            __('Test Mode Data Reset Executed', 'matchmaker'),
+            sprintf(__('Cleared all match pairs, notifications, and logs. Preserved %d candidate profiles.', 'matchmaker'), $profiles_preserved),
+            [
+                'admin_user_id'      => get_current_user_id(),
+                'profiles_preserved' => $profiles_preserved,
+                'reset_at'           => current_time('mysql'),
+            ],
+            null,
+            get_current_user_id(),
+            null,
+            'warning'
+        );
+
+        return [
+            'matches_deleted'       => $matches_deleted,
+            'notifications_deleted' => $notifications_deleted,
+            'logs_deleted'          => $logs_deleted,
+            'profiles_preserved'    => $profiles_preserved,
+        ];
+    }
+
+    // =========================================================================
+    // STRUCTURED LOGGING CRUD
+    // =========================================================================
+
+    /**
+     * Log a matchmaking or notification event into wp_matchmaker_logs.
+     *
+     * @param string      $log_type     Type: 'match_lifecycle', 'match_engine', 'notification', 'email'.
+     * @param string      $event_type   Event identifier (e.g. 'match_created', 'admin_approved', 'email_sent').
+     * @param string      $title        Human-readable title.
+     * @param string|null $message      Description or rendered message.
+     * @param array|null  $details      Additional metadata array to be JSON-encoded.
+     * @param int|null    $reference_id Match ID or target entity ID.
+     * @param int|null    $user_id      Subject user ID.
+     * @param string|null $recipient    Recipient email / identifier.
+     * @param string      $status       'info', 'success', 'warning', 'error'.
+     * @return int Log ID inserted.
+     */
+    public function log_event(
+        string $log_type,
+        string $event_type,
+        string $title,
+        ?string $message = null,
+        ?array $details = null,
+        ?int $reference_id = null,
+        ?int $user_id = null,
+        ?string $recipient = null,
+        string $status = 'info'
+    ): int {
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaker_logs';
+
+        $json_str = null;
+        if ($details !== null) {
+            $json_str = function_exists('wp_json_encode') ? wp_json_encode($details) : json_encode($details);
+        }
+
+        $data = [
+            'log_type'     => $log_type,
+            'event_type'   => $event_type,
+            'title'        => $title,
+            'message'      => $message,
+            'details_json' => $json_str,
+            'reference_id' => $reference_id,
+            'user_id'      => $user_id,
+            'recipient'    => $recipient,
+            'status'       => $status,
+            'created_at'   => current_time('mysql'),
+        ];
+
+        $format = ['%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s'];
+
+        $inserted = $wpdb->insert($table, $data, $format);
+        return $inserted ? (int) $wpdb->insert_id : 0;
+    }
+
+    /**
+     * Retrieve paginated logs with optional filtering.
+     *
+     * @param string      $log_type   Filter by type ('match_lifecycle', 'match_engine', 'notification', 'email' or comma-separated / empty for all).
+     * @param int         $limit      Number of rows to fetch.
+     * @param int         $offset     Offset for pagination.
+     * @param string|null $search     Search term in title, message, recipient.
+     * @param string|null $event_type Filter by specific event_type.
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_logs(
+        string $log_type = '',
+        int $limit = 50,
+        int $offset = 0,
+        ?string $search = null,
+        ?string $event_type = null
+    ): array {
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaker_logs';
+
+        $where = [];
+        $args  = [];
+
+        if (!empty($log_type)) {
+            $types = array_filter(array_map('trim', explode(',', $log_type)));
+            if (!empty($types)) {
+                $placeholders = implode(',', array_fill(0, count($types), '%s'));
+                $where[] = "log_type IN ({$placeholders})";
+                foreach ($types as $t) {
+                    $args[] = $t;
+                }
+            }
+        }
+
+        if (!empty($event_type)) {
+            $where[] = 'event_type = %s';
+            $args[]  = $event_type;
+        }
+
+        if (!empty($search)) {
+            $like = '%' . $wpdb->esc_like(trim($search)) . '%';
+            $where[] = '(title LIKE %s OR message LIKE %s OR recipient LIKE %s)';
+            $args[]  = $like;
+            $args[]  = $like;
+            $args[]  = $like;
+        }
+
+        $sql = "SELECT * FROM {$table}";
+        if (!empty($where)) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $sql .= ' ORDER BY id DESC LIMIT %d OFFSET %d';
+        $args[] = max(1, $limit);
+        $args[] = max(0, $offset);
+
+        $prepared = !empty($args) ? $wpdb->prepare($sql, $args) : $sql;
+        $results  = $wpdb->get_results($prepared, ARRAY_A);
+
+        return is_array($results) ? $results : [];
+    }
+
+    /**
+     * Get count of logs matching criteria.
+     *
+     * @param string      $log_type   Filter by type.
+     * @param string|null $search     Search term.
+     * @param string|null $event_type Filter by event type.
+     * @return int
+     */
+    public function get_logs_count(
+        string $log_type = '',
+        ?string $search = null,
+        ?string $event_type = null
+    ): int {
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaker_logs';
+
+        $where = [];
+        $args  = [];
+
+        if (!empty($log_type)) {
+            $types = array_filter(array_map('trim', explode(',', $log_type)));
+            if (!empty($types)) {
+                $placeholders = implode(',', array_fill(0, count($types), '%s'));
+                $where[] = "log_type IN ({$placeholders})";
+                foreach ($types as $t) {
+                    $args[] = $t;
+                }
+            }
+        }
+
+        if (!empty($event_type)) {
+            $where[] = 'event_type = %s';
+            $args[]  = $event_type;
+        }
+
+        if (!empty($search)) {
+            $like = '%' . $wpdb->esc_like(trim($search)) . '%';
+            $where[] = '(title LIKE %s OR message LIKE %s OR recipient LIKE %s)';
+            $args[]  = $like;
+            $args[]  = $like;
+            $args[]  = $like;
+        }
+
+        $sql = "SELECT COUNT(*) FROM {$table}";
+        if (!empty($where)) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $prepared = !empty($args) ? $wpdb->prepare($sql, $args) : $sql;
+        return (int) $wpdb->get_var($prepared);
+    }
+
+    /**
+     * Get a single log record by ID.
+     *
+     * @param int $log_id Log ID.
+     * @return array<string, mixed>|null
+     */
+    public function get_log_by_id(int $log_id): ?array
+    {
+        if ($log_id <= 0) {
+            return null;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaker_logs';
+        $row   = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $log_id), ARRAY_A);
+
+        return is_array($row) ? $row : null;
     }
 }

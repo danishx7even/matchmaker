@@ -139,6 +139,17 @@ class MatchingEngine {
     // -------------------------------------------------------------------------
 
     /**
+     * Get maximum candidates generated per matching run from settings.
+     *
+     * @return int
+     */
+    public function get_max_candidates_limit(): int
+    {
+        $limit = (int) get_option('mm_max_candidates_per_run', self::MAX_CANDIDATES);
+        return $limit > 0 ? $limit : self::MAX_CANDIDATES;
+    }
+
+    /**
      * Checks the queue for idle users and auto-expires old matches.
      * 
      * @throws \Exception
@@ -155,41 +166,57 @@ class MatchingEngine {
 
         $cutoff_timestamp = current_time('timestamp') - ($recurrence_days * DAY_IN_SECONDS);
 
-        // 1. Auto-expire unanswered approved matches > 7 days old and send email alerts to admin
+        // 1. Auto-expire unanswered approved matches older than configured expiry days
         \Matchmaker\Repository\MatchRepository::instance()->check_7day_match_expirations();
 
-        $sql = $wpdb->prepare(
-            "SELECT p.user_id
-             FROM {$pool_table} p
-             WHERE p.user_type = 'monthly'
-               AND (p.is_active = 1 OR p.is_active IS NULL)
-               AND (
-                   NOT EXISTS (
-                       SELECT 1 FROM {$wpdb->usermeta} um
-                       WHERE um.user_id = p.user_id
-                         AND um.meta_key = 'mm_last_match_run'
+        // 2. Fetch idle monthly users in batches of 100 to prevent memory spikes
+        $batch_size = 100;
+        $offset     = 0;
+        $queued     = 0;
+
+        do {
+            $sql = $wpdb->prepare(
+                "SELECT p.user_id
+                 FROM {$pool_table} p
+                 WHERE p.user_type = 'monthly'
+                   AND (p.is_active = 1 OR p.is_active IS NULL)
+                   AND (
+                       NOT EXISTS (
+                           SELECT 1 FROM {$wpdb->usermeta} um
+                           WHERE um.user_id = p.user_id
+                             AND um.meta_key = 'mm_last_match_run'
+                       )
+                       OR (
+                           SELECT CAST(um2.meta_value AS UNSIGNED) FROM {$wpdb->usermeta} um2
+                           WHERE um2.user_id = p.user_id
+                             AND um2.meta_key = 'mm_last_match_run'
+                           LIMIT 1
+                       ) < %d
                    )
-                   OR (
-                       SELECT CAST(um2.meta_value AS UNSIGNED) FROM {$wpdb->usermeta} um2
-                       WHERE um2.user_id = p.user_id
-                         AND um2.meta_key = 'mm_last_match_run'
-                       LIMIT 1
-                   ) < %d
-               )",
-            $cutoff_timestamp
-        );
+                 ORDER BY p.user_id ASC
+                 LIMIT %d OFFSET %d",
+                $cutoff_timestamp,
+                $batch_size,
+                $offset
+            );
 
-        $user_ids = $wpdb->get_col($sql);
+            $user_ids = $wpdb->get_col($sql);
 
-        if (empty($user_ids)) {
+            if (empty($user_ids)) {
+                break;
+            }
+
+            foreach ($user_ids as $uid) {
+                mm_enqueue_user_matching_job((int) $uid, 'idle_recurring');
+                $queued++;
+            }
+
+            $offset += $batch_size;
+        } while (count($user_ids) === $batch_size);
+
+        if ($queued === 0) {
             error_log('[Matchmaker] Idle queue check: no idle monthly users found.');
             return;
-        }
-
-        $queued = 0;
-        foreach ($user_ids as $uid) {
-            mm_enqueue_user_matching_job((int) $uid, 'idle_recurring');
-            $queued++;
         }
 
         error_log("[Matchmaker] Idle queue check: enqueued matching jobs for {$queued} idle users (threshold={$recurrence_days} days).");
@@ -213,6 +240,17 @@ class MatchingEngine {
 
         if (empty($user)) {
             error_log("[Matchmaker] run_matching_for_user: user #{$user_id} not found or inactive in pool.");
+            \Matchmaker\Repository\MatchRepository::instance()->log_event(
+                'match_engine',
+                'matching_skipped',
+                sprintf(__('Matching Skipped for User #%d: Profile not found or inactive', 'matchmaker'), $user_id),
+                __('Candidate pool entry is missing or inactive (is_active = 0).', 'matchmaker'),
+                ['user_id' => $user_id, 'trigger' => $trigger],
+                null,
+                $user_id,
+                null,
+                'warning'
+            );
             return;
         }
 
@@ -222,12 +260,34 @@ class MatchingEngine {
 
         if (!$is_paid_tier && !in_array($trigger, $allowed_triggers, true)) {
             error_log("[Matchmaker] Skipping user #{$user_id} — user_type={$user['user_type']}, trigger={$trigger}.");
+            \Matchmaker\Repository\MatchRepository::instance()->log_event(
+                'match_engine',
+                'matching_skipped',
+                sprintf(__('Matching Skipped for User #%d: Tier not eligible', 'matchmaker'), $user_id),
+                sprintf(__('User tier is %s and trigger is %s.', 'matchmaker'), $user['user_type'] ?? 'free', $trigger),
+                ['user_id' => $user_id, 'user_type' => $user['user_type'] ?? 'free', 'trigger' => $trigger],
+                null,
+                $user_id,
+                null,
+                'info'
+            );
             return;
         }
 
         // 3. Mutual match gate — if user already has an accepted mutual match this month, skip generating more matches.
         if (\Matchmaker\Repository\MatchRepository::instance()->has_mutual_match_this_month($user_id)) {
             error_log("[Matchmaker] Skipping user #{$user_id} — user already has a mutually accepted match this month.");
+            \Matchmaker\Repository\MatchRepository::instance()->log_event(
+                'match_engine',
+                'matching_skipped',
+                sprintf(__('Matching Skipped for User #%d: Already mutually matched this month', 'matchmaker'), $user_id),
+                __('User already has a mutually accepted match in the current calendar cycle.', 'matchmaker'),
+                ['user_id' => $user_id, 'trigger' => $trigger],
+                null,
+                $user_id,
+                null,
+                'info'
+            );
             return;
         }
 
@@ -247,6 +307,17 @@ class MatchingEngine {
         if (empty($candidates)) {
             error_log("[Matchmaker] user #{$user_id}: no qualifying candidates found.");
             \Matchmaker\Repository\MatchRepository::instance()->set_last_match_run($user_id);
+            \Matchmaker\Repository\MatchRepository::instance()->log_event(
+                'match_engine',
+                'matching_no_candidates',
+                sprintf(__('Matching Executed for User #%d: 0 Candidates Qualified', 'matchmaker'), $user_id),
+                __('All bi-directional hard gates were evaluated. No candidate in the pool passed all criteria.', 'matchmaker'),
+                ['user_id' => $user_id, 'trigger' => $trigger, 'user_age' => $user_age],
+                null,
+                $user_id,
+                null,
+                'info'
+            );
             return;
         }
 
@@ -257,9 +328,10 @@ class MatchingEngine {
             $scored[] = ['row' => $candidate, 'score' => $score];
         }
 
-        // 7. Sort by score descending, take top MAX_CANDIDATES.
+        // 7. Sort by score descending, take top candidates limit.
+        $max_limit = $this->get_max_candidates_limit();
         usort($scored, static fn($a, $b) => $b['score'] <=> $a['score']);
-        $top = array_slice($scored, 0, self::MAX_CANDIDATES);
+        $top = array_slice($scored, 0, $max_limit);
 
         // 8. Insert pairs into wp_matches.
         $inserted = 0;
@@ -274,6 +346,24 @@ class MatchingEngine {
 
         // 9. Record the last run timestamp.
         \Matchmaker\Repository\MatchRepository::instance()->set_last_match_run($user_id);
+
+        \Matchmaker\Repository\MatchRepository::instance()->log_event(
+            'match_engine',
+            'matching_completed',
+            sprintf(__('Matching Run for User #%d Completed: %d Match(es) Created', 'matchmaker'), $user_id, $inserted),
+            sprintf(__('Evaluated %d qualifying candidates. Inserted %d new match pairs for review (Trigger: %s).', 'matchmaker'), count($candidates), $inserted, $trigger),
+            [
+                'user_id'              => $user_id,
+                'trigger'              => $trigger,
+                'candidates_evaluated' => count($candidates),
+                'matches_inserted'     => $inserted,
+                'max_limit'            => $max_limit,
+            ],
+            null,
+            $user_id,
+            null,
+            $inserted > 0 ? 'success' : 'info'
+        );
 
         error_log("[Matchmaker] user #{$user_id} (trigger={$trigger}): {$inserted} new pairs inserted from " . count($candidates) . " qualifying candidates.");
     }

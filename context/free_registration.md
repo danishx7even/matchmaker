@@ -1,19 +1,30 @@
-# Feature Context: Free User Registration
+# Feature Context: Free Registration & Elementor Pro Form Integration
 
-This document defines the architecture, rules, and constraints for Elementor Pro decoupled free registration (`includes/Free_Reg_Handler.php`).
+This document defines the decoupled Elementor Pro Form hooks, user account generation, and automatic login logic (`src/Core/FreeRegHandler.php`).
+
+---
 
 ## 1. Core Responsibilities
-- Intercepts Elementor Pro Form submissions to register free users safely.
-- Decouples validation (`elementor_pro/forms/validation`) from creation (`elementor_pro/forms/new_record`).
-- Assigns PMPro Level 2 (Free Membership) and logs the user in automatically upon successful registration.
+- Intercepts submissions from Elementor Pro Form widget(s).
+- Validates registration data (unique email, minimum password length, phone formatting).
+- Creates WordPress subscriber user, assigns PMPro Free membership level, sets `'free'` tier meta, and signs user in seamlessly.
 
-## 2. Decoupled Form Hooks & Logic
-- **Inline Validation Hook (`elementor_pro/forms/validation`)**:
-  - Validates email address format and uniqueness via `email_exists()`.
-  - Validates password length (minimum 6 characters).
-  - Validates phone number format and E.164 compliance.
-- **Account Creation Hook (`elementor_pro/forms/new_record`)**:
-  - Creates a new WordPress user with `subscriber` role via `wp_create_user()`.
-  - Assigns PMPro Level 2 (Free Registration) using `pmpro_changeMembershipLevel(2, $user_id)`.
-  - Sets `user_type` usermeta to `'free'`.
-  - Performs safe auto-login (`wp_set_current_user`, `wp_set_auth_cookie`).
+---
+
+## 2. Decoupled Form Hook Architecture
+- **Validation Hook (`elementor_pro/forms/validation`)**:
+  - Validates email syntax and uniqueness via `email_exists()`.
+  - Checks password strength/length requirements.
+  - Formats and normalizes international phone numbers.
+- **Record Creation Hook (`elementor_pro/forms/new_record`)**:
+  - Creates WordPress user via `wp_create_user()`.
+  - Dynamically assigns PMPro Free level (`PMProSync::get_primary_level_for_tier('free', 2)`).
+  - Sets `user_type` meta to `'free'`.
+  - Performs secure auto-login via `wp_signon()`.
+
+---
+
+## 3. Dynamic Form ID Configuration
+- Admins configure the active Elementor Form ID in **Matchmaking > Settings** (`mm_free_reg_form_id`, default: `'2784843'`).
+- Supports single or multiple comma-separated Form IDs.
+- `FreeRegHandler::matches_form_id(string $form_id): bool` safely checks incoming Elementor form IDs against configured settings.

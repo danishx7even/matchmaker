@@ -218,10 +218,10 @@ class AuthController
             // Check if member has completed their profile in wp_matchmaking_pool
             $pool = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool((int) $user->ID);
             if (empty($pool) || empty($pool['gender'])) {
-                return home_url('/personal-matchmaking-questionnaire/');
+                return \Matchmaker\Service\ProfileService::instance()->get_form_url();
             }
 
-            return home_url('/dashboard/');
+            return \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
         }
         return (string) $redirect_to;
     }
@@ -237,7 +237,7 @@ class AuthController
     public function custom_pmpro_level_based_registration_redirect(string $rurl, int $user_id, object $pmpro_level): string
     {
         if (!empty($pmpro_level->id)) {
-            return home_url('/personal-matchmaking-questionnaire/');
+            return \Matchmaker\Service\ProfileService::instance()->get_form_url();
         }
         return $rurl;
     }

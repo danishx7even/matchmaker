@@ -1,19 +1,36 @@
-# Feature Context: PMPro Sync & Tier Mapping
+# Feature Context: PMPro Sync & Dynamic Plan Connector
 
-This document defines the architecture, rules, and constraints for Paid Memberships Pro synchronization (`includes/PMPro_Sync.php`).
+This document defines the architecture, options, and hooks for Paid Memberships Pro synchronization (`src/Core/PMProSync.php`).
+
+---
 
 ## 1. Core Responsibilities
-- Synchronizes PMPro membership levels with internal `user_type` metadata.
-- Updates `user_type` in `wp_usermeta` and `wp_matchmaking_pool` whenever a user's level changes.
+- Maps PMPro membership levels to Matchmaker tiers (`monthly`, `one_on_one`, `event`, `free`).
+- Synchronizes `user_type` in `wp_usermeta` and `wp_matchmaking_pool` upon checkout or administrative level changes.
+- Eliminates hardcoded plan IDs via dynamic admin settings configuration.
 
-## 2. Membership Level Mapping
-| PMPro Level ID | PMPro Level Name | Internal `user_type` | Auto-Matching Eligible |
-| :--- | :--- | :--- | :---: |
-| **Level 3** | Monthly Membership | `monthly` | ✅ Yes (on profile save/update) |
-| **Level 4, 5** | 1-on-1 VIP Matchmaking | `one_on_one` | ❌ Admin Manual Only |
-| **Level 6** | Event Participant | `event` | ❌ Admin Manual Only |
-| **Level 2** (or default) | Free Registration | `free` | ❌ Admin Manual Only |
+---
 
-## 3. Operational Rules
-- **`pmpro_after_change_membership_level` Hook**: Listens for level changes, maps level ID to `user_type`, updates usermeta, and syncs `wp_matchmaking_pool` if the user profile exists.
-- **Form Prerequisite**: Membership level changes do **not** trigger matching automatically. Users are required to submit/update their profile form after level change to initiate matching.
+## 2. Dynamic Plan Connector Matrix
+Admins configure mappings in **Matchmaking > Settings**. Stored in WordPress option `mm_pmpro_tier_mapping` as an associative array `[ level_id (int) => tier_slug (string) ]`.
+
+### Default Fallback Mapping
+If no custom mapping is configured, PMProSync gracefully falls back to:
+- **Level 3** $\rightarrow$ `monthly` (Bi-directional matching, monthly quota enforced).
+- **Level 4, 5** $\rightarrow$ `one_on_one` (VIP high-touch matching).
+- **Level 6** $\rightarrow$ `event` (Event participation only, upsell on matches tab).
+- **Level 2 (or other)** $\rightarrow$ `free` (Free tier, upsell banner).
+
+---
+
+## 3. Helper API
+- `PMProSync::instance()->get_user_type_by_level_id(int $level_id): string`
+- `PMProSync::instance()->get_levels_for_tier(string $tier): array`
+- `PMProSync::instance()->is_tier_level(int $level_id, string $tier): bool`
+- `PMProSync::instance()->get_primary_level_for_tier(string $tier, int $fallback = 0): int`
+
+---
+
+## 4. Hook Integration
+- **`pmpro_after_change_membership_level`**: Listens for level changes, normalizes `user_type`, updates usermeta, and updates `wp_matchmaking_pool` row if the member profile exists.
+- **Form Prerequisite**: Membership level upgrade does **not** trigger matching directly; members must complete their 2-step profile form to initiate matching.

@@ -83,18 +83,29 @@ class ProfileService {
      * @return string
      */
     public function get_dashboard_url(): string {
-        // if (function_exists('pmpro_url')) {
-        //     return pmpro_url('account');
-        // }
+        $page_id = (int) get_option('mm_page_dashboard_id', 0);
+        if ($page_id > 0) {
+            $link = get_permalink($page_id);
+            if (!empty($link)) {
+                return $link;
+            }
+        }
         return home_url('/dashboard/');
     }
 
     /**
-     * Get form URL.
+     * Get form (questionnaire) URL.
      *
      * @return string
      */
     public function get_form_url(): string {
+        $page_id = (int) get_option('mm_page_questionnaire_id', 0);
+        if ($page_id > 0) {
+            $link = get_permalink($page_id);
+            if (!empty($link)) {
+                return $link;
+            }
+        }
         return home_url('/personal-matchmaking-questionnaire/');
     }
 
@@ -104,6 +115,13 @@ class ProfileService {
      * @return string
      */
     public function get_events_url(): string {
+        $page_id = (int) get_option('mm_page_events_id', 0);
+        if ($page_id > 0) {
+            $link = get_permalink($page_id);
+            if (!empty($link)) {
+                return $link;
+            }
+        }
         return home_url('/events-2/');
     }
 
@@ -113,6 +131,48 @@ class ProfileService {
      * @return string
      */
     public function get_membership_account_url(): string {
+        $page_id = (int) get_option('mm_page_account_id', 0);
+        if ($page_id > 0) {
+            $link = get_permalink($page_id);
+            if (!empty($link)) {
+                return $link;
+            }
+        }
+        if (function_exists('pmpro_url')) {
+            $pmpro_acc = pmpro_url('account');
+            if (!empty($pmpro_acc)) {
+                return $pmpro_acc;
+            }
+        }
         return home_url('/membership-account/');
+    }
+
+    /**
+     * Get membership checkout URL for upgrades.
+     *
+     * @param int|null $level_id
+     * @return string
+     */
+    public function get_membership_checkout_url(?int $level_id = null): string {
+        if ($level_id === null || $level_id <= 0) {
+            $level_id = \Matchmaker\Core\PMProSync::instance()->get_primary_level_for_tier('monthly', 3);
+        }
+
+        $page_id = (int) get_option('mm_page_checkout_id', 0);
+        if ($page_id > 0) {
+            $link = get_permalink($page_id);
+            if (!empty($link)) {
+                return add_query_arg('pmpro_level', $level_id, $link);
+            }
+        }
+
+        if (function_exists('pmpro_url')) {
+            $pmpro_checkout = pmpro_url('checkout');
+            if (!empty($pmpro_checkout)) {
+                return add_query_arg('pmpro_level', $level_id, $pmpro_checkout);
+            }
+        }
+
+        return home_url('/membership-checkout/?pmpro_level=' . $level_id);
     }
 }

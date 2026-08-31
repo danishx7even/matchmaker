@@ -211,3 +211,78 @@ This document maintains a chronological, step-by-step history of all features, a
   - Updated `member-portal.js`:
     - Added `MM_Portal.goBackStep()` navigation helper with history stack.
     - Updated `MM_Portal.switchTab()` to trigger `MM_Portal.reloadTabAJAX()` for dynamic content updates on tab clicks.
+
+---
+
+### Task 23: Database Scalability, Dynamic PMPro Plan Connector, Configurable Quotas & Expirations, and Automated PHPUnit Test Suite
+- **Objective**: Scale the plugin architecture to efficiently support large candidate pools, eliminate all hardcoded static values (membership plan IDs, monthly match quotas, match expiry windows, page routing slugs, Elementor form ID), enhance the admin settings interface, and establish automated PHPUnit test coverage.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`:
+    - Added composite database indexes to `wp_matchmaking_pool` (`idx_active_gender_type (is_active, gender, user_type)`) and `wp_matches` (`idx_pair_status (user_one_id, user_two_id, status)`, `idx_status_updated (status, updated_at)`, `idx_initiator_created (initiator_user_id, created_at)`).
+    - Bumped schema version to `2.3.0`.
+  - `src/Core/PMProSync.php`:
+    - Replaced hardcoded switch with dynamic option lookup `mm_pmpro_tier_mapping` and fallback defaults.
+    - Added helper methods `get_levels_for_tier()`, `is_tier_level()`, and `get_primary_level_for_tier()`.
+  - `src/Admin/AdminPortal.php`:
+    - Added **PMPro Membership Plan Connector** table: dynamically reads all registered PMPro levels and allows admins to assign tiers using dropdowns.
+    - Added **Matchmaking Quota & Expiry Rules**: configurable Max Matches per Cycle (`mm_max_cycle_matches`), Match Expiry Days (`mm_match_expiry_days`), Idle Recurrence Days (`mm_auto_match_recurrence_days`), and Max Candidates per Run (`mm_max_candidates_per_run`).
+    - Added **Page Routing & Form Integration**: WordPress page dropdown selectors (`wp_dropdown_pages`) for Dashboard, Questionnaire, Account, Checkout, Events, and Elementor Free Registration Form ID.
+    - Updated Candidate Profile header and manual matchmaker view to display dynamic monthly quota.
+  - `src/Repository/MatchRepository.php` & `src/Service/MatchService.php`:
+    - Updated `approve_match()` to enforce dynamic cycle quota limits.
+    - Updated `check_7day_match_expirations()` and deadline calculations (`find_all_matches_for_user`, `get_match_stats`) to use dynamic match review expiry days.
+  - `src/Core/FreeRegHandler.php`:
+    - Dynamic Elementor Form ID matching and dynamic Free tier PMPro level assignment with normalized `'free'` user_type meta.
+  - `src/Service/ProfileService.php` & `src/Frontend/AuthController.php`:
+    - Dynamic page URL resolvers checking configured WordPress page IDs with `get_permalink()` before falling back to defaults.
+  - `src/Core/MatchingEngine.php`:
+    - Batch chunking (100 users per batch) in idle queue Action Scheduler job and dynamic candidates limit.
+  - `src/View/frontend/portal/tab-matches.php` & `tab-profile.php`:
+    - Dynamic checkout URLs and dynamic countdown text with 100% design and styling preservation.
+  - `tests/`:
+    - Created comprehensive test bootstrap (`tests/bootstrap.php`), automated test runner (`tests/run_tests.php`), and full test suite (`DBMigratorTest.php`, `SettingsAndPlanMappingTest.php`, `QuotaAndExpiryTest.php`, `MatchingEngineTest.php`, `EndToEndFlowTest.php`).
+    - Verified all 12 tests pass with 0 failures and 0 errors.
+
+---
+
+### Task 24: Environment Mode System, Structured Event & Notification Logging, 3-Tab Match Logs Hub, and MVC View Separation
+- **Objective**: Implement Environment Mode (Test Mode vs Live Mode) with a safe data reset tool; implement centralized structured activity and email transmission logging in dedicated `wp_matchmaker_logs` table; update the Match Logs page with 3 interactive tabs ("Match Logs", "Notification & Email Logs", "Candidate Gate Debugger") and a JSON/Email inspection modal; modularize all Member Portal 5-step views and Admin Portal views into dedicated pure PHP template files.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`:
+    - Added `wp_matchmaker_logs` table schema (tracking `log_type`, `event_type`, `title`, `message`, `details_json`, `reference_id`, `user_id`, `recipient`, `status`, `created_at`).
+    - Bumped database schema version to `2.4.0`.
+  - `src/Repository/MatchRepository.php`:
+    - Added Environment Mode getters (`get_environment_mode()`, `is_test_mode()`).
+    - Added `reset_test_matchmaking_data()` method: purges `wp_matches`, `wp_matchmaker_notifications`, `wp_matchmaker_logs`, and user cycle match counters while preserving `wp_matchmaking_pool` records.
+    - Added structured logging CRUD operations (`log_event()`, `get_logs()`, `get_logs_count()`, `get_log_by_id()`).
+  - Logging Integration across Core & Service Layers:
+    - `MatchingEngine.php`: Logs engine execution runs, skips (due to inactivity, ineligible tier, or existing mutual match), candidate evaluations, and generated matches.
+    - `MatchService.php`: Logs admin approvals, quota/tier approval blockades, admin rejections, and member accept/decline responses.
+    - `NotificationService.php`: Logs in-app notification creations and transactional HTML email dispatches with full recipient and body metadata.
+  - Frontend Member Portal Step View Separation (`src/View/frontend/portal/steps/`):
+    - `step-1-discovery.php`: Step 1 Discovery card.
+    - `step-2-profile.php`: Step 2 Full candidate profile review & dock.
+    - `step-3-waiting.php`: Step 3 Waiting for candidate response.
+    - `step-4-decline.php`: Step 4 Match declined confirmation modal card.
+    - `step-5-contact.php`: Step 5 Mutual match contact reveal.
+    - Refactored `tab-matches.php` to cleanly include modular step templates.
+  - Admin Portal MVC Architecture & Modular Views (`src/View/admin/`):
+    - `pool/pool-list.php`: Candidate Pool list view table.
+    - `pool/user-single.php`: Candidate profile detail view.
+    - `pool/manual-match.php`: Manual matchmaker candidate search and pair tool.
+    - `matches/matches-list.php`: Matches Queue table with filters.
+    - `matches/match-single.php`: Dual-profile comparison review view.
+    - `settings/settings.php`: Settings view with Environment Mode toggle, Test Mode Reset danger card, PMPro matrix, Quotas, Dynamic page routing, and Email notification templates.
+    - `logs/logs.php`: 3-Tab hub container (`match_logs`, `notification_logs`, `debugger`).
+    - `logs/tab-match-logs.php`: Match engine and lifecycle logs table.
+    - `logs/tab-notification-logs.php`: Notification and email transmission logs table.
+    - `logs/tab-debugger.php`: Candidate gate evaluation debugger tool.
+    - `logs/modal-log-detail.php`: Interactive modal overlay for detail view and HTML email preview.
+  - `AdminPortal.php`:
+    - Refactored to lean controller delegating rendering to view files.
+    - Added handlers for `mm_environment_mode` save and `mm_reset_test_data` reset POST action.
+  - Assets (`admin-matchmaker.css` & `admin-matchmaker.js`):
+    - Added modal dialog styles, backdrop blur, test mode reset danger styling, and JavaScript modal controller with JSON pretty-printing and rendered email preview.
+  - Automated Testing (`tests/`):
+    - Added `ModeAndResetTest.php` and `LoggingTest.php`.
+    - Verified all 18 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).

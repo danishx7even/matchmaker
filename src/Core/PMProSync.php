@@ -16,6 +16,17 @@ class PMProSync {
     private static ?self $instance = null;
 
     /**
+     * Default PMPro level ID to user_type mapping fallback.
+     */
+    public const DEFAULT_LEVEL_MAPPING = [
+        3 => 'monthly',
+        4 => 'one_on_one',
+        5 => 'one_on_one',
+        6 => 'event',
+        2 => 'free',
+    ];
+
+    /**
      * @return self
      */
     public static function instance(): self
@@ -33,6 +44,29 @@ class PMProSync {
     }
 
     /**
+     * Retrieves the active PMPro level ID to user_type mapping array.
+     *
+     * @return array<int, string>
+     */
+    public function get_tier_mapping(): array
+    {
+        $mapping = get_option('mm_pmpro_tier_mapping', null);
+        if (is_array($mapping) && !empty($mapping)) {
+            // Ensure integer keys
+            $normalized = [];
+            foreach ($mapping as $lvl => $tier) {
+                if (is_numeric($lvl) && (int) $lvl > 0 && is_string($tier)) {
+                    $normalized[(int) $lvl] = sanitize_key($tier);
+                }
+            }
+            if (!empty($normalized)) {
+                return $normalized;
+            }
+        }
+        return self::DEFAULT_LEVEL_MAPPING;
+    }
+
+    /**
      * Maps PMPro level ID to a matchmaking user_type.
      *
      * @param int $level_id
@@ -40,13 +74,51 @@ class PMProSync {
      */
     public function get_user_type_by_level_id(int $level_id): string
     {
-        return match ($level_id) {
-            3       => 'monthly',
-            4, 5    => 'one_on_one',
-            6       => 'event',
-            2       => 'free',
-            default => 'free',
-        };
+        $mapping = $this->get_tier_mapping();
+        return $mapping[$level_id] ?? 'free';
+    }
+
+    /**
+     * Returns all PMPro level IDs assigned to a given user_type tier.
+     *
+     * @param string $tier e.g. 'monthly', 'one_on_one', 'event', 'free'.
+     * @return int[]
+     */
+    public function get_levels_for_tier(string $tier): array
+    {
+        $mapping = $this->get_tier_mapping();
+        $levels  = [];
+        foreach ($mapping as $lvl_id => $t) {
+            if ($t === $tier) {
+                $levels[] = (int) $lvl_id;
+            }
+        }
+        return $levels;
+    }
+
+    /**
+     * Check if a specific level ID belongs to a given tier.
+     *
+     * @param int    $level_id
+     * @param string $tier
+     * @return bool
+     */
+    public function is_tier_level(int $level_id, string $tier): bool
+    {
+        return $this->get_user_type_by_level_id($level_id) === $tier;
+    }
+
+    /**
+     * Returns the primary (first) level ID for a given tier (e.g. for checkout links).
+     *
+     * @param string $tier
+     * @param int    $default
+     * @return int
+     */
+    public function get_primary_level_for_tier(string $tier, int $default = 3): int
+    {
+        $levels = $this->get_levels_for_tier($tier);
+        return !empty($levels) ? $levels[0] : $default;
     }
 
     /**

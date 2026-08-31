@@ -33,6 +33,32 @@ class FreeRegHandler {
     }
 
     /**
+     * Get configured Elementor Free Registration Form ID(s).
+     *
+     * @return string
+     */
+    public function get_configured_form_id(): string
+    {
+        return (string) get_option('mm_free_reg_form_id', '2784843');
+    }
+
+    /**
+     * Check if a given form ID matches the configured free registration form(s).
+     *
+     * @param string $form_id
+     * @return bool
+     */
+    public function matches_form_id(string $form_id): bool
+    {
+        $configured = trim($this->get_configured_form_id());
+        if ($configured === '') {
+            return false;
+        }
+        $ids = array_map('trim', explode(',', $configured));
+        return in_array($form_id, $ids, true);
+    }
+
+    /**
      * Validates free user registration form fields.
      *
      * @param \ElementorPro\Modules\Forms\Classes\Form_Record $record
@@ -41,7 +67,7 @@ class FreeRegHandler {
     public function validate_free_user_registration($record, $ajax_handler): void
     {
         $form_id = (string) $record->get_form_settings('id');
-        if ($form_id !== '2784843') {
+        if (!$this->matches_form_id($form_id)) {
             return;
         }
 
@@ -87,7 +113,7 @@ class FreeRegHandler {
     public function handle_free_user_registration($record, $handler): void
     {
         $form_id = (string) $record->get_form_settings('id');
-        if ($form_id !== '2784843') {
+        if (!$this->matches_form_id($form_id)) {
             return;
         }
 
@@ -115,15 +141,16 @@ class FreeRegHandler {
                 'first_name' => $full_name, 
                 'role' => 'subscriber'
             ]);
-            update_user_meta($user_id, 'user_type', 'free_user');
+            update_user_meta($user_id, 'user_type', 'free');
             if (!empty($phone_number)) { 
                 update_user_meta($user_id, 'phone_number', $phone_number); 
             }
 
             if (function_exists('pmpro_changeMembershipLevel')) {
+                $free_level = PMProSync::instance()->get_primary_level_for_tier('free', 2);
                 add_filter('pmpro_send_checkout_emails', '__return_false', 999);
                 try { 
-                    pmpro_changeMembershipLevel(2, $user_id); 
+                    pmpro_changeMembershipLevel($free_level, $user_id); 
                 } finally { 
                     remove_filter('pmpro_send_checkout_emails', '__return_false', 999); 
                 }

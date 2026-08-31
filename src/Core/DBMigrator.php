@@ -39,7 +39,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.2.0';
+        $new_version = '2.4.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -52,13 +52,16 @@ class DBMigrator {
             return;
         }
 
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        if (file_exists(ABSPATH . 'wp-admin/includes/upgrade.php')) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        }
 
         $charset_collate = $wpdb->get_charset_collate();
 
         $pool_table          = $wpdb->prefix . 'matchmaking_pool';
         $matches_table       = $wpdb->prefix . 'matches';
         $notifications_table = $wpdb->prefix . 'matchmaker_notifications';
+        $logs_table          = $wpdb->prefix . 'matchmaker_logs';
 
         $sql_pool = "CREATE TABLE {$pool_table} (
             user_id bigint(20) unsigned NOT NULL,
@@ -91,6 +94,7 @@ class DBMigrator {
             updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (user_id),
             KEY idx_match_core (is_active, gender, pref_gender),
+            KEY idx_active_gender_type (is_active, gender, user_type),
             KEY idx_birth_date (birth_date),
             KEY idx_location (location),
             KEY idx_religion (religion),
@@ -116,6 +120,9 @@ class DBMigrator {
             UNIQUE KEY uniq_pair  (user_one_id, user_two_id),
             KEY idx_user_one (user_one_id),
             KEY idx_user_two (user_two_id),
+            KEY idx_pair_status (user_one_id, user_two_id, status),
+            KEY idx_status_updated (status, updated_at),
+            KEY idx_initiator_created (initiator_user_id, created_at),
             KEY idx_initiator (initiator_user_id),
             KEY idx_status (status)
         ) {$charset_collate};";
@@ -134,9 +141,30 @@ class DBMigrator {
             KEY idx_match_id (match_id)
         ) {$charset_collate};";
 
+        $sql_logs = "CREATE TABLE {$logs_table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            log_type enum('match_lifecycle','match_engine','notification','email') NOT NULL DEFAULT 'match_lifecycle',
+            reference_id bigint(20) unsigned DEFAULT NULL,
+            user_id bigint(20) unsigned DEFAULT NULL,
+            recipient varchar(191) DEFAULT NULL,
+            event_type varchar(50) NOT NULL,
+            title varchar(255) NOT NULL,
+            message text DEFAULT NULL,
+            details_json longtext DEFAULT NULL,
+            status varchar(50) NOT NULL DEFAULT 'info',
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY idx_type_created (log_type, created_at),
+            KEY idx_ref_id (reference_id),
+            KEY idx_user_id (user_id),
+            KEY idx_event_type (event_type),
+            KEY idx_status (status)
+        ) {$charset_collate};";
+
         dbDelta($sql_pool);
         dbDelta($sql_matches);
         dbDelta($sql_notifications);
+        dbDelta($sql_logs);
 
         // Direct schema patch: dbDelta does NOT modify existing ENUM definitions
         $wpdb->query(

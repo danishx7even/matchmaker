@@ -1,27 +1,30 @@
-# Feature Context: Form & Data Collection
+# Feature Context: Form Handler & Questionnaire
 
-This document defines the architecture, rules, and constraints for the Matchmaking Questionnaire Form (`includes/Form_Handler.php` & `includes/Field_Generator.php`).
+This document defines the 37-field questionnaire wizard, hydration logic, file upload handling, and standalone field shortcodes (`src/Frontend/FormController.php` and `src/Frontend/FieldGenerator.php`).
 
-## 1. Core Responsibilities
-- Provides shortcodes `[matchmaking_form]` (full 2-step form) and `[matchmaking_field name="..."]` (standalone field).
-- Hydrates existing user profile data from `wp_matchmaking_pool` and `wp_usermeta`.
-- Processes form submission via AJAX (`wp_ajax_mmf_submit_form`).
-- Enqueues frontend assets (`assets/css/matchmaking-form.css`, `assets/js/matchmaking-form.js`) conditionally only on pages containing the form shortcodes.
+---
 
-## 2. Form Architecture & 2-Step Layout
-The form is divided into two distinct steps:
-- **Step 1: About You**
-  - Personal information, location, background, physical attributes, lifestyle, family, education, and finance.
-  - Required client-side validation: Full Name and Email must be filled before proceeding to Step 2.
-  - Profile Photos: Supports up to 3 photo uploads, processed via WP Media Library (`media_handle_upload()`).
-- **Step 2: Partner Preferences**
-  - Preferred age range, location, background, partner attributes, lifestyle preferences, and ideal match notes (`pref_additional_info`).
+## 1. Shortcodes
+1. **`[matchmaking_form]`**: Renders the complete 2-step profile and partner preference questionnaire.
+2. **`[matchmaking_field field="..."]`**: Renders a standalone single field component anywhere on the site.
 
-## 3. Data Processing & Security
-- **Nonce Verification**: Validates `mmf_nonce` on AJAX submission.
-- **Authentication**: Requires user to be logged in.
-- **Data Hygiene**: Sanitizes text inputs (`sanitize_text_field`), textareas (`sanitize_textarea_field`), emails (`sanitize_email`), and normalizes multi-select array inputs into comma-delimited strings.
-- **Dual Table Storage**:
-  - Indexed matching criteria are saved in `wp_matchmaking_pool` via `$wpdb->replace()`.
-  - Presentation and display attributes are saved in `wp_usermeta` via `update_user_meta()`.
-- **Auto-Matching Trigger**: If the user is a `monthly` tier, `mm_enqueue_user_matching_job()` is executed after successful database update.
+---
+
+## 2. Multi-Step Form Structure
+- **Step 1: About You (Self Profile)**: Personal details, birth date, height, religion, modesty, origin, education, occupation, smoking/drinking habits, and photo uploads.
+- **Step 2: Partner Preferences**: Reciprocal search filters (gender, age window, location, height min/max, religion, modesty, origin).
+
+---
+
+## 3. Data Ingestion & Dual Storage
+Upon submission via AJAX (`wp_ajax_mmf_submit_form`):
+1. **Indexed Criteria $\rightarrow$ `wp_matchmaking_pool`**: 11 core criteria (5 mandatory + 6 flexible) are normalized and written to the dedicated pool table for high-speed SQL matching.
+2. **Presentation Metadata $\rightarrow$ `wp_usermeta`**: All 37 fields, biographical notes, and media attachment IDs are saved into WordPress usermeta.
+3. **Background Job Dispatch**: If the submitting member is in an active matching tier, enqueues an asynchronous matching job via `mm_enqueue_user_matching_job()`.
+
+---
+
+## 4. Frontend Assets & Validation
+- Handled by `assets/js/matchmaking-form.js` and `assets/css/matchmaking-form.css`.
+- Client-side validation per step with smooth error highlights.
+- Image uploads support instant client-side preview.
