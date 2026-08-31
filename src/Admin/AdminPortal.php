@@ -418,10 +418,10 @@ class AdminPortal
      */
     private function render_manual_match_view(int $user_id): void
     {
-        $repo = MatchRepository::instance();
-        $pool = $repo->get_user_pool($user_id);
+        $repo     = MatchRepository::instance();
+        $pool     = $repo->get_user_pool($user_id);
         $user_obj = get_userdata($user_id);
-        $meta = $repo->get_meta_block($user_id);
+        $meta     = $repo->get_meta_block($user_id);
 
         if (!$pool || !$user_obj) {
             echo '<p>' . esc_html__('User profile not found.', 'matchmaker') . '</p>';
@@ -431,26 +431,29 @@ class AdminPortal
         $user_age   = $repo->calc_age($pool['birth_date'] ?? '');
         $quota_used = (int) get_user_meta($user_id, 'cycle_matches_count', true);
 
-        $f_gender   = sanitize_text_field(wp_unslash($_GET['f_gender']   ?? $pool['pref_gender'] ?? ''));
+        // Smart default candidate gender (opposite of user gender if pref_gender not specified)
+        $pref_g = trim((string)($pool['pref_gender'] ?? ''));
+        if (empty($pref_g) || strtolower($pref_g) === 'any') {
+            $user_g = strtolower(trim((string)($pool['gender'] ?? '')));
+            $pref_g = ($user_g === 'male') ? 'female' : (($user_g === 'female') ? 'male' : 'any');
+        }
+
+        $f_gender   = sanitize_text_field(wp_unslash($_GET['f_gender']   ?? $pref_g));
         $f_age_min  = isset($_GET['f_age_min'])  ? (int) $_GET['f_age_min']  : (int) ($pool['preferred_age_min'] ?? 18);
         $f_age_max  = isset($_GET['f_age_max'])  ? (int) $_GET['f_age_max']  : (int) ($pool['preferred_age_max'] ?? 80);
         $f_location = sanitize_text_field(wp_unslash($_GET['f_location'] ?? $pool['pref_location'] ?? ''));
         $f_origin   = sanitize_text_field(wp_unslash($_GET['f_origin']   ?? $pool['pref_origin'] ?? ''));
         $f_religion = sanitize_text_field(wp_unslash($_GET['f_religion'] ?? $pool['pref_religion'] ?? ''));
         $f_modesty  = sanitize_text_field(wp_unslash($_GET['f_modesty']  ?? $pool['pref_modesty'] ?? ''));
-        $f_marital  = sanitize_text_field(wp_unslash($_GET['f_marital']  ?? $meta['pref_marital_status'] ?? ''));
-        $f_education= sanitize_text_field(wp_unslash($_GET['f_education']?? $meta['pref_education'] ?? ''));
 
         $filters = [
-            'f_gender'         => $f_gender,
-            'f_age_min'        => $f_age_min,
-            'f_age_max'        => $f_age_max,
-            'f_location'       => $f_location,
-            'f_origin'         => $f_origin,
-            'f_religion'       => $f_religion,
-            'f_modesty'        => $f_modesty,
-            'f_marital_status' => $f_marital,
-            'f_education'      => $f_education,
+            'f_gender'   => $f_gender,
+            'f_age_min'  => $f_age_min,
+            'f_age_max'  => $f_age_max,
+            'f_location' => $f_location,
+            'f_origin'   => $f_origin,
+            'f_religion' => $f_religion,
+            'f_modesty'  => $f_modesty,
         ];
 
         $candidates = $repo->get_manual_match_candidates($user_id, $pool, $filters);

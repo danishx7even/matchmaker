@@ -286,3 +286,42 @@ This document maintains a chronological, step-by-step history of all features, a
   - Automated Testing (`tests/`):
     - Added `ModeAndResetTest.php` and `LoggingTest.php`.
     - Verified all 18 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 25: Manual Matchmaker Search Filtering, Compatibility Score Ranking & Event Logging
+- **Objective**: Ensure the Manual Matchmaker tool (`manual_match=USER_ID`) accurately searches the candidate pool using advanced filter inputs (Gender, Age Min/Max, Location, Origin, Religion, Modesty), automatically ranks candidates by compatibility score in descending order, provides a one-click "+ Create Match Pair" action, and logs all search and match creation activities into `wp_matchmaker_logs`.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Refactored `get_manual_match_candidates()`:
+      - Fixed MySQL strict mode `Incorrect DATE value: ''` error in age clause by removing invalid string comparisons against the `DATE` column (`birth_date`).
+      - Removed `f_marital_status` and `f_education` from candidate query per user requirements.
+      - Fixed query matching for text criteria (Location, Origin, Religion, Modesty) using flexible `LIKE`, `FIND_IN_SET`, and case-insensitive matching.
+      - Added dynamic preference scoring for each candidate based on admin-specified filter values.
+      - Sorted candidate results in descending order by `compatibility_score`.
+      - Added automatic logging of `manual_match_search` event into `wp_matchmaker_logs` recording filter parameters and matching candidates count.
+    - Updated `create_match()` to log `manual_match_created` event with match pair IDs, compatibility score, and admin user ID.
+  - `src/Admin/AdminPortal.php`:
+    - Updated `render_manual_match_view()` to provide intelligent candidate gender defaulting (target user's `pref_gender` or inverted user gender) and handle all filter parameters.
+  - `src/View/admin/pool/manual-match.php`:
+    - Cleaned up filter form: removed Education and Marital Status fields; focused on Gender, Age Range, Location, Origin, Religion, and Modesty Level.
+    - Ranked candidate results table displaying candidate photo, name, email, criteria, compatibility score badge (`X / 6`), and `+ Create Match Pair` action button.
+  - Verified User #283496466 against Live Local DB:
+    - Successfully returned the 2 expected candidate matches: Candidate #283496465 (`eren`, 3/6 score) and Candidate #283496467 (`Armin`, 3/6 score).
+  - `tests/Unit/ManualMatchmakerTest.php`:
+    - Created unit tests verifying filter execution, match exclusion, score computation, and event logging.
+    - Verified all 20 automated tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 26: Create Comprehensive Root README.md for GitHub Repository
+- **Objective**: Author a professional, complete, and well-structured `README.md` at the root of the repository for GitHub, detailing the architecture, features, directory layout, database schema, shortcodes, test runner, and integrations.
+- **Implemented**:
+  - `README.md`:
+    - Added System Architecture diagram with full directory tree and PSR-4 namespace mapping.
+    - Detailed Core Features: Asynchronous Action Scheduler background matching, bi-directional hard gates, 6-point flexible compatibility scoring, 5-state member portal match flow, admin management hub, manual matchmaker, test/live environment modes, and structured audit logs.
+    - Documented all 4 custom database tables (`wp_matchmaking_pool`, `wp_matches`, `wp_matchmaker_notifications`, `wp_matchmaker_logs`).
+    - Added Shortcodes Reference table (`[matchmaker_member_portal]`, `[matchmaking_form]`, `[matchmaking_field]`, `[logout_url]`).
+    - Added Automated Testing Guide with CLI command and output.
+    - Documented system requirements and integrations (PMPro, Elementor Pro, Action Scheduler).
+  - Verified test suite passes with 100% success rate (20/20 tests passed).

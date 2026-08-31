@@ -45,7 +45,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <p class="description">
             <strong><?php esc_html_e('Gender:', 'matchmaker'); ?></strong> <?php echo esc_html(ucfirst($pool['gender'])); ?> &nbsp;|&nbsp; 
             <strong><?php esc_html_e('Age:', 'matchmaker'); ?></strong> <?php echo esc_html($user_age . ' yrs'); ?> &nbsp;|&nbsp; 
-            <strong><?php esc_html_e('Location:', 'matchmaker'); ?></strong> <?php echo esc_html($pool['location']); ?> &nbsp;|&nbsp; 
+            <strong><?php esc_html_e('Location:', 'matchmaker'); ?></strong> <?php echo esc_html($pool['location'] ?: '—'); ?> &nbsp;|&nbsp; 
             <strong><?php esc_html_e('Quota Used:', 'matchmaker'); ?></strong> <?php echo $quota_used; ?> / <?php echo (int) $repo->get_max_cycle_matches(); ?>
         </p>
     </div>
@@ -54,6 +54,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 <!-- Advanced Filter Form Card -->
 <div class="mm-card" style="margin-bottom:24px;">
     <h3><?php esc_html_e('Advanced Candidate Match Filters', 'matchmaker'); ?></h3>
+    <p class="description" style="margin-top:-6px; margin-bottom:16px;">
+        <?php esc_html_e('Customize search criteria to find the best compatible candidates in the pool. Results are automatically ranked by compatibility score.', 'matchmaker'); ?>
+    </p>
     <form method="get">
         <input type="hidden" name="page" value="matchmaking-pool">
         <input type="hidden" name="manual_match" value="<?php echo $user_id; ?>">
@@ -64,6 +67,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                 <select name="f_gender" style="width:100%;">
                     <option value="female" <?php selected(strtolower($f_gender), 'female'); ?>><?php esc_html_e('Female', 'matchmaker'); ?></option>
                     <option value="male"   <?php selected(strtolower($f_gender), 'male');   ?>><?php esc_html_e('Male', 'matchmaker'); ?></option>
+                    <option value="any"    <?php selected(strtolower($f_gender), 'any');    ?>><?php esc_html_e('Any Gender', 'matchmaker'); ?></option>
                 </select>
             </div>
 
@@ -78,22 +82,22 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 
             <div style="flex:1 1 200px;">
                 <label><strong><?php esc_html_e('Candidate Location', 'matchmaker'); ?></strong></label><br>
-                <input type="text" name="f_location" value="<?php echo esc_attr($f_location); ?>" placeholder="e.g. Riyadh or Any" style="width:100%;">
+                <input type="text" name="f_location" value="<?php echo esc_attr($f_location); ?>" placeholder="<?php esc_attr_e('e.g. Riyadh or Any', 'matchmaker'); ?>" style="width:100%;">
             </div>
 
             <div style="flex:1 1 200px;">
                 <label><strong><?php esc_html_e('Origin / Ethnicity', 'matchmaker'); ?></strong></label><br>
-                <input type="text" name="f_origin" value="<?php echo esc_attr($f_origin); ?>" placeholder="e.g. Arab or Any" style="width:100%;">
+                <input type="text" name="f_origin" value="<?php echo esc_attr($f_origin); ?>" placeholder="<?php esc_attr_e('e.g. Arab or Any', 'matchmaker'); ?>" style="width:100%;">
             </div>
 
             <div style="flex:1 1 200px;">
                 <label><strong><?php esc_html_e('Religion', 'matchmaker'); ?></strong></label><br>
-                <input type="text" name="f_religion" value="<?php echo esc_attr($f_religion); ?>" placeholder="e.g. Muslim or Any" style="width:100%;">
+                <input type="text" name="f_religion" value="<?php echo esc_attr($f_religion); ?>" placeholder="<?php esc_attr_e('e.g. Muslim or Any', 'matchmaker'); ?>" style="width:100%;">
             </div>
 
             <div style="flex:1 1 200px;">
                 <label><strong><?php esc_html_e('Modesty Level', 'matchmaker'); ?></strong></label><br>
-                <input type="text" name="f_modesty" value="<?php echo esc_attr($f_modesty); ?>" placeholder="e.g. Hijab, Niqab or Any" style="width:100%;">
+                <input type="text" name="f_modesty" value="<?php echo esc_attr($f_modesty); ?>" placeholder="<?php esc_attr_e('e.g. Hijab, Niqab or Any', 'matchmaker'); ?>" style="width:100%;">
             </div>
         </div>
 
@@ -106,7 +110,13 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 
 <!-- Candidate Results Table -->
 <div class="mm-card">
-    <h3><?php echo esc_html(sprintf(__('Filtered Candidate Results (%d found)', 'matchmaker'), count($candidates))); ?></h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3 style="margin:0; border:0; padding:0;"><?php echo esc_html(sprintf(__('Ranked Candidate Matches (%d found)', 'matchmaker'), count($candidates))); ?></h3>
+        <span class="mm-badge mm-badge-monthly" style="font-size:12px; font-weight:600; padding:4px 10px; border-radius:12px;">
+            <?php esc_html_e('Ranked by Highest Compatibility Score', 'matchmaker'); ?>
+        </span>
+    </div>
+
     <table class="wp-list-table widefat fixed striped">
         <thead>
             <tr>
@@ -115,7 +125,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                 <th><?php esc_html_e('Gender / Age', 'matchmaker'); ?></th>
                 <th><?php esc_html_e('Location / Origin', 'matchmaker'); ?></th>
                 <th><?php esc_html_e('Religion / Modesty', 'matchmaker'); ?></th>
-                <th><?php esc_html_e('Compatibility Score', 'matchmaker'); ?></th>
+                <th style="width:130px; text-align:center;"><?php esc_html_e('Score', 'matchmaker'); ?></th>
                 <th style="width:160px; text-align:center;"><?php esc_html_e('Action', 'matchmaker'); ?></th>
             </tr>
         </thead>
@@ -128,7 +138,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     $cuser = get_userdata($cid);
                     $photo = $repo->get_meta($cid, 'user_photo1');
                     $cage  = $repo->calc_age($cand['birth_date'] ?? '');
-                    $score = \Matchmaker\Service\MatchService::instance()->compute_flexible_score($pool, $cand);
+                    $score = (int) ($cand['compatibility_score'] ?? \Matchmaker\Service\MatchService::instance()->compute_flexible_score($pool, $cand));
                     $create_url = wp_nonce_url(
                         admin_url('admin.php?page=matchmaking-pool&manual_match=' . $user_id . '&mm_action=create_manual_match&u1=' . $user_id . '&u2=' . $cid),
                         'mm_manual_match'
@@ -145,13 +155,21 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                             <?php endif; ?>
                         </td>
                         <td>
-                            <strong><a href="<?php echo esc_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $cid)); ?>"><?php echo esc_html($cuser ? $cuser->display_name : 'User #' . $cid); ?></a></strong><br>
+                            <strong><a href="<?php echo esc_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $cid)); ?>"><?php echo esc_html($cuser ? $cuser->display_name : 'User #' . $cid); ?></a></strong>
+                            <span class="mm-badge mm-badge-<?php echo esc_attr($cand['user_type'] ?? 'free'); ?>" style="margin-left:4px;">
+                                <?php echo esc_html($repo->format_tier_label($cand['user_type'] ?? 'free')); ?>
+                            </span>
+                            <br>
                             <small style="color:#666;"><?php echo esc_html($cuser ? $cuser->user_email : ''); ?></small>
                         </td>
                         <td><?php echo esc_html(ucfirst($cand['gender'] ?? '')) . ' (' . esc_html($cage) . ' yrs)'; ?></td>
-                        <td><?php echo esc_html(($cand['location'] ?? '—') . ' / ' . ($cand['origin'] ?? '—')); ?></td>
-                        <td><?php echo esc_html(($cand['religion'] ?? '—') . ' / ' . ($cand['modesty'] ?? '—')); ?></td>
-                        <td><strong><?php echo (int) $score; ?></strong> / 6</td>
+                        <td><?php echo esc_html(($cand['location'] ?: '—') . ' / ' . ($cand['origin'] ?: '—')); ?></td>
+                        <td><?php echo esc_html(($cand['religion'] ?: '—') . ' / ' . ($cand['modesty'] ?: '—')); ?></td>
+                        <td style="text-align:center;">
+                            <span style="display:inline-block; font-weight:700; color:#0284c7; background:#e0f2fe; padding:3px 10px; border-radius:12px; font-size:12px;">
+                                <?php echo $score; ?> / 6
+                            </span>
+                        </td>
                         <td style="text-align:center;">
                             <a href="<?php echo esc_url($create_url); ?>" class="button button-primary button-small">
                                 + <?php esc_html_e('Create Match Pair', 'matchmaker'); ?>

@@ -8,6 +8,7 @@ require_once __DIR__ . '/Unit/QuotaAndExpiryTest.php';
 require_once __DIR__ . '/Unit/MatchingEngineTest.php';
 require_once __DIR__ . '/Unit/ModeAndResetTest.php';
 require_once __DIR__ . '/Unit/LoggingTest.php';
+require_once __DIR__ . '/Unit/ManualMatchmakerTest.php';
 require_once __DIR__ . '/Integration/EndToEndFlowTest.php';
 
 $test_classes = [
@@ -17,6 +18,7 @@ $test_classes = [
     \Matchmaker\Tests\Unit\MatchingEngineTest::class,
     \Matchmaker\Tests\Unit\ModeAndResetTest::class,
     \Matchmaker\Tests\Unit\LoggingTest::class,
+    \Matchmaker\Tests\Unit\ManualMatchmakerTest::class,
     \Matchmaker\Tests\Integration\EndToEndFlowTest::class,
 ];
 

@@ -349,6 +349,7 @@ function mm_enqueue_user_matching_job(int $user_id, string $trigger = 'auto'): v
 class Fakewpdb {
     public string $prefix = 'wp_';
     public string $usermeta = 'wp_usermeta';
+    public string $users = 'wp_users';
     public int $insert_id = 1;
     public array $queries = [];
     public array $mock_results = [];

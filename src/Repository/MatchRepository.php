@@ -454,50 +454,41 @@ class MatchRepository
     public function get_manual_match_candidates(int $user_id, array $pool, array $filters): array
     {
         global $wpdb;
-        $pool_table    = $wpdb->prefix . 'matchmaking_pool';
-        $matches_table = $wpdb->prefix . 'matches';
+        $pool_table      = $wpdb->prefix . 'matchmaking_pool';
+        $matches_table   = $wpdb->prefix . 'matches';
+        $usermeta_table  = !empty($wpdb->usermeta) ? $wpdb->usermeta : ($wpdb->prefix . 'usermeta');
 
         $where = ['(c.user_id != %d AND (c.is_active = 1 OR c.is_active IS NULL))'];
         $args  = [$user_id];
 
-        if (!empty($filters['f_gender'])) {
-            $where[] = '(LOWER(TRIM(c.gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.gender), \', \', \',\')) > 0)';
+        // 1. Gender Filter
+        if (!empty($filters['f_gender']) && strtolower($filters['f_gender']) !== 'any') {
             $gender_val = strtolower(trim($filters['f_gender']));
+            $where[] = '(LOWER(TRIM(c.gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.gender), \', \', \',\')) > 0)';
             $args[]  = $gender_val;
             $args[]  = $gender_val;
         }
 
+        // 2. Age Range Filter (DATE column must not be compared to empty string '')
         $f_age_min = (int) ($filters['f_age_min'] ?? 18);
         $f_age_max = (int) ($filters['f_age_max'] ?? 80);
-        $where[] = '(c.birth_date IS NULL OR c.birth_date = \'0000-00-00\' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)';
-        $args[]  = $f_age_min;
-        $args[]  = $f_age_max;
+        $where[]   = '(c.birth_date IS NULL OR c.birth_date = \'0000-00-00\' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)';
+        $args[]    = $f_age_min;
+        $args[]    = $f_age_max;
 
-        foreach (['f_location', 'f_religion', 'f_modesty', 'f_origin'] as $filter_key) {
-            $col = str_replace('f_', '', $filter_key);
+        // 3. Pool Profile Text Criteria (Location, Religion, Modesty, Origin)
+        foreach (['f_location' => 'location', 'f_religion' => 'religion', 'f_modesty' => 'modesty', 'f_origin' => 'origin'] as $filter_key => $col) {
             if (!empty($filters[$filter_key]) && strtolower($filters[$filter_key]) !== 'any') {
-                $where[] = "(c.{$col} IS NULL OR c.{$col} = '' OR FIND_IN_SET(c.{$col}, REPLACE(%s, ', ', ',')) > 0 OR c.{$col} LIKE CONCAT('%%', %s, '%%'))";
-                $args[]  = $filters[$filter_key];
-                $args[]  = $filters[$filter_key];
+                $val = trim((string)$filters[$filter_key]);
+                $like = '%' . $wpdb->esc_like(strtolower($val)) . '%';
+                $where[] = "(c.{$col} IS NOT NULL AND c.{$col} != '' AND (LOWER(c.{$col}) LIKE %s OR %s LIKE CONCAT('%%', LOWER(c.{$col}), '%%') OR FIND_IN_SET(LOWER(c.{$col}), REPLACE(LOWER(%s), ', ', ',')) > 0))";
+                $args[]  = $like;
+                $args[]  = strtolower($val);
+                $args[]  = $val;
             }
         }
 
-        // Bi-directional preference checks
-        foreach (['location', 'religion', 'modesty'] as $field) {
-            if (!empty($pool[$field]) && strtolower($pool[$field]) !== 'any') {
-                $where[] = "(c.pref_{$field} IS NULL OR c.pref_{$field} = '' OR LOWER(TRIM(c.pref_{$field})) = 'any' OR FIND_IN_SET(%s, REPLACE(c.pref_{$field}, ', ', ',')) > 0 OR LOWER(c.pref_{$field}) LIKE CONCAT('%%', %s, '%%'))";
-                $args[]  = $pool[$field];
-                $args[]  = strtolower($pool[$field]);
-            }
-        }
-
-        if (!empty($pool['gender'])) {
-            $user_g = strtolower(trim($pool['gender']));
-            $where[] = "(c.pref_gender IS NULL OR c.pref_gender = '' OR LOWER(TRIM(c.pref_gender)) = 'any' OR LOWER(TRIM(c.pref_gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.pref_gender), ', ', ',')) > 0)";
-            $args[]  = $user_g;
-            $args[]  = $user_g;
-        }
-
+        // 4. Exclude Existing Match Pairs with this user
         $where[] = "NOT EXISTS (
             SELECT 1 FROM {$matches_table} m
             WHERE m.user_one_id = LEAST(%d, c.user_id)
@@ -506,31 +497,67 @@ class MatchRepository
         $args[] = $user_id;
         $args[] = $user_id;
 
-        // Usermeta filters (marital status, education, citizenship)
-        if (!empty($filters['f_marital_status']) && strtolower($filters['f_marital_status']) !== 'any') {
-            $where[] = "EXISTS (SELECT 1 FROM {$wpdb->usermeta} um_ms WHERE um_ms.user_id = c.user_id AND um_ms.meta_key = 'user_marital_status' AND um_ms.meta_value = %s)";
-            $args[]  = $filters['f_marital_status'];
-        }
-        if (!empty($filters['f_education']) && strtolower($filters['f_education']) !== 'any') {
-            $where[] = "EXISTS (SELECT 1 FROM {$wpdb->usermeta} um_ed WHERE um_ed.user_id = c.user_id AND um_ed.meta_key = 'user_education' AND um_ed.meta_value = %s)";
-            $args[]  = $filters['f_education'];
-        }
-        if (!empty($filters['f_citizenship']) && strtolower($filters['f_citizenship']) !== 'any') {
-            $where[] = "EXISTS (SELECT 1 FROM {$wpdb->usermeta} um_cz WHERE um_cz.user_id = c.user_id AND um_cz.meta_key = 'user_citizenship' AND um_cz.meta_value = %s)";
-            $args[]  = $filters['f_citizenship'];
-        }
-
         $where_sql = implode(' AND ', $where);
+        $users_table = !empty($wpdb->users) ? $wpdb->users : ($wpdb->prefix . 'users');
 
         $sql = "
             SELECT c.*, u.user_email, u.display_name
             FROM {$pool_table} c
-            INNER JOIN {$wpdb->users} u ON c.user_id = u.ID
+            INNER JOIN {$users_table} u ON c.user_id = u.ID
             WHERE {$where_sql}
             ORDER BY c.updated_at DESC
         ";
 
         $results = $wpdb->get_results($wpdb->prepare($sql, ...$args), ARRAY_A) ?: [];
+
+        // 6. Compute compatibility scores and sort by score descending
+        $scoring_profile = $pool;
+        if (!empty($filters['f_gender']) && strtolower($filters['f_gender']) !== 'any') {
+            $scoring_profile['pref_gender'] = $filters['f_gender'];
+        }
+        if (!empty($filters['f_location']) && strtolower($filters['f_location']) !== 'any') {
+            $scoring_profile['pref_location'] = $filters['f_location'];
+        }
+        if (!empty($filters['f_origin']) && strtolower($filters['f_origin']) !== 'any') {
+            $scoring_profile['pref_origin'] = $filters['f_origin'];
+        }
+        if (!empty($filters['f_religion']) && strtolower($filters['f_religion']) !== 'any') {
+            $scoring_profile['pref_religion'] = $filters['f_religion'];
+        }
+        if (!empty($filters['f_modesty']) && strtolower($filters['f_modesty']) !== 'any') {
+            $scoring_profile['pref_modesty'] = $filters['f_modesty'];
+        }
+        $scoring_profile['preferred_age_min'] = $f_age_min;
+        $scoring_profile['preferred_age_max'] = $f_age_max;
+
+        $match_service = \Matchmaker\Service\MatchService::instance();
+        foreach ($results as &$cand) {
+            $cand['compatibility_score'] = $match_service->compute_flexible_score($scoring_profile, $cand);
+        }
+        unset($cand);
+
+        usort($results, static function (array $a, array $b): int {
+            return ($b['compatibility_score'] ?? 0) <=> ($a['compatibility_score'] ?? 0);
+        });
+
+        // 7. Structured Activity Log for Manual Match Search
+        $this->log_event(
+            'match_lifecycle',
+            'manual_match_search',
+            sprintf(__('Manual Match Search for User #%d', 'matchmaker'), $user_id),
+            sprintf(__('Admin searched candidate pool with filters for User #%d. Found %d matching candidates.', 'matchmaker'), $user_id, count($results)),
+            [
+                'target_user_id' => $user_id,
+                'filters'        => $filters,
+                'results_count'  => count($results),
+                'admin_id'       => get_current_user_id(),
+            ],
+            null,
+            $user_id,
+            null,
+            'info'
+        );
+
         return $results;
     }
 
