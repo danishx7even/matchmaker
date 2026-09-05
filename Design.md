@@ -1,6 +1,6 @@
-# Feature Context: Official Design System & Visual Tokens
+# Matchmaker Plugin — Official Design System & Visual Guidelines
 
-This document defines the official design tokens, typography, CSS component classes, status colors, and responsive breakpoints for the Matchmaker plugin.
+This document defines the official design tokens, typography, CSS component classes, status colors, and color balance matrix for the Matchmaker plugin.
 
 ---
 
@@ -25,7 +25,7 @@ This document defines the official design tokens, typography, CSS component clas
 To ensure visual elegance and high contrast, views balance **`#1D1E20`** (Obsidian Dark) and **`#CC723F`** (Warm Primary Ochre):
 
 1. **Where `#1D1E20` is Used**:
-   - **Headings & Titles**: H1 page titles, H2 section headings, H3 card headers (`.font-cormorant`, `.mm-events-title`, `.portal-nav-brand`).
+   - **Headings & Titles**: H1 page titles, H2 section headings, H3 card headers (`.font-cormorant`, `.mm-events-title`, `.portal-nav-brand`, `.az-user-name`).
    - **Secondary & Dark Action Controls**: `.btn-outline-dark`, `.btn-dark`, table header cells (`thead th` in Admin Pool & Matches Queue).
    - **High-Contrast Accents**: Modal header banners, subtle container borders, card title bars (`.az-card-title`, `.mm-card-header`).
    - **Form Structure**: Step indicator inactive text, field grouping titles.
@@ -38,7 +38,7 @@ To ensure visual elegance and high contrast, views balance **`#1D1E20`** (Obsidi
 
 ---
 
-## 2. Typography Rules
+## 3. Typography Rules
 
 - **Display & Section Headings**: `'Cormorant SC', serif`
   - **H1 / Page Titles**: `32px` · Semi-Bold (600) · `letter-spacing: 1.5px` · Uppercase
@@ -51,7 +51,7 @@ To ensure visual elegance and high contrast, views balance **`#1D1E20`** (Obsidi
 
 ---
 
-## 3. Match Status Lifecycle & Badge Classes
+## 4. Match Status Lifecycle & Badge Classes
 
 ```css
 /* Pending Review (Yellow/Gold) */
@@ -78,7 +78,7 @@ To ensure visual elegance and high contrast, views balance **`#1D1E20`** (Obsidi
 
 ---
 
-## 4. Mobile & Tablet Responsiveness
+## 5. Mobile & Tablet Responsiveness
 - **Canvas Width**: `1100px` max-width with `36px` border radii.
 - **Breakpoints**:
   - `@media (max-width: 900px)`: Sidebars stack vertically, dual comparison becomes single-column scroll.

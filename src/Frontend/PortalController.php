@@ -116,6 +116,14 @@ class PortalController
         $user_id  = get_current_user_id();
         $user_obj = wp_get_current_user();
 
+        // Email Verification Gating: Unverified members must enter 6-digit code
+        if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
+            $verify_service = \Matchmaker\Service\EmailVerificationService::instance();
+            if (!$verify_service->is_user_verified($user_id)) {
+                return $verify_service->render_verification_screen($user_id, 'portal');
+            }
+        }
+
         $repo = \Matchmaker\Repository\MatchRepository::instance();
         
         $pool = $repo->get_user_pool($user_id);
@@ -216,14 +224,24 @@ class PortalController
             wp_send_json_error(['message' => __('User not logged in.', 'matchmaker')]);
         }
 
-        $tab = isset($_POST['tab']) ? sanitize_key((string) $_POST['tab']) : 'profile';
+        $tab       = isset($_POST['tab']) ? sanitize_key((string) $_POST['tab']) : 'profile';
         $user_type = \Matchmaker\Service\ProfileService::instance()->get_user_type($user_id);
+        $page      = isset($_POST['page']) ? max(1, (int) $_POST['page']) : 1;
 
-        $html = ($tab === 'matches')
-            ? $this->render_matches_html($user_id, $user_type)
-            : $this->render_profile_html($user_id);
+        // Tab Gating: Members with 'event' membership are not permitted to access matches
+        if ($user_type === 'event' && $tab === 'matches') {
+            wp_send_json_error(['message' => __('Matches are not available for Event memberships.', 'matchmaker')]);
+        }
 
-        wp_send_json_success(['html' => $html, 'tab' => $tab]);
+        if ($tab === 'matches') {
+            $html = $this->render_matches_html($user_id, $user_type);
+        } elseif ($tab === 'events') {
+            $html = $this->render_events_html($user_id, $user_type, $page);
+        } else {
+            $html = $this->render_profile_html($user_id);
+        }
+
+        wp_send_json_success(['html' => $html, 'tab' => $tab, 'page' => $page]);
     }
 
     /**
@@ -237,8 +255,14 @@ class PortalController
         if ($action === 'accept_match' || $action === 'decline_match') {
             $_POST['response_action'] = ($action === 'accept_match') ? 'accept' : 'decline';
             $this->handle_ajax_match_response();
-        } elseif ($action === 'get_matches_html' || $action === 'get_profile_html') {
-            $_POST['tab'] = ($action === 'get_matches_html') ? 'matches' : 'profile';
+        } elseif ($action === 'get_matches_html' || $action === 'get_profile_html' || $action === 'get_events_html') {
+            if ($action === 'get_matches_html') {
+                $_POST['tab'] = 'matches';
+            } elseif ($action === 'get_events_html') {
+                $_POST['tab'] = 'events';
+            } else {
+                $_POST['tab'] = 'profile';
+            }
             $this->handle_ajax_reload_tab();
         } else {
             wp_send_json_error(['message' => __('Invalid action.', 'matchmaker')]);
@@ -260,6 +284,23 @@ class PortalController
         
         ob_start();
         include __DIR__ . '/../View/frontend/portal/tab-matches.php';
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the events tab HTML
+     *
+     * @param int    $user_id
+     * @param string $user_type
+     * @param int    $paged
+     * @return string
+     */
+    private function render_events_html(int $user_id, string $user_type, int $paged = 1): string
+    {
+        $is_premium = in_array($user_type, ['monthly', 'one_on_one'], true);
+
+        ob_start();
+        include __DIR__ . '/../View/frontend/portal/tab-events.php';
         return (string) ob_get_clean();
     }
     

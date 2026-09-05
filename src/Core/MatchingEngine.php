@@ -389,8 +389,12 @@ class MatchingEngine {
 
         $user_gender   = strtolower(trim((string) ($user['gender'] ?? '')));
         $pref_gender   = strtolower(trim((string) ($user['pref_gender'] ?? '')));
-        $user_location = trim((string) ($user['location'] ?? ''));
-        $pref_location = trim((string) ($user['pref_location'] ?? ''));
+        $user_country  = trim((string) ($user['country'] ?? ''));
+        $pref_country  = trim((string) ($user['pref_country'] ?? ''));
+        $user_state    = trim((string) ($user['state'] ?? ''));
+        $pref_state    = trim((string) ($user['pref_state'] ?? ''));
+        $user_city     = trim((string) ($user['city'] ?? ''));
+        $pref_city     = trim((string) ($user['pref_city'] ?? ''));
         $user_religion = trim((string) ($user['religion'] ?? ''));
         $pref_religion = trim((string) ($user['pref_religion'] ?? ''));
         $user_modesty  = trim((string) ($user['modesty'] ?? ''));
@@ -422,29 +426,29 @@ class MatchingEngine {
                    OR (TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)
                )
 
-               -- Location bi-directional gate
+               -- Country bi-directional gate
                AND (
-                   c.pref_location IS NULL OR c.pref_location = '' OR LOWER(TRIM(c.pref_location)) = 'any'
-                   OR %s = '' OR LOWER(%s) = 'any'
-                   OR FIND_IN_SET(%s, REPLACE(c.pref_location, ', ', ',')) > 0
-                   OR LOWER(c.pref_location) LIKE CONCAT('%%', %s, '%%')
+                   c.pref_country IS NULL OR c.pref_country = '' OR LOWER(TRIM(c.pref_country)) = 'any' OR LOWER(TRIM(c.pref_country)) = 'any country'
+                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any country'
+                   OR FIND_IN_SET(%s, REPLACE(c.pref_country, ', ', ',')) > 0
+                   OR LOWER(c.pref_country) LIKE CONCAT('%%', %s, '%%')
                )
                AND (
-                   %s = '' OR LOWER(%s) = 'any'
-                   OR c.location IS NULL OR c.location = ''
-                   OR FIND_IN_SET(c.location, REPLACE(%s, ', ', ',')) > 0
-                   OR (%s != '' AND %s LIKE CONCAT('%%', c.location, '%%'))
+                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any country'
+                   OR c.country IS NULL OR c.country = ''
+                   OR FIND_IN_SET(c.country, REPLACE(%s, ', ', ',')) > 0
+                   OR (%s != '' AND %s LIKE CONCAT('%%', c.country, '%%'))
                )
 
                -- Religion bi-directional gate
                AND (
-                   c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) = 'any'
-                   OR %s = '' OR LOWER(%s) = 'any'
+                   c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) = 'any' OR LOWER(TRIM(c.pref_religion)) = 'no preference' OR LOWER(TRIM(c.pref_religion)) = 'prefer not to say'
+                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
                    OR FIND_IN_SET(%s, REPLACE(c.pref_religion, ', ', ',')) > 0
                    OR LOWER(c.pref_religion) LIKE CONCAT('%%', %s, '%%')
                )
                AND (
-                   %s = '' OR LOWER(%s) = 'any'
+                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
                    OR c.religion IS NULL OR c.religion = ''
                    OR FIND_IN_SET(c.religion, REPLACE(%s, ', ', ',')) > 0
                    OR (%s != '' AND %s LIKE CONCAT('%%', c.religion, '%%'))
@@ -452,13 +456,13 @@ class MatchingEngine {
 
                -- Modesty bi-directional gate
                AND (
-                   c.pref_modesty IS NULL OR c.pref_modesty = '' OR LOWER(TRIM(c.pref_modesty)) = 'any'
-                   OR %s = '' OR LOWER(%s) = 'any'
+                   c.pref_modesty IS NULL OR c.pref_modesty = '' OR LOWER(TRIM(c.pref_modesty)) = 'any' OR LOWER(TRIM(c.pref_modesty)) = 'no preference' OR LOWER(TRIM(c.pref_modesty)) = 'prefer not to say'
+                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
                    OR FIND_IN_SET(%s, REPLACE(c.pref_modesty, ', ', ',')) > 0
                    OR LOWER(c.pref_modesty) LIKE CONCAT('%%', %s, '%%')
                )
                AND (
-                   %s = '' OR LOWER(%s) = 'any'
+                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
                    OR c.modesty IS NULL OR c.modesty = ''
                    OR FIND_IN_SET(c.modesty, REPLACE(%s, ', ', ',')) > 0
                    OR (%s != '' AND %s LIKE CONCAT('%%', c.modesty, '%%'))
@@ -486,14 +490,14 @@ class MatchingEngine {
             $user_age,
             $user_age,
             $user_age_min, $user_age_max,
-            // Location
-            $user_location, $user_location, $user_location, strtolower($user_location),
-            $pref_location, $pref_location, $pref_location, $pref_location, strtolower($pref_location),
+            // Country
+            $user_country, $user_country, $user_country, $user_country, strtolower($user_country),
+            $pref_country, $pref_country, $pref_country, $pref_country, strtolower($pref_country),
             // Religion
-            $user_religion, $user_religion, $user_religion, strtolower($user_religion),
+            $user_religion, $user_religion, $user_religion, $user_religion, strtolower($user_religion),
             $pref_religion, $pref_religion, $pref_religion, $pref_religion, strtolower($pref_religion),
             // Modesty
-            $user_modesty, $user_modesty, $user_modesty, strtolower($user_modesty),
+            $user_modesty, $user_modesty, $user_modesty, $user_modesty, strtolower($user_modesty),
             $pref_modesty, $pref_modesty, $pref_modesty, $pref_modesty, strtolower($pref_modesty),
             // Existing match checks
             $user_id,

@@ -85,4 +85,59 @@ final class MatchingEngineTest extends TestCase
         // Only height (1pt) + drinking (1pt) match = 2 pts
         $this->assertEquals(2, $scoreC);
     }
+
+    public function test_field_generator_options_usd_and_no_preference_and_citizenship(): void
+    {
+        $gen = \Matchmaker\Frontend\FieldGenerator::instance();
+
+        // 1. Verify USD income ranges: user options do NOT have No Preference, pref options DO have No Preference
+        $incomes = $gen->options_income();
+        $this->assertContains('0-100k USD', $incomes);
+        $this->assertContains('100k-500k USD', $incomes);
+        $this->assertContains('500k-1million USD', $incomes);
+        $this->assertContains('1 million + USD', $incomes);
+        $this->assertNotContains('No Preference', $incomes);
+
+        $pref_incomes = $gen->options_pref_income();
+        $this->assertContains('No Preference', $pref_incomes);
+        $this->assertContains('0-100k USD', $pref_incomes);
+
+        // 2. Verify Step 1 options do NOT contain "No Preference", Step 2 pref options DO contain "No Preference"
+        $this->assertNotContains('No Preference', $gen->options_marital());
+        $this->assertContains('No Preference', $gen->options_pref_marital());
+
+        $this->assertNotContains('No Preference', $gen->options_children());
+        $this->assertContains('No Preference', $gen->options_pref_children());
+
+        $this->assertNotContains('No Preference', $gen->options_education());
+        $this->assertContains('No Preference', $gen->options_pref_education());
+
+        $this->assertNotContains('No Preference', $gen->options_religion());
+        $this->assertContains('No Preference', $gen->options_pref_religion());
+
+        $this->assertNotContains('No Preference', $gen->options_modesty());
+        $this->assertContains('No Preference', $gen->options_pref_modesty());
+
+        $this->assertNotContains('No Preference', $gen->options_drinking());
+        $this->assertContains('No Preference', $gen->options_pref_drinking());
+
+        $this->assertNotContains('No Preference', $gen->options_smoking());
+        $this->assertContains('No Preference', $gen->options_pref_smoking());
+
+        $this->assertNotContains('No Preference', $gen->options_prayer());
+        $this->assertContains('No Preference', $gen->options_pref_prayer());
+
+        // 3. Verify "Any Citizenship" as first preferred citizenship option
+        $pref_citizenship = $gen->options_pref_citizenship();
+        $this->assertEquals('Any Citizenship', $pref_citizenship[0]);
+        $this->assertContains('Saudi Arabia', $pref_citizenship);
+        $this->assertContains('United States', $pref_citizenship);
+
+        // 4. Verify specific country list
+        $countries = $gen->options_country();
+        $this->assertContains('United States', $countries);
+        $this->assertContains('United Kingdom', $countries);
+        $this->assertContains('Pakistan', $countries);
+        $this->assertContains('Saudi Arabia', $countries);
+    }
 }

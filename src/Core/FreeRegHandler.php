@@ -146,6 +146,12 @@ class FreeRegHandler {
                 update_user_meta($user_id, 'phone_number', $phone_number); 
             }
 
+            update_user_meta($user_id, 'mm_email_verified', 0);
+
+            if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
+                \Matchmaker\Service\EmailVerificationService::instance()->generate_and_send_code($user_id, true);
+            }
+
             if (function_exists('pmpro_changeMembershipLevel')) {
                 $free_level = PMProSync::instance()->get_primary_level_for_tier('free', 2);
                 add_filter('pmpro_send_checkout_emails', '__return_false', 999);

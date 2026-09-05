@@ -283,7 +283,39 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             </table>
         </div>
 
-        <!-- SECTION 4: Approval Email Template -->
+        <!-- SECTION 4: Events Configuration -->
+        <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
+            <h2 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <?php esc_html_e('4. Member Portal Events Configuration', 'matchmaker'); ?>
+            </h2>
+            <p class="description"><?php esc_html_e('Configure how the Events custom post type and Elementor loop template are displayed inside the Member Portal Events tab.', 'matchmaker'); ?></p>
+
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="mm_events_cpt_slug"><?php esc_html_e('Event CPT Slug', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="text" name="mm_events_cpt_slug" id="mm_events_cpt_slug" value="<?php echo esc_attr($events_cpt_slug ?? 'event'); ?>" class="regular-text">
+                        <p class="description"><?php esc_html_e('The post type slug for Events created via ACF (default: "event").', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_events_template_id"><?php esc_html_e('Elementor Loop Template ID', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="number" name="mm_events_template_id" id="mm_events_template_id" value="<?php echo (int) ($events_template_id ?? 395); ?>" class="small-text">
+                        <p class="description"><?php esc_html_e('The Elementor Loop Item Template ID used to render event cards (default: 395).', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_events_per_page"><?php esc_html_e('Events Per Page', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="number" name="mm_events_per_page" id="mm_events_per_page" value="<?php echo (int) ($events_per_page ?? 6); ?>" min="1" max="50" class="small-text">
+                        <p class="description"><?php esc_html_e('Number of events to display per page with in-canvas AJAX pagination (default: 6).', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- SECTION 5: Approval Email Template -->
         <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
             <h2 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">
                 <?php esc_html_e('5. Approval Email Notification Template', 'matchmaker'); ?>
@@ -325,6 +357,86 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                                 <tr><td><code>{dashboard_url}</code></td><td><?php esc_html_e('Direct member portal dashboard URL', 'matchmaker'); ?></td></tr>
                             </tbody>
                         </table>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- SECTION 6: Verification Email Configuration -->
+        <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
+            <h2 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <?php esc_html_e('6. Email Verification Code & Delivery Settings', 'matchmaker'); ?>
+            </h2>
+            <p class="description"><?php esc_html_e('Configure the sender headers, 6-digit OTP template, expiration, and resend cooldown for user email verification.', 'matchmaker'); ?></p>
+            <p class="description" style="margin-top: 10px; color: #1e3a8a; background: #eff6ff; padding: 10px 14px; border-left: 4px solid #3b82f6; border-radius: 4px; font-size: 13px; line-height: 1.5;">
+                <strong>ℹ️ <?php esc_html_e('SMTP Configuration Note:', 'matchmaker'); ?></strong><br>
+                <?php esc_html_e('If your server returns "Could not instantiate mail function", WordPress is trying to use PHP\'s built-in mail() without a local mail transfer agent. Please ensure an SMTP plugin (such as WP Mail SMTP, FluentSMTP, or Post SMTP) is configured with valid credentials. In Test Mode, the plugin will automatically simulate code delivery so you can test locally without an active SMTP server.', 'matchmaker'); ?>
+            </p>
+
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="mm_email_verify_from_email"><?php esc_html_e('Sender Email (From Email)', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="email" name="mm_email_verify_from_email" id="mm_email_verify_from_email" value="<?php echo esc_attr($verify_from_email ?? ''); ?>" placeholder="<?php echo esc_attr(get_option('admin_email')); ?>" class="regular-text">
+                        <p class="description"><?php esc_html_e('Email address used as the sender (e.g. no-reply@arabzawaj.com). Leave empty to default to site admin email / domain.', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_email_verify_from_name"><?php esc_html_e('Sender Name (From Name)', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="text" name="mm_email_verify_from_name" id="mm_email_verify_from_name" value="<?php echo esc_attr($verify_from_name ?? ''); ?>" placeholder="<?php echo esc_attr(get_bloginfo('name') ?: 'Arab Zawaj Matrimony'); ?>" class="regular-text">
+                        <p class="description"><?php esc_html_e('Display name used as the sender (e.g. Arab Zawaj Matrimony).', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_email_verify_subject"><?php esc_html_e('Verification Email Subject', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="text" name="mm_email_verify_subject" id="mm_email_verify_subject" value="<?php echo esc_attr($verify_subject ?? ''); ?>" class="large-text">
+                        <p class="description"><?php esc_html_e('Subject line for the verification email. Supports {code} placeholder.', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_email_verify_template"><?php esc_html_e('Verification Email Body', 'matchmaker'); ?></label></th>
+                    <td>
+                        <?php
+                        wp_editor($verify_template ?? '', 'mm_email_verify_template', [
+                            'textarea_name' => 'mm_email_verify_template',
+                            'textarea_rows' => 10,
+                            'media_buttons' => true,
+                            'teeny'         => false,
+                        ]);
+                        ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e('Available Placeholders', 'matchmaker'); ?></th>
+                    <td>
+                        <table class="widefat compact striped" style="max-width:550px;">
+                            <thead>
+                                <tr><th><?php esc_html_e('Variable Tag', 'matchmaker'); ?></th><th><?php esc_html_e('Description', 'matchmaker'); ?></th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>{code}</code></td><td><strong><?php esc_html_e('The 6-digit verification security code (REQUIRED)', 'matchmaker'); ?></strong></td></tr>
+                                <tr><td><code>{user_name}</code></td><td><?php esc_html_e('Member display name', 'matchmaker'); ?></td></tr>
+                                <tr><td><code>{user_email}</code></td><td><?php esc_html_e('Member recipient email address', 'matchmaker'); ?></td></tr>
+                                <tr><td><code>{site_name}</code></td><td><?php esc_html_e('Website title', 'matchmaker'); ?></td></tr>
+                                <tr><td><code>{expiry_hours}</code></td><td><?php esc_html_e('Code expiry duration in hours', 'matchmaker'); ?></td></tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_email_verify_expiry_hours"><?php esc_html_e('Code Expiration (Hours)', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="number" name="mm_email_verify_expiry_hours" id="mm_email_verify_expiry_hours" value="<?php echo (int) ($verify_expiry_hours ?? 24); ?>" min="1" max="168" class="small-text">
+                        <p class="description"><?php esc_html_e('Number of hours a 6-digit verification code remains valid before expiring (default: 24).', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_email_verify_cooldown_seconds"><?php esc_html_e('Resend Cooldown (Seconds)', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="number" name="mm_email_verify_cooldown_seconds" id="mm_email_verify_cooldown_seconds" value="<?php echo (int) ($verify_cooldown_seconds ?? 60); ?>" min="5" max="600" class="small-text">
+                        <p class="description"><?php esc_html_e('Minimum seconds a user must wait before requesting another verification code via resend (default: 60).', 'matchmaker'); ?></p>
                     </td>
                 </tr>
             </table>

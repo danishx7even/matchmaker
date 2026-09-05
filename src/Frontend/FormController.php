@@ -48,8 +48,10 @@ class FormController {
         add_shortcode('matchmaking_field', [$this, 'render_standalone_field']);
 
         // AJAX handlers
-        add_action('wp_ajax_mmf_submit_form',        [$this, 'handle_ajax']);
-        add_action('wp_ajax_nopriv_mmf_submit_form', [$this, 'handle_ajax']);
+        add_action('wp_ajax_mmf_submit_form',            [$this, 'handle_ajax']);
+        add_action('wp_ajax_nopriv_mmf_submit_form',     [$this, 'handle_ajax']);
+        add_action('wp_ajax_mm_get_location_cascade',    [$this, 'handle_location_cascade_ajax']);
+        add_action('wp_ajax_nopriv_mm_get_location_cascade', [$this, 'handle_location_cascade_ajax']);
 
         // Conditional asset enqueue — fires after post data is available
         add_action('wp_enqueue_scripts', [$this, 'maybe_enqueue_assets']);
@@ -94,10 +96,11 @@ class FormController {
             true // load in footer
         );
 
-        // Pass AJAX URL to JS
+        // Pass AJAX URL and hierarchy URL to JS
         wp_localize_script('mm-form-script', 'mmfData', [
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce'   => wp_create_nonce('mmf_form_nonce'),
+            'ajaxUrl'      => admin_url('admin-ajax.php'),
+            'nonce'        => wp_create_nonce('mmf_form_nonce'),
+            'hierarchyUrl' => $plugin_url . 'assets/file/hierarchy_names.json',
         ]);
     }
 
@@ -137,6 +140,22 @@ class FormController {
             $values['user_origin']          = $pool['origin']              ?? '';
             $values['pref_origin']          = $pool['pref_origin']         ?? '';
             $values['user_languages']       = $pool['languages']           ?? '';
+            $values['country']              = $pool['country']             ?? ($pool['location'] ?? '');
+            $values['state']                = $pool['state']               ?? '';
+            $values['city']                 = $pool['city']                ?? '';
+            $values['user_country']         = $pool['country']             ?? ($pool['location'] ?? '');
+            $values['user_state']           = $pool['state']               ?? '';
+            $values['user_city']            = $pool['city']                ?? '';
+            $values['pref_country']         = $pool['pref_country']        ?? ($pool['pref_location'] ?? '');
+            $values['pref_state']           = $pool['pref_state']          ?? '';
+            $values['pref_city']            = $pool['pref_city']           ?? '';
+            $values['user_origin']          = $pool['origin']              ?? '';
+            $values['pref_origin']          = $pool['pref_origin']         ?? '';
+            $values['user_religion']        = $pool['religion']            ?? '';
+            $values['pref_religion']        = $pool['pref_religion']       ?? '';
+            $values['user_modesty']         = $pool['modesty']             ?? '';
+            $values['pref_modesty']         = $pool['pref_modesty']        ?? '';
+            $values['user_languages']       = $pool['languages']          ?? '';
             $values['pref_languages']       = $pool['pref_languages']      ?? '';
             $values['user_job']             = $pool['job']                 ?? '';
             $values['user_smoking']         = $pool['smoking']             ?? '';
@@ -161,8 +180,10 @@ class FormController {
         $meta_keys = [
             'phone_number', 'user_citizenship', 'user_social_links', 'user_marital_status',
             'user_children', 'user_prayer', 'user_education', 'user_income',
+            'user_country', 'user_state', 'user_city',
             'user_photo1', 'user_photo2', 'user_photo3',
-            'pref_citizenship', 'pref_social_links', 'pref_marital_status',
+            'pref_country', 'pref_state', 'pref_city',
+            'pref_citizenship', 'pref_marital_status',
             'pref_children', 'pref_prayer', 'pref_education', 'pref_income', 'pref_additional_info',
         ];
 
@@ -188,11 +209,20 @@ class FormController {
             return '<p>' . esc_html__('You must be logged in to access this form.', 'matchmaker') . '</p>';
         }
 
+        $user_id = get_current_user_id();
+
+        // Email Verification Gating: Unverified members must enter 6-digit code
+        if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
+            $verify_service = \Matchmaker\Service\EmailVerificationService::instance();
+            if (!$verify_service->is_user_verified($user_id)) {
+                return $verify_service->render_verification_screen($user_id, 'form');
+            }
+        }
+
         $atts = shortcode_atts(['redirect' => ''], $atts, 'matchmaking_form');
         $redirect_url = !empty($atts['redirect']) ? esc_url_raw((string) $atts['redirect']) : '';
 
-        $user_id = get_current_user_id();
-        $v       = $this->get_user_form_values($user_id);
+        $v = $this->get_user_form_values($user_id);
 
         $has_existing_profile = !empty($v['user_gender']);
         $btn_label = $has_existing_profile ? __('Update Profile', 'matchmaker') : __('Submit Application', 'matchmaker');
@@ -216,6 +246,9 @@ class FormController {
                 </div>
             </div>
 
+            <!-- Top Notification & Error Display Box -->
+            <div class="mmf-form-message" role="alert" aria-live="assertive"></div>
+
             <div class="elementor-form-fields-wrapper elementor-labels-above">
 
                 <!-- ===================== STEP 1: About You ===================== -->
@@ -231,7 +264,9 @@ class FormController {
                     <?php echo $this->fg->section_close(); ?>
 
                     <?php echo $this->fg->section_open('pin', 'Location &amp; Background'); ?>
-                        <?php echo $this->fg->render_single_field('user_location', $v); ?>
+                        <?php echo $this->fg->render_single_field('user_country', $v); ?>
+                        <?php echo $this->fg->render_single_field('user_state', $v); ?>
+                        <?php echo $this->fg->render_single_field('user_city', $v); ?>
                         <?php echo $this->fg->render_single_field('user_origin', $v); ?>
                         <?php echo $this->fg->render_single_field('user_religion', $v); ?>
                         <?php echo $this->fg->render_single_field('user_citizenship', $v); ?>
@@ -260,7 +295,7 @@ class FormController {
                         <?php echo $this->fg->render_single_field('user_income', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
-                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload up to 3 photos. Clear, recent photos significantly increase matchmaking success.', 'upload-section'); ?>
+                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. All 3 photos are mandatory.', 'upload-section'); ?>
                         <?php echo $this->fg->render_single_field('user_photo1', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo2', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo3', $v); ?>
@@ -287,7 +322,9 @@ class FormController {
                     <?php echo $this->fg->section_close(); ?>
 
                     <?php echo $this->fg->section_open('', 'Preferred Location &amp; Background'); ?>
-                        <?php echo $this->fg->render_single_field('pref_location', $v); ?>
+                        <?php echo $this->fg->render_single_field('pref_country', $v); ?>
+                        <?php echo $this->fg->render_single_field('pref_state', $v); ?>
+                        <?php echo $this->fg->render_single_field('pref_city', $v); ?>
                         <?php echo $this->fg->render_single_field('pref_origin', $v); ?>
                         <?php echo $this->fg->render_single_field('pref_religion', $v); ?>
                         <?php echo $this->fg->render_single_field('pref_citizenship', $v); ?>
@@ -295,7 +332,6 @@ class FormController {
 
                     <?php echo $this->fg->section_open('', 'Preferred Partner'); ?>
                         <?php echo $this->fg->render_single_field('preferred_height_range', $v); ?>
-                        <?php echo $this->fg->render_single_field('pref_social_links', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
                     <?php echo $this->fg->section_open('', 'Preferred Marital Status'); ?>
@@ -345,8 +381,6 @@ class FormController {
                 </div>
 
             </div><!-- .elementor-form-fields-wrapper -->
-
-            <div class="mmf-form-message" role="status" aria-live="polite"></div>
         </form>
         <?php
         return (string) ob_get_clean();
@@ -398,6 +432,13 @@ class FormController {
             wp_send_json_error(['message' => __('You must be logged in to save your matchmaking profile.', 'matchmaker')]);
         }
 
+        // Email Verification Check
+        if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
+            if (!\Matchmaker\Service\EmailVerificationService::instance()->is_user_verified($user_id)) {
+                wp_send_json_error(['message' => __('Please verify your email address before saving your profile.', 'matchmaker')]);
+            }
+        }
+
         // 3. Sanitize input
         $f = isset($_POST['form_fields']) && is_array($_POST['form_fields'])
             ? wp_unslash($_POST['form_fields'])
@@ -410,7 +451,19 @@ class FormController {
             wp_send_json_error(['message' => __('Please provide a valid full name and email address.', 'matchmaker')]);
         }
 
-        // 4. Helpers
+        // 4. Validate mandatory profile photos (All 3 photos required)
+        for ($i = 1; $i <= 3; $i++) {
+            $photo_key    = 'user_photo' . $i;
+            $has_existing = !empty(get_user_meta($user_id, $photo_key, true));
+            $has_uploaded = !empty($_FILES['form_fields']['name'][$photo_key])
+                && (int) ($_FILES['form_fields']['error'][$photo_key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+
+            if (!$has_existing && !$has_uploaded) {
+                wp_send_json_error(['message' => sprintf(__('Photo %d is mandatory. Please provide all 3 profile photos.', 'matchmaker'), $i)]);
+            }
+        }
+
+        // 5. Helpers
         $sanitize_select = static function (?string $raw): string {
             if (empty($raw)) {
                 return '';
@@ -450,7 +503,7 @@ class FormController {
             return implode(',', $clean);
         };
 
-        // 5. Resolve user_type from PMPro or usermeta
+        // 6. Resolve user_type from PMPro or usermeta
         $user_type = class_exists('\Matchmaker\Core\PMProSync')
             ? \Matchmaker\Core\PMProSync::instance()->get_current_user_type($user_id)
             : (string) get_user_meta($user_id, 'user_type', true);
@@ -465,16 +518,32 @@ class FormController {
             ? gmdate('Y-m-d', (int) strtotime((string) $f['birth_date']))
             : '1995-01-01';
 
-        // 6. Build pool payload
+        $pref_age_min = !empty($f['preferred_age_min']) ? (int) $f['preferred_age_min'] : 18;
+        $pref_age_max = !empty($f['preferred_age_max']) ? (int) $f['preferred_age_max'] : 80;
+        if (!empty($f['preferred_age_min']) && !empty($f['preferred_age_max']) && $pref_age_min >= $pref_age_max) {
+            wp_send_json_error(['message' => __('Preferred Maximum Age must be higher than Minimum Age.', 'matchmaker')]);
+        }
+
+        $pref_h_min = $parse_height((string) ($f['preferred_height_min'] ?? ''));
+        $pref_h_max = $parse_height((string) ($f['preferred_height_max'] ?? ''));
+        if ($pref_h_min !== null && $pref_h_max !== null && $pref_h_min >= $pref_h_max) {
+            wp_send_json_error(['message' => __('Preferred Maximum Height must be higher than Minimum Height.', 'matchmaker')]);
+        }
+
+        // 7. Build pool payload (Country, State, City)
         $pool_payload = [
             'user_id'              => $user_id,
             'gender'               => in_array($gender, ['male', 'female'], true) ? $gender : 'male',
             'pref_gender'          => in_array($pref_gender, ['male', 'female'], true) ? $pref_gender : 'female',
             'birth_date'           => $birth_date,
-            'preferred_age_min'    => !empty($f['preferred_age_min']) ? (int) $f['preferred_age_min'] : 18,
-            'preferred_age_max'    => !empty($f['preferred_age_max']) ? (int) $f['preferred_age_max'] : 80,
-            'location'             => $sanitize_select((string) ($f['user_location'] ?? '')),
-            'pref_location'        => $normalize_list($f['pref_location'] ?? ''),
+            'preferred_age_min'    => $pref_age_min,
+            'preferred_age_max'    => $pref_age_max,
+            'country'              => $sanitize_select((string) ($f['user_country'] ?? $f['user_location'] ?? '')),
+            'state'                => sanitize_text_field((string) ($f['user_state'] ?? '')),
+            'city'                 => sanitize_text_field((string) ($f['user_city'] ?? '')),
+            'pref_country'         => $normalize_list($f['pref_country'] ?? $f['pref_location'] ?? ''),
+            'pref_state'           => sanitize_text_field((string) ($f['pref_state'] ?? '')),
+            'pref_city'            => sanitize_text_field((string) ($f['pref_city'] ?? '')),
             'religion'             => $sanitize_select((string) ($f['user_religion'] ?? '')),
             'pref_religion'        => $normalize_list($f['pref_religion'] ?? ''),
             'modesty'              => $sanitize_select((string) ($f['user_modesty'] ?? '')),
@@ -484,8 +553,8 @@ class FormController {
             'languages'            => $normalize_list($f['user_languages'] ?? ''),
             'pref_languages'       => $normalize_list($f['pref_languages'] ?? ''),
             'height_cm'            => $parse_height((string) ($f['user_height'] ?? '')),
-            'preferred_height_min' => $parse_height((string) ($f['preferred_height_min'] ?? '')),
-            'preferred_height_max' => $parse_height((string) ($f['preferred_height_max'] ?? '')),
+            'preferred_height_min' => $pref_h_min,
+            'preferred_height_max' => $pref_h_max,
             'job'                  => sanitize_text_field((string) ($f['user_job'] ?? '')),
             'smoking'              => $sanitize_select((string) ($f['user_smoking'] ?? '')),
             'pref_smoking'         => $normalize_list($f['pref_smoking'] ?? ''),
@@ -495,7 +564,7 @@ class FormController {
             'is_active'            => 1,
         ];
 
-        // 7. Check if user is updating an existing profile (vs filling for the first time)
+        // 8. Check if user is updating an existing profile (vs filling for the first time)
         $existing_pool      = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
         $is_update_profile  = !empty($existing_pool) && !empty($existing_pool['gender']);
 
@@ -505,14 +574,14 @@ class FormController {
             wp_send_json_error(['message' => __('Database error while updating match pool. Please try again.', 'matchmaker')]);
         }
 
-        // 8. Update WP user display name
+        // 9. Update WP user display name
         wp_update_user([
             'ID'           => $user_id,
             'display_name' => $full_name,
             'first_name'   => $full_name,
         ]);
 
-        // 9. Save usermeta fields
+        // 10. Save usermeta fields (remove pref_social_links)
         $meta_map = [
             'phone_number'        => sanitize_text_field((string) ($f['phone_number'] ?? '')),
             'user_citizenship'    => sanitize_text_field((string) ($f['user_citizenship'] ?? '')),
@@ -522,8 +591,13 @@ class FormController {
             'user_prayer'         => sanitize_text_field((string) ($f['user_prayer'] ?? '')),
             'user_education'      => sanitize_text_field((string) ($f['user_education'] ?? '')),
             'user_income'         => sanitize_text_field((string) ($f['user_income'] ?? '')),
+            'user_country'        => sanitize_text_field((string) ($f['user_country'] ?? '')),
+            'user_state'          => sanitize_text_field((string) ($f['user_state'] ?? '')),
+            'user_city'           => sanitize_text_field((string) ($f['user_city'] ?? '')),
+            'pref_country'        => $normalize_list($f['pref_country'] ?? ''),
+            'pref_state'          => sanitize_text_field((string) ($f['pref_state'] ?? '')),
+            'pref_city'           => sanitize_text_field((string) ($f['pref_city'] ?? '')),
             'pref_citizenship'    => $normalize_list($f['pref_citizenship'] ?? ''),
-            'pref_social_links'   => sanitize_textarea_field((string) ($f['pref_social_links'] ?? '')),
             'pref_marital_status' => sanitize_text_field((string) ($f['pref_marital_status'] ?? '')),
             'pref_children'       => sanitize_text_field((string) ($f['pref_children'] ?? '')),
             'pref_prayer'         => sanitize_text_field((string) ($f['pref_prayer'] ?? '')),
@@ -599,5 +673,30 @@ class FormController {
         }
 
         wp_send_json_success($response_data);
+    }
+
+    /**
+     * AJAX handler for dynamic cascading location queries.
+     *
+     * @return void
+     */
+    public function handle_location_cascade_ajax(): void
+    {
+        $country = isset($_GET['country']) ? sanitize_text_field(wp_unslash((string) $_GET['country'])) : '';
+        $state   = isset($_GET['state'])   ? sanitize_text_field(wp_unslash((string) $_GET['state']))   : '';
+        $mode    = isset($_GET['mode'])    ? sanitize_key((string) $_GET['mode']) : 'user'; // 'user' | 'pref'
+
+        $states = ($mode === 'pref')
+            ? $this->fg->options_pref_state($country)
+            : $this->fg->options_user_state($country);
+
+        $cities = ($mode === 'pref')
+            ? $this->fg->options_pref_city($country, $state)
+            : $this->fg->options_user_city($country, $state);
+
+        wp_send_json_success([
+            'states' => $states,
+            'cities' => $cities,
+        ]);
     }
 }

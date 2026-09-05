@@ -37,6 +37,9 @@ if (!defined('ABSPATH')) {
             <option value=""><?php esc_html_e('All Channels & Types', 'matchmaker'); ?></option>
             <option value="email_sent" <?php selected($event_type, 'email_sent'); ?>><?php esc_html_e('Member Approval Email', 'matchmaker'); ?></option>
             <option value="admin_alert_email" <?php selected($event_type, 'admin_alert_email'); ?>><?php esc_html_e('Admin Alert Email', 'matchmaker'); ?></option>
+            <option value="verification_code_sent" <?php selected($event_type, 'verification_code_sent'); ?>><?php esc_html_e('Verification Code Sent', 'matchmaker'); ?></option>
+            <option value="verification_code_failed" <?php selected($event_type, 'verification_code_failed'); ?>><?php esc_html_e('Verification Code Failed', 'matchmaker'); ?></option>
+            <option value="email_verified" <?php selected($event_type, 'email_verified'); ?>><?php esc_html_e('Email Verified Successfully', 'matchmaker'); ?></option>
             <option value="match_approved" <?php selected($event_type, 'match_approved'); ?>><?php esc_html_e('In-App Notification (Match Approved)', 'matchmaker'); ?></option>
             <option value="match_revealed" <?php selected($event_type, 'match_revealed'); ?>><?php esc_html_e('In-App Notification (Contact Revealed)', 'matchmaker'); ?></option>
         </select>

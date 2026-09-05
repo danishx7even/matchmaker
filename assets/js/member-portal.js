@@ -41,7 +41,7 @@
         /**
          * Fetch updated tab HTML content via AJAX
          */
-        reloadTabAJAX: function (tabName) {
+        reloadTabAJAX: function (tabName, targetStep, page) {
             var panel = document.getElementById('mm-tab-' + tabName);
             if (!panel) return;
 
@@ -50,13 +50,16 @@
             var data = new FormData();
             data.append('action', 'mm_reload_tab_content');
             data.append('tab', tabName);
+            if (page) {
+                data.append('page', page);
+            }
             data.append('nonce', (window.mmPortalData && window.mmPortalData.nonce) ? window.mmPortalData.nonce : '');
 
             var ajaxUrl = (window.mmPortalData && window.mmPortalData.ajaxUrl)
                 ? window.mmPortalData.ajaxUrl
                 : '/wp-admin/admin-ajax.php';
 
-            fetch(ajaxUrl, {
+            return fetch(ajaxUrl, {
                 method: 'POST',
                 body: data,
                 credentials: 'same-origin'
@@ -67,14 +70,20 @@
                 if (resData.success && resData.data && resData.data.html) {
                     panel.innerHTML = resData.data.html;
 
-                    // Re-bind tab event listeners if needed
+                    // Re-bind or navigate step if matches tab
                     if (tabName === 'matches') {
-                        stepHistory = [1];
+                        if (targetStep) {
+                            MM_Portal.navigateStep(targetStep);
+                        } else {
+                            stepHistory = [1];
+                        }
                     }
                 }
+                return resData;
             })
-            .catch(function () {
+            .catch(function (err) {
                 panel.style.opacity = '1';
+                throw err;
             });
         },
 
@@ -137,6 +146,15 @@
         submitResponse: function (matchId, responseAction) {
             if (!matchId || !responseAction) return;
 
+            // Show loading state on clicked button
+            var clickedBtn = document.querySelector('[data-mm-action="submit-response"][data-decision="' + responseAction + '"]');
+            var originalHtml = '';
+            if (clickedBtn) {
+                originalHtml = clickedBtn.innerHTML;
+                clickedBtn.disabled = true;
+                clickedBtn.textContent = (responseAction === 'accept') ? 'Processing...' : 'Declining...';
+            }
+
             var data = new FormData();
             data.append('action', 'mm_submit_match_response');
             data.append('match_id', matchId);
@@ -156,17 +174,22 @@
             .then(function (resData) {
                 if (resData.success) {
                     MM_Portal.markNotificationsRead();
-                    if (responseAction === 'decline') {
-                        // Immediately reload the matches tab content via AJAX to display hand-curated queue card
-                        MM_Portal.reloadTabAJAX('matches');
-                    } else if (resData.data && resData.data.next_step) {
-                        MM_Portal.navigateStep(resData.data.next_step);
-                    }
+                    var nextStep = (resData.data && resData.data.next_step) ? resData.data.next_step : 1;
+                    // Always reload the matches tab content via AJAX so the view displays fresh updated data from DB
+                    MM_Portal.reloadTabAJAX('matches', nextStep);
                 } else {
+                    if (clickedBtn) {
+                        clickedBtn.disabled = false;
+                        clickedBtn.innerHTML = originalHtml || 'Submit';
+                    }
                     alert(resData.data && resData.data.message ? resData.data.message : 'An error occurred.');
                 }
             })
             .catch(function () {
+                if (clickedBtn) {
+                    clickedBtn.disabled = false;
+                    clickedBtn.innerHTML = originalHtml || 'Submit';
+                }
                 alert('Network error. Please try again.');
             });
         },
@@ -271,6 +294,9 @@
                     if (matchId && decision) {
                         MM_Portal.submitResponse(matchId, decision);
                     }
+                } else if (action === 'paginate-events') {
+                    var pageNum = parseInt(actionBtn.getAttribute('data-page'), 10) || 1;
+                    MM_Portal.reloadTabAJAX('events', null, pageNum);
                 }
                 return;
             }

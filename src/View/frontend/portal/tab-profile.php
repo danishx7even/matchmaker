@@ -53,7 +53,11 @@ $badge_label = $repo->format_tier_label($user_type);
             <p class="az-user-name"><?php echo esc_html($name); ?></p>
 
             <div class="az-rows">
-                <div class="az-row"><span class="az-label"><?php esc_html_e('Location', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($pool['location'] ?? '—'); ?></span></div>
+                <?php
+                $loc_parts = array_filter([$pool['city'] ?? '', $pool['state'] ?? '', $pool['country'] ?? '']);
+                $user_location_display = !empty($loc_parts) ? implode(', ', $loc_parts) : ($pool['location'] ?? '—');
+                ?>
+                <div class="az-row"><span class="az-label"><?php esc_html_e('Location', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($user_location_display); ?></span></div>
                 <div class="az-row"><span class="az-label"><?php esc_html_e('Age', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($age); ?> <?php esc_html_e('Years Old', 'matchmaker'); ?></span></div>
                 <div class="az-row"><span class="az-label"><?php esc_html_e('Origin', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($pool['origin'] ?? '—'); ?></span></div>
                 <div class="az-row"><span class="az-label"><?php esc_html_e('Languages', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($pool['languages'] ?? '—'); ?></span></div>
@@ -118,7 +122,11 @@ $badge_label = $repo->format_tier_label($user_type);
             <p class="az-looking-text"><?php echo esc_html($meta['pref_additional_info']); ?></p>
         <?php endif; ?>
         <div class="az-rows">
-            <div class="az-row"><span class="az-label"><?php esc_html_e('Preferred Location', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($pool['pref_location'] ?? '—'); ?></span></div>
+            <?php
+            $pref_loc_parts = array_filter([$pool['pref_city'] ?? '', $pool['pref_state'] ?? '', $pool['pref_country'] ?? '']);
+            $pref_location_display = !empty($pref_loc_parts) ? implode(', ', $pref_loc_parts) : ($pool['pref_location'] ?? '—');
+            ?>
+            <div class="az-row"><span class="az-label"><?php esc_html_e('Preferred Location', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($pref_location_display); ?></span></div>
             <div class="az-row"><span class="az-label"><?php esc_html_e('Preferred Background', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($pool['pref_origin'] ?? '—'); ?></span></div>
             <div class="az-row"><span class="az-label"><?php esc_html_e('Age Preference', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html(($pool['preferred_age_min'] ?? 18) . ' to ' . ($pool['preferred_age_max'] ?? 80)); ?></span></div>
             <div class="az-row"><span class="az-label"><?php esc_html_e('Relationship Goal', 'matchmaker'); ?></span><span class="az-value"><?php esc_html_e('Marriage', 'matchmaker'); ?></span></div>

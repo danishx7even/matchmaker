@@ -9,7 +9,18 @@ require_once __DIR__ . '/Unit/MatchingEngineTest.php';
 require_once __DIR__ . '/Unit/ModeAndResetTest.php';
 require_once __DIR__ . '/Unit/LoggingTest.php';
 require_once __DIR__ . '/Unit/ManualMatchmakerTest.php';
+require_once __DIR__ . '/Unit/NotificationAndApprovalTest.php';
+require_once __DIR__ . '/Unit/FormWizardAndShortcodesTest.php';
+require_once __DIR__ . '/Unit/FreeRegHandlerTest.php';
+require_once __DIR__ . '/Unit/HeartbeatAndNotificationsTest.php';
+require_once __DIR__ . '/Unit/AuthAndRedirectsTest.php';
+require_once __DIR__ . '/Unit/GateDebuggerAndScoringTest.php';
+require_once __DIR__ . '/Unit/AdminWorkflowTest.php';
+require_once __DIR__ . '/Unit/PortalAndEventsTest.php';
+require_once __DIR__ . '/Unit/EmailVerificationTest.php';
+require_once __DIR__ . '/Unit/LocationCascadeTest.php';
 require_once __DIR__ . '/Integration/EndToEndFlowTest.php';
+require_once __DIR__ . '/Integration/FullMemberLifecycleFlowTest.php';
 
 $test_classes = [
     \DBMigratorTest::class,
@@ -19,7 +30,18 @@ $test_classes = [
     \Matchmaker\Tests\Unit\ModeAndResetTest::class,
     \Matchmaker\Tests\Unit\LoggingTest::class,
     \Matchmaker\Tests\Unit\ManualMatchmakerTest::class,
+    \Matchmaker\Tests\Unit\NotificationAndApprovalTest::class,
+    \Matchmaker\Tests\Unit\FormWizardAndShortcodesTest::class,
+    \Matchmaker\Tests\Unit\FreeRegHandlerTest::class,
+    \Matchmaker\Tests\Unit\HeartbeatAndNotificationsTest::class,
+    \Matchmaker\Tests\Unit\AuthAndRedirectsTest::class,
+    \Matchmaker\Tests\Unit\GateDebuggerAndScoringTest::class,
+    \Matchmaker\Tests\Unit\AdminWorkflowTest::class,
+    \Matchmaker\Tests\Unit\PortalAndEventsTest::class,
+    \Matchmaker\Tests\Unit\EmailVerificationTest::class,
+    \Matchmaker\Tests\Unit\LocationCascadeTest::class,
     \Matchmaker\Tests\Integration\EndToEndFlowTest::class,
+    \Matchmaker\Tests\Integration\FullMemberLifecycleFlowTest::class,
 ];
 
 $total_tests  = 0;

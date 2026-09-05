@@ -84,7 +84,11 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     </td>
                     <td><?php echo esc_html(ucfirst($c['gender'] ?? '')); ?></td>
                     <td><?php echo esc_html($age); ?></td>
-                    <td><?php echo esc_html($c['location'] ?? '—'); ?></td>
+                    <?php
+                    $c_loc_parts = array_filter([$c['city'] ?? '', $c['state'] ?? '', $c['country'] ?? '']);
+                    $c_loc = !empty($c_loc_parts) ? implode(', ', $c_loc_parts) : ($c['location'] ?? '—');
+                    ?>
+                    <td><?php echo esc_html($c_loc); ?></td>
                     <td>
                         <span class="mm-badge mm-badge-<?php echo esc_attr($c['user_type'] ?? 'free'); ?>">
                             <?php echo esc_html($repo->format_tier_label($c['user_type'] ?? 'free')); ?>

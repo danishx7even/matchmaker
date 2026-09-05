@@ -85,7 +85,7 @@ class NotificationService {
             }
         }
 
-        if (in_array($user_type, ['free', 'event'], true)) {
+        if ($user_type === 'event') {
             return $response;
         }
 
@@ -130,6 +130,46 @@ class NotificationService {
     }
 
     /**
+     * Send rejection in-app notification to the candidate whose match was declined.
+     *
+     * @param int $match_id The match ID.
+     * @param int $declined_by_user_id The user ID who declined the match.
+     * @return void
+     */
+    public function send_rejection_notification(int $match_id, int $declined_by_user_id): void
+    {
+        $repo  = MatchRepository::instance();
+        $match = $repo->find_match_by_id($match_id);
+
+        if (!$match) {
+            return;
+        }
+
+        $other_user_id = ((int) ($match['user_one_id'] ?? 0) === $declined_by_user_id)
+            ? (int) ($match['user_two_id'] ?? 0)
+            : (int) ($match['user_one_id'] ?? 0);
+
+        if ($other_user_id <= 0) {
+            return;
+        }
+
+        // 1. Invalidate/Dismiss any stale 'match_approved' notification for this match so the candidate doesn't see a new match alert
+        $repo->dismiss_notifications_for_match($match_id, 'match_approved');
+
+        // 2. Dispatch polite conclusion notification to the other user
+        $this->create_notification(
+            $other_user_id,
+            $match_id,
+            'match_rejected',
+            __('Match Recommendation Concluded', 'matchmaker'),
+            __('Your recent match recommendation has concluded as the candidate declined to proceed. Our matchmakers will continue curating fresh matches for you.', 'matchmaker')
+        );
+
+        $this->flush_user_unread_transient($other_user_id);
+        $this->flush_user_unread_transient($declined_by_user_id);
+    }
+
+    /**
      * Get user unread count.
      *
      * @param int $user_id The user ID.
@@ -167,7 +207,7 @@ class NotificationService {
     }
 
     /**
-     * Send approval emails.
+     * Send approval emails and in-app notifications.
      *
      * @param int $match_id The match ID.
      * @return void
@@ -193,10 +233,10 @@ class NotificationService {
         $age_a = isset($pool_a['birth_date']) ? $repo->calc_age($pool_a['birth_date']) : '';
         $age_b = isset($pool_b['birth_date']) ? $repo->calc_age($pool_b['birth_date']) : '';
 
-        $loc_a = !empty($pool_a['location']) ? $pool_a['location'] : '—';
-        $loc_b = !empty($pool_b['location']) ? $pool_b['location'] : '—';
+        $loc_a = trim(($pool_a['city'] ?? '') . ', ' . ($pool_a['country'] ?? ($pool_a['location'] ?? '')), ', ') ?: '—';
+        $loc_b = trim(($pool_b['city'] ?? '') . ', ' . ($pool_b['country'] ?? ($pool_b['location'] ?? '')), ', ') ?: '—';
 
-        $dashboard_url = home_url('/dashboard/');
+        $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
 
         $default_subject = __('Congratulations! You have a new approved match on Arab Zawaj', 'matchmaker');
         $default_template = "<p>Dear {user_name},</p>\n"
@@ -227,10 +267,11 @@ class NotificationService {
         $this->create_notification((int) $user_a->ID, $match_id, 'match_approved', __('New Match Available!', 'matchmaker'), __('You have a new approved match awaiting your review.', 'matchmaker'));
         $this->create_notification((int) $user_b->ID, $match_id, 'match_approved', __('New Match Available!', 'matchmaker'), __('You have a new approved match awaiting your review.', 'matchmaker'));
 
-        add_filter('wp_mail_content_type', static fn() => 'text/html');
+        $html_filter = static fn() => 'text/html';
+        add_filter('wp_mail_content_type', $html_filter);
         $mail_a_sent = wp_mail($user_a->user_email, $subject, wpautop($body_a));
         $mail_b_sent = wp_mail($user_b->user_email, $subject, wpautop($body_b));
-        remove_filter('wp_mail_content_type', static fn() => 'text/html');
+        remove_filter('wp_mail_content_type', $html_filter);
 
         $repo->log_event(
             'email',
@@ -255,6 +296,100 @@ class NotificationService {
             'email',
             'email_sent',
             sprintf(__('Approval Email Sent: %s (Match #%d)', 'matchmaker'), $user_b->user_email, $match_id),
+            $subject,
+            [
+                'match_id'      => $match_id,
+                'user_id'       => (int) $user_b->ID,
+                'recipient'     => $user_b->user_email,
+                'subject'       => $subject,
+                'body_html'     => wpautop($body_b),
+                'delivery_stat' => $mail_b_sent ? 'delivered' : 'failed',
+            ],
+            $match_id,
+            (int) $user_b->ID,
+            $user_b->user_email,
+            $mail_b_sent ? 'success' : 'error'
+        );
+    }
+
+    /**
+     * Send mutual match emails and in-app notifications.
+     *
+     * @param int $match_id The match ID.
+     * @return void
+     */
+    public function send_mutual_match_notifications(int $match_id): void
+    {
+        $repo  = MatchRepository::instance();
+        $match = $repo->find_match_by_id($match_id);
+
+        if (!$match) {
+            return;
+        }
+
+        $user_a = get_userdata((int) ($match['user_one_id'] ?? 0));
+        $user_b = get_userdata((int) ($match['user_two_id'] ?? 0));
+
+        if (!$user_a || !$user_b) {
+            return;
+        }
+
+        $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
+
+        // 1. In-App Notifications
+        $this->create_notification((int) $user_a->ID, $match_id, 'mutual_match', __('It\'s a Mutual Match!', 'matchmaker'), sprintf(__('Congratulations! You and %s have both accepted the match. Contact information is now unlocked!', 'matchmaker'), $user_b->display_name));
+        $this->create_notification((int) $user_b->ID, $match_id, 'mutual_match', __('It\'s a Mutual Match!', 'matchmaker'), sprintf(__('Congratulations! You and %s have both accepted the match. Contact information is now unlocked!', 'matchmaker'), $user_a->display_name));
+
+        // 2. Transactional HTML Emails
+        $subject = __('Congratulations! It\'s a Mutual Match on Arab Zawaj', 'matchmaker');
+        
+        $body_template = "<p>Dear {user_name},</p>\n"
+            . "<p>Exciting news! <strong>{candidate_name}</strong> has also accepted your profile match. It's a mutual match!</p>\n"
+            . "<p>You can now log in to your Member Portal to view their verified contact details and begin communications.</p>\n"
+            . "<p><a href=\"{dashboard_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;\">View Contact Details &rarr;</a></p>\n"
+            . "<p>Warm regards,<br>Arab Zawaj Matchmaking Team</p>";
+
+        $body_a = str_replace(
+            ['{user_name}', '{candidate_name}', '{dashboard_url}'],
+            [$user_a->display_name, $user_b->display_name, $dashboard_url],
+            $body_template
+        );
+
+        $body_b = str_replace(
+            ['{user_name}', '{candidate_name}', '{dashboard_url}'],
+            [$user_b->display_name, $user_a->display_name, $dashboard_url],
+            $body_template
+        );
+
+        $html_filter = static fn() => 'text/html';
+        add_filter('wp_mail_content_type', $html_filter);
+        $mail_a_sent = wp_mail($user_a->user_email, $subject, wpautop($body_a));
+        $mail_b_sent = wp_mail($user_b->user_email, $subject, wpautop($body_b));
+        remove_filter('wp_mail_content_type', $html_filter);
+
+        $repo->log_event(
+            'email',
+            'email_sent',
+            sprintf(__('Mutual Match Email Sent: %s (Match #%d)', 'matchmaker'), $user_a->user_email, $match_id),
+            $subject,
+            [
+                'match_id'      => $match_id,
+                'user_id'       => (int) $user_a->ID,
+                'recipient'     => $user_a->user_email,
+                'subject'       => $subject,
+                'body_html'     => wpautop($body_a),
+                'delivery_stat' => $mail_a_sent ? 'delivered' : 'failed',
+            ],
+            $match_id,
+            (int) $user_a->ID,
+            $user_a->user_email,
+            $mail_a_sent ? 'success' : 'error'
+        );
+
+        $repo->log_event(
+            'email',
+            'email_sent',
+            sprintf(__('Mutual Match Email Sent: %s (Match #%d)', 'matchmaker'), $user_b->user_email, $match_id),
             $subject,
             [
                 'match_id'      => $match_id,

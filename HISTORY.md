@@ -325,3 +325,454 @@ This document maintains a chronological, step-by-step history of all features, a
     - Added Automated Testing Guide with CLI command and output.
     - Documented system requirements and integrations (PMPro, Elementor Pro, Action Scheduler).
   - Verified test suite passes with 100% success rate (20/20 tests passed).
+
+---
+
+### Task 27: Fix Undefined "message" Array Key on Match Approval & Audit Notifications and Emails
+- **Objective**: Fix PHP notice/warning `Undefined array key "message" in AdminPortal.php on line 256` when approving a match; audit and ensure transactional approval emails and mutual match notifications operate correctly with proper headers, dynamic dashboard permalinks, in-app alerts, and audit logging.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `approve_match()` to return `'message'` string in success return array.
+    - Updated `update_match_response()` to invoke `send_mutual_match_notifications()` when both members accept a match.
+  - `src/Admin/AdminPortal.php`:
+    - Added defensive null-coalescing fallback for `$result['message']` in match approval handler.
+  - `src/Service/NotificationService.php`:
+    - Updated `send_approval_emails()` to resolve dynamic dashboard permalinks via `ProfileService::instance()->get_dashboard_url()`.
+    - Fixed closure variable assignment for `wp_mail_content_type` filter addition and removal.
+    - Added `send_mutual_match_notifications()`: generates in-app notifications in `wp_matchmaker_notifications` and dispatches transactional HTML emails to both matched members when a match is mutually accepted.
+  - `tests/Unit/NotificationAndApprovalTest.php`:
+    - Added unit test suite covering approval response format, email dispatches, and mutual match notifications.
+    - Verified all 22 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 28: Full-Spectrum Codebase Audit, Comprehensive Test Expansion & Verification
+- **Objective**: Perform an exhaustive audit across all features, flows, and database interactions in the plugin; author comprehensive unit and integration test suites covering every aspect, controller, shortcode, hook, and query without removing any features or styling.
+- **Implemented**:
+  - `src/Service/MatchService.php`:
+    - Unified `compute_flexible_score()` to delegate directly to `MatchingEngine::compute_flexible_score()` using standardized pool column names (`origin`, `languages`, `height_cm`, `preferred_height_min`, `preferred_height_max`, `job`, `smoking`, `pref_smoking`, `drinking`, `pref_drinking`).
+  - `tests/bootstrap.php`:
+    - Added comprehensive stubs for `add_shortcode`, `do_shortcode`, `shortcode_atts`, `has_shortcode`, `wp_create_nonce`, `wp_logout_url`, `wp_get_current_user`, `user_can`, `esc_html_e`, `esc_textarea`, `WP_User` alias, and transient stubs.
+  - `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Added tests for `FieldGenerator::render_single_field()`, `FormController::render_standalone_field()`, and `FormController::render_form()`.
+  - `tests/Unit/FreeRegHandlerTest.php`:
+    - Added tests for single and comma-separated Elementor Pro form IDs and matching logic.
+  - `tests/Unit/HeartbeatAndNotificationsTest.php`:
+    - Added tests for 15s Heartbeat API configuration, active member unread count polling, and mark-as-read updates.
+  - `tests/Unit/AuthAndRedirectsTest.php`:
+    - Added tests for role-based redirects (admins to wp-admin, members with completed profile to dashboard, new members to questionnaire) and `[logout_url]` shortcode.
+  - `tests/Unit/GateDebuggerAndScoringTest.php`:
+    - Added unit tests for 6-point flexible scoring (perfect score 6, partial scoring).
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Added unit tests for pool search query building and settings option persistence.
+  - `tests/Integration/FullMemberLifecycleFlowTest.php`:
+    - Added end-to-end integration test simulating the entire multi-user journey: Registration -> Profile wizard -> Matching Engine -> Admin approval -> In-app alert -> Member portal 5-step flow -> Mutual match contact reveal -> Test Mode safe reset.
+  - `tests/run_tests.php`:
+    - Registered all 16 test suites.
+    - Verified all 38 automated test cases pass with 100% success rate (0 errors, 0 failures).
+  - Created Comprehensive System Audit Report artifact.
+
+---
+
+### Task 29: Inspect Button Delegated Modal Handling, AJAX View Reload on Match State Changes & Brand Active Colors
+- **Objective**: Fix inspect button in Match Logs hub; ensure Member Portal always reloads matches view via AJAX whenever match status/decisions change (accept, decline, mutual match); enforce official brand colors (`#CC723F` / `#b6602f`) on active button states across Member Portal, Questionnaire, and Admin Portal (eliminating generic green colors).
+- **Implemented**:
+  - `assets/js/admin-matchmaker.js`:
+    - Re-architected modal click listener using jQuery document event delegation (`$(document).on('click', '.mm-btn-view-log', ...)`).
+    - Added resilient DOM ready check (`document.readyState === 'loading'` fallback) to ensure script initialization even when executed in the footer after DOMContentLoaded.
+    - Handled JSON payload parsing, raw string formatting, email HTML previews, and modal backdrop escape/close handlers.
+  - `src/View/admin/logs/tab-match-logs.php`:
+    - Added defensive serialization on `$meta_json` so `data-payload` is always a clean string.
+  - `assets/css/admin-matchmaker.css`:
+    - Elevated `.mm-modal-overlay` `z-index` to `999999 !important` so it stays above all WordPress admin bars and wrappers.
+    - Added brand active color rules for admin action buttons (`#b6602f !important`).
+  - `assets/js/member-portal.js`:
+    - Updated `reloadTabAJAX(tabName, targetStep)` to accept an optional target step and navigate to it upon receiving fresh HTML.
+    - Updated `submitResponse()` so that every accept/decline decision immediately reloads the matches tab via AJAX, fetching fresh DB state.
+  - `src/View/frontend/portal/tab-matches.php` & Step Views:
+    - Added dynamic `$default_step` calculation (step 5 for mutual matches, step 3 for accepted waiting state, step 1 for fresh matches) so server-rendered HTML immediately has the correct `.view-state.active`.
+  - CSS Active Button State Styling (`member-portal.css`, `matchmaking-form.css`, `admin-matchmaker.css`):
+    - Added explicit rules for `.btn-primary:active`, `.btn-primary.active`, `.btn-outline-dark:active`, `.btn-outline-danger:active`, `#matchmaking_form .elementor-button:active`, and `.button-primary:active`.
+    - Enforced `#b6602f` / `#CC723F` with `!important` to eliminate generic green button active states.
+  - Verified test suite: all 38 unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 30: In-Canvas Events Tab with Elementor Loop Template & Event Tier Tab Gating
+- **Objective**: Display ACF "Event" custom post type posts inside the Member Portal Events tab using Elementor loop item template (`template_id = 395`) with pagination matching the design system, and restrict tab visibility for `event` tier members so they only see Profile and Events tabs (Matches tab hidden).
+- **Implemented**:
+  - `src/View/frontend/portal/portal.php`:
+    - Updated navigation header to conditionally hide the Matches button for users with `user_type === 'event'`.
+    - Converted Events nav button to an in-canvas AJAX tab (`data-tab="events"`).
+    - Included `#mm-tab-events` container hosting `tab-events.php`.
+  - `src/View/frontend/portal/tab-events.php`:
+    - Created in-canvas events loop querying published `event` CPT posts with pagination.
+    - Integrated Elementor Loop Item Template rendering via `\Elementor\Plugin::instance()->frontend->get_builder_content_for_display()`.
+    - Added design system fallback event card with thumbnail, date pill, title, excerpt, and CTA button.
+    - Added AJAX pagination controls with `data-mm-action="paginate-events"`.
+  - `src/Frontend/PortalController.php`:
+    - Updated `handle_ajax_reload_tab()` to support `tab === 'events'` with `page` parameter.
+    - Added tab gating preventing access to `matches` for members with `user_type === 'event'`.
+    - Added `render_events_html()` method.
+  - `assets/js/member-portal.js`:
+    - Updated `reloadTabAJAX(tabName, targetStep, page)` to pass `page` parameter for pagination.
+    - Added delegated event handler for `[data-mm-action="paginate-events"]`.
+  - `assets/css/member-portal.css`:
+    - Added responsive grid layout for `.mm-events-grid`, card container `.mm-events-container`, and pagination controls `.mm-pagination` using brand tokens (`#CC723F` / `#b6602f`).
+  - `src/Admin/AdminPortal.php` & `src/View/admin/settings/settings.php`:
+    - Added Member Portal Events Configuration section (`mm_events_cpt_slug`, `mm_events_template_id`, `mm_events_per_page`).
+  - `src/Service/ProfileService.php`:
+    - Updated `get_user_type()` to robustly check PMPro membership level, `user_type`, `az_user_type`, and pool user_type.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Created unit tests verifying `event` tier tab gating, non-event tier matches visibility, AJAX events tab rendering, pagination, and settings persistence.
+  - Verified test suite: all 43 unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 31: 7-Point Feature Updates, Location Schema Migration (Country/State/City), Mandatory Fields & Rejection Alerts
+- **Objective**: Execute comprehensive feature updates:
+  1. **Rejection Notifications**: When a user rejects/declines a match, the other candidate receives an in-app notification about the rejection that clears upon clicking the bell or visiting the matches tab.
+  2. **Free User Matchmaking & Membership CTA Card**: Free users can have matches created and approved by admin without quota blocking; the 5-step match flow is accessible to them, and standard membership upgrade cards (`.mm-upsell-card`) are shown on the Profile tab and at the bottom of the Matches tab.
+  3. **Mandatory Questionnaire Fields & 3 Mandatory Photos**: All form fields in the questionnaire are mandatory with a red asterisk `*`; photo slots 1, 2, and 3 are required on both client-side and server-side.
+  4. **"Prefer not to say" Option**: Add `"Prefer not to say"` to Preferred Marital Status, Children Preference, and Preferred Education Level, supporting it as a flexible match in the matching engine.
+  5. **Remove Preferred Social Link**: Removed `pref_social_links` from form, DB, and meta while preserving user's own `user_social_links`.
+  6. **Salary Currency in USD**: Changed salary currency from SAR to USD (`$`) in `FieldGenerator::options_income()`, profile tabs, and step views.
+  7. **Replace Location with Country, State, City**: In `wp_matchmaking_pool`, replaced `location` and `pref_location` with `country`, `state`, `city`, `pref_country`, `pref_state`, `pref_city`. Country input is a single-select with specific country names (e.g., United States, UK, Pakistan, Saudi Arabia, etc.), Preferred Country is a multiselect with specific countries and "Any Country", while State and City are text inputs.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`:
+    - Bumped schema version to `2.5.0`.
+    - Added columns `country`, `state`, `city`, `pref_country`, `pref_state`, `pref_city` with indices `idx_country_city` and `idx_country`.
+    - Added automated schema patch migrating existing `location` data and dropping legacy columns.
+  - `src/Frontend/FieldGenerator.php`:
+    - Added `options_country()` and `options_pref_country()`.
+    - Added `"Prefer not to say"` to `options_marital()`, `options_children()`, and `options_education()`.
+    - Updated `options_income()` to USD ranges (`USD $3,000 – $4,999`, etc.).
+    - Added red asterisk `*` (`<span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span>`) to all field labels.
+    - Added text/select/multiselect configs for country, state, city, pref_country, pref_state, pref_city.
+    - Removed `pref_social_links`.
+  - `src/Frontend/FormController.php` & `assets/js/matchmaking-form.js`:
+    - Step 1: Rendered `user_country`, `user_state`, `user_city`; Step 2: Rendered `pref_country`, `pref_state`, `pref_city`.
+    - Added client-side (`validateStep`) and server-side validation enforcing that all 3 photo slots are filled.
+  - `src/Service/NotificationService.php`:
+    - Added `send_rejection_notification(int $match_id, int $declined_by_user_id)` dispatching in-app notification to the candidate and flushing unread transient.
+    - Updated Heartbeat API pulse check allowing Free users with unread notifications to receive real-time badge updates (only skipping `event` tier).
+  - `src/Service/MatchService.php` & `src/Repository/MatchRepository.php`:
+    - Updated `handle_match_response()`: on decline/rejection, automatically dispatches rejection notification to candidate.
+    - Updated `is_info_only_pair()`: only event tier is info-only; free users are permitted.
+    - Updated `approve_match()`: free users can be approved by admin without quota blockades.
+    - Updated `search_pool()`, `find_approved_matches_for_user()`, `get_all_matches()`, and manual candidate search to handle country, state, city.
+  - `src/Core/MatchingEngine.php`:
+    - Updated `query_candidates()` for bi-directional country/state/city gate evaluations and "Prefer not to say" flexible matching.
+  - Portal & Admin Views (`src/View/`):
+    - `tab-matches.php`: Allowed free users with approved matches to see their active match flow, and rendered `.mm-upsell-card` at the bottom of the Matches tab for free members.
+    - `tab-profile.php`: Displayed combined location (`city, state, country`), preferred location (`pref_city, pref_state, pref_country`), and upsell card.
+    - `steps/step-1-discovery.php`, `steps/step-2-profile.php`, `steps/step-5-contact.php`: Displayed formatted candidate location.
+    - `user-single.php`, `pool-list.php`, `match-single.php`: Updated location display and allowed free user approval.
+  - Automated Testing (`tests/`):
+    - Added unit tests for rejection notification dispatch, free user admin approval, USD income options, "Prefer not to say" options, and country list.
+    - Verified all 46 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 32: Settings Gear Icon Fix, Declined Match Notification Stale Invalidation & Events Equal Height / Background
+- **Objective**:
+  1. Fix the settings gear icon in the member portal header which had a clipped/broken SVG path.
+  2. Invalidate stale `match_approved` notifications when a match is declined by either candidate so that a user who has not logged in does not see a phantom "New Match Available!" toast or badge count.
+  3. Ensure all event cards in the Events tab have identical equal heights (`align-items: stretch`, flex column stretch) and the Events tab has `#F8F2ED` background color.
+- **Implemented**:
+  - `src/View/frontend/portal/portal.php`:
+    - Replaced corrupted SVG path on the settings link with the full 24x24 Lucide/Feather `settings` gear icon.
+  - `src/Repository/MatchRepository.php`:
+    - Added `dismiss_notifications_for_match(int $match_id, ?string $type = null)` to invalidate unread notifications (`is_read = 1`).
+    - Hooked notification invalidation into `reject_match()`, `expire_match()`, and `handle_match_response()`.
+  - `src/Service/NotificationService.php`:
+    - Updated `send_rejection_notification()` to call `dismiss_notifications_for_match($match_id, 'match_approved')` before dispatching the rejection notification and flushing transients.
+  - `assets/css/member-portal.css`:
+    - Added `#F8F2ED` background color to `#mm-tab-events` and `.mm-events-container`.
+    - Configured equal card heights for `.mm-event-card`, `.mm-event-loop-item`, `.mm-event-card-body`, and `.mm-event-card-footer` using CSS Grid `align-items: stretch` and flexbox `flex: 1 1 auto` / `margin-top: auto`.
+  - `tests/Unit/NotificationAndApprovalTest.php`:
+    - Added unit test assertion validating notification dismissal on decline.
+  - Verified test suite: all 46 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 33: Events Tab CSS Deduplication & Dynamic Background Image Injection
+- **Objective**:
+  1. Eliminate raw/duplicate CSS blocks rendered by Elementor in the Events tab when rendering loop templates.
+  2. Fix event card background image rendering by binding post featured images / ACF thumbnails dynamically onto loop item containers and card thumbnails.
+- **Implemented**:
+  - `src/View/frontend/portal/tab-events.php`:
+    - Extracted and deduplicated all `<style>` tags from Elementor loop template outputs so that template CSS is output cleanly only once in a hidden container (`.mm-elementor-template-styles`), stripping repeated style blocks from inside individual card markups.
+    - Added dynamic thumbnail resolution checking `get_the_post_thumbnail_url()`, ACF `event_image`, `image`, and `_thumbnail_id` meta.
+    - Injected dynamic `background-image: url(...) !important; background-size: cover !important; background-position: center center !important;` into top-level Elementor container style and applied `--mm-event-bg` CSS custom property with `data-has-bg="1"`.
+    - Added thumbnail image fallback in native event cards.
+  - `assets/css/member-portal.css`:
+    - Added rules for `.mm-event-loop-item[data-has-bg="1"]` targeting container elements, featured image placeholders, and inner sections to display `--mm-event-bg` background images.
+    - Added hidden scoping rules for `.mm-elementor-template-styles` (`display: none !important; visibility: hidden !important; height: 0 !important; overflow: hidden !important;`).
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added `test_tab_events_renders_thumbnail_and_deduplicates_elementor_css` verifying thumbnail binding, background style presence, and clean rendering.
+  - Verified test suite: all 47 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 34: Restore Pure Elementor Loop Template Rendering (Remove Automated BG Image Overrides)
+- **Objective**:
+  1. Remove forced automated background image injections and `--mm-event-bg` inline styles from the Elementor loop item container, allowing the Elementor template (#395) to render its exact native design untouched.
+  2. Maintain CSS deduplication so that Elementor `<style>` tags are output cleanly once in a hidden container rather than repeating inside card HTML.
+- **Implemented**:
+  - `src/View/frontend/portal/tab-events.php`:
+    - Removed regex background-image injection and `--mm-event-bg` attributes from `.mm-event-loop-item`.
+    - Maintained clean single-instance template CSS output.
+  - `assets/css/member-portal.css`:
+    - Removed `.mm-event-loop-item[data-has-bg="1"]` background overrides.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Updated unit tests to verify pure template rendering without forced background styles.
+  - Verified test suite: all 47 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 35: 5-Point System Updates: Income Ranges, Age/Height Range Enforcement, Any Citizenship, No Preference & #1D1E20 Color System
+- **Objective**:
+  1. Income Ranges in USD: `0-100k USD`, `100k-500k USD`, `500k-1million USD`, `1 million + USD`.
+  2. Preferred Age & Height: Enforce that max value is strictly higher than min value and min value is strictly less than max value (dynamic select synchronization + step validation + server-side normalization).
+  3. Preferred Citizenship: Include `"Any Citizenship"` as the first option.
+  4. Replace `"Prefer not to say"` with `"No Preference"` across all questionnaire dropdowns.
+  5. Include `#1D1E20` in `Design.md` / `context/design_system.md` and balance `#1D1E20` (Obsidian Dark) with `#CC723F` (Primary Ochre) across views and stylesheets.
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `options_income()` to `['Select range', 'No Preference', '0-100k USD', '100k-500k USD', '500k-1million USD', '1 million + USD']`.
+    - Added `options_pref_citizenship()` with `"Any Citizenship"` as the primary first option.
+    - Replaced `"Prefer not to say"` with `"No Preference"` across `options_marital()`, `options_children()`, `options_religion()`, `options_modesty()`, `options_drinking()`, `options_smoking()`, `options_prayer()`, and `options_education()`.
+  - `assets/js/matchmaking-form.js`:
+    - Added real-time change synchronization for `preferred_age_min` / `preferred_age_max` and `preferred_height_min` / `preferred_height_max`.
+    - Added strict `min < max` range checks in `validateStep(2)`.
+  - `src/Frontend/FormController.php`:
+    - Enforced server-side normalization for preferred age and height ranges ensuring min < max.
+  - `src/Core/MatchingEngine.php`:
+    - Supported `'no preference'` as pass-through in bi-directional queries and flexible scoring.
+  - `Design.md` & `context/design_system.md`:
+    - Documented `#1D1E20` token ("Obsidian Dark / Accent") and defined color balance role matrix.
+  - `assets/css/` (`member-portal.css`, `admin-matchmaker.css`, `matchmaking-form.css`):
+    - Configured `--obsidian: #1D1E20;` and `--text-dark: #1D1E20;` balancing typography with `#CC723F` CTAs and active states.
+  - `tests/`:
+    - Updated `MatchingEngineTest.php` and `FormWizardAndShortcodesTest.php` with assertions for new income ranges, "No Preference", "Any Citizenship", and range validation.
+  - Verified test suite: all 48 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 36: Top Form Error Display & Balanced #1D1E20 Backgrounds / Buttons Implementation
+- **Objective**:
+  1. Relocate form error notification banner to the very top of the questionnaire form (directly under step indicator progress).
+  2. Implement smooth scroll-to-top on validation error trigger so users immediately see any missing fields or invalid range constraints.
+  3. Apply `#1D1E20` (Obsidian Dark) to backgrounds and buttons in high-contrast balanced areas (Previous Step button, admin table headers, secondary buttons) while maintaining Primary Ochre `#CC723F` for main CTAs and active states.
+- **Implemented**:
+  - `src/Frontend/FormController.php`:
+    - Moved `<div class="mmf-form-message">` from the bottom to the very top of the form directly beneath `.mm-step-indicator`.
+  - `assets/js/matchmaking-form.js`:
+    - Enhanced `showMessage(text, type)` to construct styled icon banners and automatically call `.scrollIntoView({ behavior: 'smooth', block: 'center' })` to focus the user's viewport on the top error banner upon validation failure.
+  - `assets/css/matchmaking-form.css`:
+    - Styled top `.mmf-form-message.error` with high-visibility red border (`#FCA5A5`), soft background (`#FEF2F2`), and dark red text (`#991B1B`).
+    - Styled `.e-form__buttons__wrapper__button-previous` and `[data-direction="previous"]` with `#1D1E20` solid background, white text, and `#333538` hover state.
+  - `assets/css/member-portal.css` & `assets/css/admin-matchmaker.css`:
+    - Integrated `--obsidian: #1D1E20;` across dark outline buttons, secondary action controls, and admin table headers.
+  - Verified test suite: all 48 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 37: Real-Time Age/Height Range Error Display & Form Primary CTAs Updated to #1D1E20
+- **Objective**:
+  1. Fix issue where selecting min age/height $\ge$ max age/height did not display the error banner (eliminated the previous auto-mutation logic that silently altered dropdown selections, replacing it with active validation on dropdown `change`, step transition, and AJAX submission).
+  2. Enhance `showMessage(text, type)` in `matchmaking-form.js` to guarantee `display: block`, build `.mmf-alert-content` with icons (`⚠️`/`✅`), and execute `scrollIntoView({ behavior: 'smooth', block: 'center' })`.
+  3. Apply `#1D1E20` (Obsidian Dark) as the primary background color for all primary CTA buttons on the form (`.elementor-button`, `button[type="submit"]`, `.e-form__buttons__wrapper__button-next`), paired with high-contrast `#F8F2ED` / `#1D1E20` previous button styling.
+  4. Implement server-side validation error handling in `FormController.php` for `pref_age_min >= pref_age_max` and `pref_h_min >= pref_h_max`.
+- **Implemented**:
+  - `assets/js/matchmaking-form.js`:
+    - Implemented `checkAgeRange(silent)` and `checkHeightRange(silent)` with `.has-error` class toggling on `.custom-select-wrapper`.
+    - Added `change` event listeners on `preferred_age_min`, `preferred_age_max`, `preferred_height_min`, and `preferred_height_max` that immediately show the error banner and scroll into view when min $\ge$ max.
+    - Updated `showMessage(text, type)` with auto-scrolling and rich warning formatting.
+  - `src/Frontend/FormController.php`:
+    - Added server-side validation rejecting submissions where `pref_age_min >= pref_age_max` or `pref_h_min >= pref_h_max` with `wp_send_json_error()`.
+  - `assets/css/matchmaking-form.css`:
+    - Styled `.elementor-button` and submit buttons with `#1D1E20` background (`#333538` hover, `#000000` active).
+    - Styled `.e-form__buttons__wrapper__button-previous` with `#F8F2ED` background and `#1D1E20` text.
+    - Added `.custom-select-wrapper.has-error .custom-select-display` red bottom border (`#e11d48`).
+  - `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Added `test_range_validation_logic` verifying range inequality detection.
+  - Verified test suite: all 49 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 38: Instant Error Dismissal on Value Entry and Correction
+- **Objective**:
+  - Automatically and immediately dismiss the top error alert and clear `.has-error` visual cues as soon as the user enters a value into a missing field, selects a dropdown option, checks a radio option, uploads required photos, or adjusts min/max age/height into a valid range.
+- **Implemented**:
+  - `assets/js/matchmaking-form.js`:
+    - Added `input` and `change` event listeners across all form inputs (`input, select, textarea`) that dynamically remove `.has-error` and clear active field error banners when a valid value is entered.
+    - Updated `onAgeChange` and `onHeightChange` to clear top alerts immediately when valid `min < max` ranges are restored.
+    - Added instant photo upload listeners clearing photo requirement alerts once all 3 photos have files or previews attached.
+  - Verified test suite: all 49 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 39: Balanced Application of #1D1E20 Across Matching Step Flow & Profile Views
+- **Objective**:
+  - Incorporate the new `#1D1E20` (Obsidian Dark) color token across selected areas of the member portal (profile tab, match steps, buttons, badges, contact reveals) while preserving `#CC723F` (Primary Ochre) and `#F8F2ED` (Warm Cream) for brand harmony.
+- **Implemented**:
+  - `assets/css/member-portal.css`:
+    - **Buttons**:
+      - `.btn-primary` (e.g. "View Match →", "Accept Match →", "Keep Match", "Back to Profile Dashboard →", "Get Monthly Membership →") styled with `#1D1E20` background, `#333538` hover, and `#000000` active state.
+      - `.btn-outline-dark` (e.g. "View Status", "Decline Match") styled with `#1D1E20` border/text and `#1D1E20` hover fill.
+    - **Profile Tab**:
+      - `.az-edit-btn`: Styled with `#1D1E20` border and text with `#1D1E20` solid hover.
+      - `.az-badge`: Styled with `#1D1E20` background and white text.
+      - `.az-stat-box` & `.az-stat-num`: Styled stat cards with `#F8F2ED` warm background, `#e8ded0` border, and `#1D1E20` numbers.
+      - `.az-value` and `.az-user-name`: Displayed in `#1D1E20` for high-contrast readability.
+    - **Matching Steps**:
+      - `.candidate-tags-row span`: Styled candidate tags with `#F8F2ED` background and `#1D1E20` text.
+      - `.contact-icon-bubble`: Styled with `#1D1E20` background and white icons.
+      - `.contact-data-text .val`: Rendered in `#1D1E20` font weight 600.
+      - `.notice-gray-box`: Styled with `#F8F2ED` background, `#e8ded0` border, and `#1D1E20` text.
+  - Verified test suite: all 49 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 40: Remove "No Preference" from Step 1 User Info & Preserve in Step 2 Preferences
+- **Objective**:
+  - Remove "No Preference" from all personal info dropdowns on Step 1 (where the member is declaring their own profile attributes: marital status, children, religion, modesty, drinking, smoking, prayer, education, income).
+  - Preserve "No Preference" (and "Any Country" / "Any Citizenship") across all partner preference dropdowns on Step 2.
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Cleaned `options_religion()`, `options_marital()`, `options_children()`, `options_modesty()`, `options_drinking()`, `options_smoking()`, `options_prayer()`, `options_education()`, and `options_income()` to provide only concrete user options without "No Preference".
+    - Added corresponding `options_pref_*()` methods containing "No Preference" for Step 2 partner preference fields.
+    - Updated `$select_configs` in `render_single_field()` so `pref_*` fields use the `options_pref_*()` sets while `user_*` fields use the user info sets.
+  - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Added assertions verifying that Step 1 user options do NOT contain "No Preference" while Step 2 preference options DO contain "No Preference".
+  - Verified test suite: all 49 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 41: PMPro Multi-Group Priority Sync, Dynamic Location Cascading Dropdowns, Readonly Email & 6-Digit Email Verification Module
+- **Objective**:
+  - Handle PMPro multiple level groups and resolve user tier priority (`one_on_one` > `monthly` > `event` > `free`) upon checkout, auto-cancelling the old Free level in Group 1 when paid levels are acquired.
+  - Make the questionnaire `email` field strictly readonly with subtle lock styling so users cannot modify their registered email.
+  - Dynamically populate cascading Country -> State -> City dropdowns for Step 1 (`user_country`, `user_state`, `user_city`) and Step 2 (`pref_country`, `pref_state`, `pref_city`) using `assets/file/hierarchy_names.json`, with "Any" wildcards for preferences.
+  - Implement a 6-digit email verification module (`EmailVerificationService`) with 24-hour expiration, 60-second cooldown, branded HTML email template, and restricted screen access to Dashboard and Form Wizard until verified.
+- **Implemented**:
+  - `src/Core/PMProSync.php`:
+    - Added `TIER_PRIORITY = ['one_on_one' => 4, 'monthly' => 3, 'event' => 2, 'free' => 1]`.
+    - Enhanced `get_current_user_type($user_id)` to query `pmpro_getMembershipLevelsForUser()` across multiple groups and return the highest-priority tier.
+    - Added `maybe_cancel_free_levels($user_id)` to automatically cancel Free level 2 when upgrading to paid tiers.
+    - Hooked into `pmpro_after_all_membership_level_changes` and `pmpro_after_checkout` with robust support for PMPro's array of users argument structure.
+  - `src/Service/EmailVerificationService.php`:
+    - Created email verification service handling 6-digit cryptographic code generation (`random_int(100000, 999999)`), 24h expiration, 60s cooldown timer, HTML email dispatch, and AJAX verification (`mm_verify_email_code`, `mm_resend_verification_code`).
+    - Hooked into `user_register` and `pmpro_after_checkout`.
+  - `src/View/frontend/portal/email-verification.php`:
+    - Created modern OTP input screen with `#1D1E20` primary button, `#CC723F` accents, live 60s cooldown countdown timer, and inline alert feedback.
+  - `src/Frontend/PortalController.php` & `src/Frontend/FormController.php`:
+    - Intercept unverified members and render `email-verification.php` until code is verified.
+    - Block unverified profile form submissions in AJAX handler.
+    - Enqueue `hierarchyUrl` in script localization for form JS.
+  - `src/Frontend/FieldGenerator.php`:
+    - Made `email` field readonly (`<input type="email" ... readonly class="... is-readonly">`).
+    - Added `get_hierarchy_data()`, `options_country()`, `options_user_state()`, `options_user_city()`, `options_pref_country()`, `options_pref_state()`, `options_pref_city()`.
+    - Rendered location fields as dynamic select dropdowns with `location-cascade-group`.
+  - `assets/js/matchmaking-form.js` & `assets/css/matchmaking-form.css`:
+    - Implemented `updateCustomSelect()` and asynchronous `loadHierarchy()` for instant Country -> State -> City cascading.
+    - Styled readonly inputs with disabled tone and distinct border.
+  - `tests/Unit/EmailVerificationTest.php` & `tests/Unit/LocationCascadeTest.php`:
+    - Added unit test suites verifying email code generation, expiry, 60s cooldown, correct verification, location hierarchy loading, state/city cascading, and readonly email rendering.
+  - Verified test suite: all 59 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+---
+
+### Task 43: Fix Email Verification Dispatch, Cooldown Management & Admin Audit Logging
+- **Objective**:
+  - Resolve email dispatch failures and "Could not resend code." errors during email verification.
+  - Implement comprehensive logging for all email verification lifecycle events (dispatches, failures, OTP verifications, expired/invalid attempts) in the Admin Logs under Settings (`wp_matchmaker_logs`).
+  - Ensure failed mail transmissions do not lock the user in a cooldown timer, allowing immediate resend retry.
+- **Implemented**:
+  - `src/Service/EmailVerificationService.php`:
+    - Sanitized `From:` header to prevent invalid RFC 822 domain/port formatting (stripping ports/www, validating domain syntax, falling back to valid `admin_email`).
+    - Added `wp_mail_content_type` filter for HTML MIME formatting and hooked into `wp_mail_failed` to capture granular error reasons from WordPress/PHPMailer.
+    - Integrated with `MatchRepository::instance()->log_event()`:
+      - Logged `verification_code_sent` (`success`) with full email HTML payload (`details_json['body_html']`) for admin email preview.
+      - Logged `verification_code_failed` (`error`) with detailed error messages when `wp_mail()` or user lookup fails.
+      - Logged `email_verified` (`success`) when a user successfully enters the correct OTP code.
+      - Logged `email_verify_failed` (`warning`) when an expired or incorrect code is submitted.
+    - Updated cooldown handling so `mm_verification_last_sent_at` is only updated when an email is successfully dispatched, resetting cooldown to 0 on failure for immediate retry.
+  - `src/View/frontend/portal/email-verification.php`:
+    - Improved frontend AJAX response error extraction to display clear server-provided error messages instead of generic fallbacks.
+  - `src/View/admin/logs/tab-notification-logs.php`:
+    - Added `verification_code_sent`, `verification_code_failed`, and `email_verified` filter options to the Admin Notification & Email Logs filter dropdown.
+  - `tests/Unit/EmailVerificationTest.php` & `tests/bootstrap.php`:
+    - Added unit test `test_email_verification_logs_events_on_success_and_failure` asserting `wp_matchmaker_logs` insertions and cooldown bypass on failed send.
+    - Added `wp_parse_url` mock and configurable `__mm_wp_mail_return` flag in bootstrap.
+  - Verified test suite: all 62 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 44: Add Verification Email Admin Settings & Comprehensive Resend Mechanism Enhancement
+- **Objective**:
+  - Add a dedicated "6. Email Verification Code & Delivery Settings" section to the Matchmaker Settings page (`/wp-admin/admin.php?page=matchmaking-settings`).
+  - Allow administrators to configure:
+    - Sender Email (`mm_email_verify_from_email`)
+    - Sender Name (`mm_email_verify_from_name`)
+    - Email Subject (`mm_email_verify_subject`) with `{code}` placeholder
+    - Email Body (`mm_email_verify_template`) with rich WYSIWYG editor and placeholders (`{code}`, `{user_name}`, `{user_email}`, `{site_name}`, `{expiry_hours}`)
+    - Code Expiration Hours (`mm_email_verify_expiry_hours`, default 24h)
+    - Resend Cooldown Seconds (`mm_email_verify_cooldown_seconds`, default 60s)
+  - Ensure the resend mechanism works seamlessly by adding `wp_ajax_nopriv_` hooks, passing `user_id` authenticated with user-bound nonce `mm_verify_nonce_{$user_id}`, applying `credentials: 'same-origin'` to all fetch calls, and hooking `wp_mail_from` and `wp_mail_from_name` with priority 999 for full SMTP plugin compatibility.
+- **Implemented**:
+  - `src/Admin/AdminPortal.php`:
+    - Saved and retrieved options: `mm_email_verify_from_email`, `mm_email_verify_from_name`, `mm_email_verify_subject`, `mm_email_verify_template`, `mm_email_verify_expiry_hours`, `mm_email_verify_cooldown_seconds`.
+    - Passed verification settings to `src/View/admin/settings/settings.php`.
+  - `src/View/admin/settings/settings.php`:
+    - Created Section 6 with From Email, From Name, Subject input, WYSIWYG editor for body template with placeholder guide table, Code Expiry input, and Resend Cooldown input.
+  - `src/Service/EmailVerificationService.php`:
+    - Added getters: `get_expiry_seconds()`, `get_cooldown_seconds()`, `get_sender_email()`, `get_sender_name()`, `get_email_subject()`.
+    - Updated `get_email_html()` with support for custom body templates and placeholder replacements.
+    - Updated `send_verification_email()` to filter `wp_mail_from` and `wp_mail_from_name` with priority 999.
+    - Registered `wp_ajax_nopriv_mm_verify_email_code` and `wp_ajax_nopriv_mm_resend_verification_code`.
+    - Added user-bound nonce authentication (`mm_verify_nonce_{$user_id}`) in `handle_ajax_verify()` and `handle_ajax_resend()`.
+  - `src/View/frontend/portal/email-verification.php`:
+    - Added hidden input for `user_id` and generated user-bound nonce.
+    - Included `user_id` and `credentials: 'same-origin'` in all fetch calls.
+  - `tests/Unit/EmailVerificationTest.php`:
+    - Added `test_custom_verification_settings_affect_subject_template_and_sender` testing placeholder replacement, custom from name/email, and configurable durations.
+  - Verified test suite: all 63 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 45: Handle Local "Could Not Instantiate Mail Function" & Support Test Mode Email Simulation
+- **Objective**:
+  - Resolve the error `"Could not instantiate mail function."` which occurs when WordPress / PHPMailer attempts to use PHP's default `mail()` function on a local or staging server without an active local sendmail binary or SMTP provider.
+  - Allow developers and administrators to test the entire email verification workflow seamlessly without needing a configured SMTP server when in Test Mode (`is_test_mode()`).
+  - Provide clear, actionable guidance in Matchmaker Settings explaining SMTP requirements for live production environments.
+- **Implemented**:
+  - `src/Service/EmailVerificationService.php`:
+    - Added Test Mode simulation in `generate_and_send_code()`: when `MatchRepository::instance()->is_test_mode()` is active and `wp_mail` fails due to local mail server unavailability, the plugin logs a simulation event and returns the 6-digit OTP code directly in the alert banner, enabling instant OTP testing without an SMTP server.
+    - Added user-friendly diagnostic guidance for Live Mode when `Could not instantiate mail function.` is reported.
+  - `src/View/admin/settings/settings.php`:
+    - Added an informative callout box in Section 6 explaining SMTP setup and Test Mode simulation.
+  - `tests/Unit/EmailVerificationTest.php`:
+    - Added `test_test_mode_simulates_email_dispatch_on_mail_failure` asserting that in Test Mode, offline mail functions return the generated verification code in the response.
+  - Verified test suite: all 64 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+### Task 46: Resolve AJAX 400 on Verification Code Resend & Verification
+- **Objective**:
+  - Fix HTTP 400 Bad Request returned by WordPress `admin-ajax.php` when requesting OTP verification or code resend (`mm_resend_verification_code` / `mm_verify_email_code`).
+- **Root Cause**:
+  - `EmailVerificationService::instance()` was not initialized during `plugins_loaded` in `matchmaker.php`. When AJAX requests hit `admin-ajax.php`, the frontend shortcode controllers are not rendered, meaning `EmailVerificationService` had not been instantiated, leaving `wp_ajax_` and `wp_ajax_nopriv_` action hooks unregistered. WordPress `admin-ajax.php` terminates with HTTP 400 when an unregistered action is called.
+- **Implemented**:
+  - `matchmaker.php`:
+    - Added `\Matchmaker\Service\EmailVerificationService::instance();` to `plugins_loaded` bootstrap sequence so all verification AJAX hooks (`wp_ajax_mm_resend_verification_code`, `wp_ajax_nopriv_mm_resend_verification_code`, `wp_ajax_mm_verify_email_code`, `wp_ajax_nopriv_mm_verify_email_code`) are permanently registered on every WordPress request.
+  - `tests/bootstrap.php`:
+    - Added `has_action` stub to test environment mock layer.
+  - `tests/Unit/EmailVerificationTest.php`:
+    - Added `test_ajax_hooks_are_registered` confirming all verification and resend AJAX hooks are active.
+  - Verified test suite: all 65 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+

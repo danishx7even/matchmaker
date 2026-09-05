@@ -224,13 +224,44 @@ class AdminPortal
                 update_option('mm_free_reg_form_id', sanitize_text_field(wp_unslash($_POST['mm_free_reg_form_id'])));
             }
 
-            // Email Templates
+            // Events Configuration
+            if (isset($_POST['mm_events_cpt_slug'])) {
+                update_option('mm_events_cpt_slug', sanitize_key((string) $_POST['mm_events_cpt_slug']));
+            }
+            if (isset($_POST['mm_events_template_id'])) {
+                update_option('mm_events_template_id', max(0, (int) $_POST['mm_events_template_id']));
+            }
+            if (isset($_POST['mm_events_per_page'])) {
+                update_option('mm_events_per_page', max(1, (int) $_POST['mm_events_per_page']));
+            }
+
+            // Email Templates (Match Approval)
             if (isset($_POST['mm_email_approval_subject'])) {
                 update_option('mm_email_approval_subject', sanitize_text_field(wp_unslash($_POST['mm_email_approval_subject'])));
             }
 
             if (isset($_POST['mm_email_approval_template'])) {
                 update_option('mm_email_approval_template', wp_kses_post(wp_unslash($_POST['mm_email_approval_template'])));
+            }
+
+            // Section 6: Verification Email Configuration
+            if (isset($_POST['mm_email_verify_from_email'])) {
+                update_option('mm_email_verify_from_email', sanitize_email(wp_unslash($_POST['mm_email_verify_from_email'])));
+            }
+            if (isset($_POST['mm_email_verify_from_name'])) {
+                update_option('mm_email_verify_from_name', sanitize_text_field(wp_unslash($_POST['mm_email_verify_from_name'])));
+            }
+            if (isset($_POST['mm_email_verify_subject'])) {
+                update_option('mm_email_verify_subject', sanitize_text_field(wp_unslash($_POST['mm_email_verify_subject'])));
+            }
+            if (isset($_POST['mm_email_verify_template'])) {
+                update_option('mm_email_verify_template', wp_kses_post(wp_unslash($_POST['mm_email_verify_template'])));
+            }
+            if (isset($_POST['mm_email_verify_expiry_hours'])) {
+                update_option('mm_email_verify_expiry_hours', max(1, (int) $_POST['mm_email_verify_expiry_hours']));
+            }
+            if (isset($_POST['mm_email_verify_cooldown_seconds'])) {
+                update_option('mm_email_verify_cooldown_seconds', max(5, (int) $_POST['mm_email_verify_cooldown_seconds']));
             }
 
             add_settings_error('mm_admin_notices', 'settings_saved', __('Settings saved successfully.', 'matchmaker'), 'updated');
@@ -252,10 +283,10 @@ class AdminPortal
             $admin_id = get_current_user_id();
             $result   = MatchService::instance()->process_admin_approve($match_id, $admin_id);
 
-            if ($result['success']) {
-                add_settings_error('mm_admin_notices', 'approved', $result['message'], 'updated');
+            if (!empty($result['success'])) {
+                add_settings_error('mm_admin_notices', 'approved', $result['message'] ?? sprintf(__('Match #%d approved successfully.', 'matchmaker'), $match_id), 'updated');
             } else {
-                add_settings_error('mm_admin_notices', 'approve_failed', $result['message'], 'error');
+                add_settings_error('mm_admin_notices', 'approve_failed', $result['message'] ?? __('Failed to approve match.', 'matchmaker'), 'error');
             }
             return;
         }
@@ -574,7 +605,12 @@ class AdminPortal
         $page_events        = (int) get_option('mm_page_events_id', 0);
         $free_form_id       = (string) get_option('mm_free_reg_form_id', '2784843');
 
-        // 4. Email Template
+        // 4. Events Configuration
+        $events_cpt_slug    = (string) get_option('mm_events_cpt_slug', 'event');
+        $events_template_id = (int) get_option('mm_events_template_id', 395);
+        $events_per_page    = (int) get_option('mm_events_per_page', 6);
+
+        // 5. Email Template
         $default_subject = __('Congratulations! You have a new approved match on Arab Zawaj', 'matchmaker');
         $default_template = "<p>Dear {user_name},</p>\n"
             . "<p>Great news! Our matchmakers have reviewed and approved a new profile match for you.</p>\n"
@@ -588,6 +624,19 @@ class AdminPortal
 
         $subject  = (string) get_option('mm_email_approval_subject', $default_subject);
         $template = (string) get_option('mm_email_approval_template', $default_template);
+
+        // 6. Verification Email Settings
+        $verify_from_email       = (string) get_option('mm_email_verify_from_email', '');
+        $verify_from_name        = (string) get_option('mm_email_verify_from_name', '');
+        $verify_subject          = (string) get_option('mm_email_verify_subject', __('Your Arab Zawaj Verification Code: {code}', 'matchmaker'));
+        $default_verify_template = "<p>Assalamu Alaikum, {user_name}!</p>\n"
+            . "<p>Please use the 6-digit verification code below to verify your email address and access your Arab Zawaj matchmaking portal:</p>\n"
+            . "<div style=\"font-size: 32px; font-weight: 800; letter-spacing: 0.25em; padding: 14px 28px; background: #F8F2ED; border: 2px dashed #CC723F; border-radius: 10px; display: inline-block; margin: 15px 0; color: #1D1E20;\">{code}</div>\n"
+            . "<p>This code is valid for <strong>{expiry_hours} hours</strong>. If you did not request this verification, please disregard this email.</p>\n"
+            . "<p>Warm regards,<br>Arab Zawaj Matchmaking Team</p>";
+        $verify_template         = (string) get_option('mm_email_verify_template', $default_verify_template);
+        $verify_expiry_hours     = (int) get_option('mm_email_verify_expiry_hours', 24);
+        $verify_cooldown_seconds = (int) get_option('mm_email_verify_cooldown_seconds', 60);
 
         require dirname(__DIR__) . '/View/admin/settings/settings.php';
     }

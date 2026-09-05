@@ -29,6 +29,19 @@ class PMProSync {
     /**
      * @return self
      */
+    /**
+     * Tier priority rank (higher integer = higher priority).
+     */
+    public const TIER_PRIORITY = [
+        'one_on_one' => 4,
+        'monthly'    => 3,
+        'event'      => 2,
+        'free'       => 1,
+    ];
+
+    /**
+     * @return self
+     */
     public static function instance(): self
     {
         if (self::$instance === null) {
@@ -40,6 +53,8 @@ class PMProSync {
     private function __construct()
     {
         add_action('pmpro_after_change_membership_level', [$this, 'sync_pmpro_level_to_user_type'], 10, 3);
+        add_action('pmpro_after_all_membership_level_changes', [$this, 'sync_all_membership_levels'], 10, 1);
+        add_action('pmpro_after_checkout', [$this, 'handle_checkout_sync'], 10, 2);
         add_action('pmpro_subscription_payment_completed', [$this, 'reset_user_quota_on_renewal'], 10, 1);
     }
 
@@ -134,12 +149,24 @@ class PMProSync {
             return;
         }
 
-        $user_type = $this->get_user_type_by_level_id($level_id);
-        
-        \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $user_type);
-        \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $user_type);
+        $new_tier = $this->get_user_type_by_level_id($level_id);
 
-        if ($user_type === 'monthly') {
+        // If user upgraded to a paid tier, cancel any lingering Free tier level from separate PMPro level groups
+        if (in_array($new_tier, ['monthly', 'one_on_one', 'event'], true)) {
+            $this->maybe_cancel_free_levels($user_id);
+        }
+
+        $resolved_user_type = $this->get_current_user_type($user_id);
+        $new_rank = self::TIER_PRIORITY[$new_tier] ?? 1;
+        $resolved_rank = self::TIER_PRIORITY[$resolved_user_type] ?? 1;
+        if ($new_rank > $resolved_rank) {
+            $resolved_user_type = $new_tier;
+        }
+        
+        \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
+        \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
+
+        if ($resolved_user_type === 'monthly') {
             $pool_user = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
             if (!empty($pool_user)) {
                 if (function_exists('mm_enqueue_user_matching_job')) {
@@ -150,13 +177,136 @@ class PMProSync {
     }
 
     /**
-     * Retrieves the current user_type.
+     * Hook after all membership level changes (multi-group support).
+     * PMPro passes an array of [$user_id => $old_levels] or array of user IDs.
+     *
+     * @param mixed $user_data
+     * @return void
+     */
+    public function sync_all_membership_levels(mixed $user_data): void
+    {
+        $user_ids = [];
+
+        if (is_numeric($user_data)) {
+            $user_ids[] = (int) $user_data;
+        } elseif (is_array($user_data)) {
+            foreach ($user_data as $key => $val) {
+                if (is_numeric($key) && (int) $key > 0) {
+                    $user_ids[] = (int) $key;
+                }
+                if (is_numeric($val) && (int) $val > 0) {
+                    $user_ids[] = (int) $val;
+                }
+            }
+        }
+
+        $user_ids = array_unique(array_filter($user_ids, static fn($id) => (int) $id > 0));
+
+        foreach ($user_ids as $user_id) {
+            $resolved_user_type = $this->get_current_user_type($user_id);
+
+            if (in_array($resolved_user_type, ['monthly', 'one_on_one', 'event'], true)) {
+                $this->maybe_cancel_free_levels($user_id);
+            }
+
+            \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
+            \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
+
+            if ($resolved_user_type === 'monthly') {
+                $pool_user = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
+                if (!empty($pool_user)) {
+                    if (function_exists('mm_enqueue_user_matching_job')) {
+                        mm_enqueue_user_matching_job($user_id, 'tier_upgrade');
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Hook on PMPro checkout completion.
+     *
+     * @param int $user_id
+     * @param mixed $morder
+     * @return void
+     */
+    public function handle_checkout_sync(int $user_id, mixed $morder = null): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $this->sync_all_membership_levels($user_id);
+    }
+
+    /**
+     * Cancels any active Free tier levels for a user if they hold a paid tier.
+     *
+     * @param int $user_id
+     * @return void
+     */
+    public function maybe_cancel_free_levels(int $user_id): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $free_levels = $this->get_levels_for_tier('free');
+        if (empty($free_levels)) {
+            $free_levels = [2];
+        }
+
+        if (function_exists('pmpro_getMembershipLevelsForUser')) {
+            $active_levels = pmpro_getMembershipLevelsForUser($user_id);
+            if (is_array($active_levels)) {
+                foreach ($active_levels as $lvl) {
+                    $lid = is_object($lvl) ? (int) ($lvl->id ?? 0) : (int) $lvl;
+                    if (in_array($lid, $free_levels, true) && function_exists('pmpro_cancelMembershipLevel')) {
+                        pmpro_cancelMembershipLevel($lid, $user_id);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Retrieves the current user_type with multi-group priority resolution.
      *
      * @param int $user_id
      * @return string
      */
     public function get_current_user_type(int $user_id): string
     {
+        if ($user_id <= 0) {
+            return 'free';
+        }
+
+        // 1. Check all active membership levels for user (supporting PMPro multiple level groups)
+        if (function_exists('pmpro_getMembershipLevelsForUser')) {
+            $levels = pmpro_getMembershipLevelsForUser($user_id);
+            if (is_array($levels) && !empty($levels)) {
+                $best_tier     = 'free';
+                $highest_rank  = 0;
+
+                foreach ($levels as $level_obj) {
+                    $lvl_id = is_object($level_obj) ? (int) ($level_obj->id ?? 0) : (int) $level_obj;
+                    if ($lvl_id > 0) {
+                        $tier = $this->get_user_type_by_level_id($lvl_id);
+                        $rank = self::TIER_PRIORITY[$tier] ?? 0;
+                        if ($rank > $highest_rank) {
+                            $highest_rank = $rank;
+                            $best_tier    = $tier;
+                        }
+                    }
+                }
+
+                if ($highest_rank > 0) {
+                    return $best_tier;
+                }
+            }
+        }
+
+        // 2. Fallback to single level getter
         if (function_exists('pmpro_getMembershipLevelForUser')) {
             $membership = pmpro_getMembershipLevelForUser($user_id);
             if (!empty($membership->id)) {
@@ -164,6 +314,7 @@ class PMProSync {
             }
         }
 
+        // 3. Fallback to usermeta
         $meta_type = (string) get_user_meta($user_id, 'user_type', true);
         return !empty($meta_type) ? $meta_type : 'free';
     }

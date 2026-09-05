@@ -44,16 +44,33 @@ class ProfileService {
      * @return string
      */
     public function get_user_type(int $user_id): string {
-        $user_type = 'free';
-        if (class_exists('\Matchmaker\PMPro_Sync')) {
-            $user_type = \Matchmaker\PMPro_Sync::get_user_type($user_id);
-        } else {
-            $meta_type = get_user_meta($user_id, 'user_type', true);
-            if (!empty($meta_type)) {
-                $user_type = $meta_type;
+        if ($user_id <= 0) {
+            return 'free';
+        }
+
+        if (function_exists('pmpro_getMembershipLevelForUser')) {
+            $level = pmpro_getMembershipLevelForUser($user_id);
+            if ($level && !empty($level->id)) {
+                return \Matchmaker\Core\PMProSync::instance()->get_user_type_by_level_id((int) $level->id);
             }
         }
-        return $user_type;
+
+        $meta_type = get_user_meta($user_id, 'user_type', true);
+        if (!empty($meta_type)) {
+            return (string) $meta_type;
+        }
+
+        $az_type = get_user_meta($user_id, 'az_user_type', true);
+        if (!empty($az_type)) {
+            return (string) $az_type;
+        }
+
+        $pool = MatchRepository::instance()->get_user_pool($user_id);
+        if ($pool && !empty($pool['user_type'])) {
+            return (string) $pool['user_type'];
+        }
+
+        return 'free';
     }
 
     /**

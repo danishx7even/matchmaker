@@ -71,7 +71,9 @@ if (!defined('ABSPATH')) {
                     $st      = (string) ($log['status'] ?? 'info');
                     $ref_id  = (int) ($log['reference_id'] ?? 0);
                     $uid     = (int) ($log['user_id'] ?? 0);
-                    $meta_json = $log['details_json'] ?? '';
+                    $meta_json = is_array($log['details_json'] ?? null)
+                        ? (function_exists('wp_json_encode') ? wp_json_encode($log['details_json']) : json_encode($log['details_json']))
+                        : (string) ($log['details_json'] ?? '');
                 ?>
                     <tr>
                         <td><strong>#<?php echo $lid; ?></strong></td>

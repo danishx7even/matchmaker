@@ -20,7 +20,7 @@ $their_is_accepted = ($their_resp === 'accepted');
 $their_is_declined = in_array($their_resp, ['rejected', 'declined'], true);
 ?>
 <!-- STATE 3: ACCEPTED — WAITING FOR RESPONSE (STEP 3) -->
-<div id="step-3" class="view-state">
+<div id="step-3" class="view-state <?php echo (($default_step ?? 1) === 3) ? 'active' : ''; ?>">
     <div style="padding: 24px 48px 0;">
         <button type="button" class="mm-back-btn" data-mm-action="goback-step" style="display: inline-flex; align-items: center; gap: 6px; background: none; border: none; font-size: 14px; font-weight: 600; color: #CC723F; cursor: pointer; padding: 0;">
             ← <?php esc_html_e('Back to Matches', 'matchmaker'); ?>

@@ -82,4 +82,29 @@ final class SettingsAndPlanMappingTest extends TestCase
         $this->assertTrue($handler->matches_form_id('67890'));
         $this->assertFalse($handler->matches_form_id('2784843'));
     }
+
+    public function test_pmpro_sync_all_membership_levels_handles_array_and_int(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 701;
+
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(3, 'Monthly Matchmaking'),
+        ];
+
+        // 1. Array format as passed by PMPro core do_action('pmpro_after_all_membership_level_changes', $old_levels_by_user)
+        $pmpro_hook_data = [
+            $user_id => [2], // user 701 had old level 2
+        ];
+        $sync->sync_all_membership_levels($pmpro_hook_data);
+        $this->assertEquals('monthly', get_user_meta($user_id, 'user_type', true));
+
+        // 2. Direct int format
+        $user_id_2 = 702;
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id_2] = [
+            new \FakePMProLevel(4, 'VIP 1-on-1 Matchmaking'),
+        ];
+        $sync->sync_all_membership_levels($user_id_2);
+        $this->assertEquals('one_on_one', get_user_meta($user_id_2, 'user_type', true));
+    }
 }

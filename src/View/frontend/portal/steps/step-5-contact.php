@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 }
 ?>
 <!-- STATE 5: MUTUAL MATCH — REVEALED CONTACT INFO (STEP 5) -->
-<div id="step-5" class="view-state">
+<div id="step-5" class="view-state <?php echo (($default_step ?? 1) === 5) ? 'active' : ''; ?>">
     <div class="centered-state-wrapper" style="max-width: 620px;">
         <div class="status-avatar-bubble orange" style="background: linear-gradient(135deg, #CC723F 0%, #E89158 100%); width: 76px; height: 76px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(204, 114, 63, 0.35); margin: 0 auto 20px;">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

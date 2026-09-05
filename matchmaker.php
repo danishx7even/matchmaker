@@ -130,10 +130,13 @@ add_action('plugins_loaded', static function (): void {
     // 7. Notification service (Heartbeat API polling + email dispatch)
     \Matchmaker\Service\NotificationService::instance();
 
-    // 8. Async matching engine (Action Scheduler hooks + weekly cron)
+    // 8. Email verification service (6-digit OTP codes & AJAX resend/verify handlers)
+    \Matchmaker\Service\EmailVerificationService::instance();
+
+    // 9. Async matching engine (Action Scheduler hooks + weekly cron)
     \Matchmaker\Core\MatchingEngine::instance();
 
-    // 9. Admin portal (only needed in admin context, but safe to always init)
+    // 10. Admin portal (only needed in admin context, but safe to always init)
     if (is_admin()) {
         \Matchmaker\Admin\AdminPortal::instance();
     }

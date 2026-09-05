@@ -83,9 +83,13 @@ $photo3 = $meta['user_photo3'] ?? '';
         <?php endif; ?>
 
         <table class="mm-kv-table">
+            <?php
+            $u_loc_parts = array_filter([$pool['city'] ?? '', $pool['state'] ?? '', $pool['country'] ?? '']);
+            $u_loc = !empty($u_loc_parts) ? implode(', ', $u_loc_parts) : ($pool['location'] ?? '—');
+            ?>
             <tr><th><?php esc_html_e('Age / Date of Birth', 'matchmaker'); ?></th><td><?php echo esc_html($age . ' yrs (' . ($pool['birth_date'] ?? 'N/A') . ')'); ?></td></tr>
             <tr><th><?php esc_html_e('Gender', 'matchmaker'); ?></th><td><?php echo esc_html(ucfirst($pool['gender'] ?? '')); ?></td></tr>
-            <tr><th><?php esc_html_e('Location', 'matchmaker'); ?></th><td><?php echo esc_html($pool['location'] ?? '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Location', 'matchmaker'); ?></th><td><?php echo esc_html($u_loc); ?></td></tr>
             <tr><th><?php esc_html_e('Citizenship', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_citizenship'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Origin / Ethnicity', 'matchmaker'); ?></th><td><?php echo esc_html($pool['origin'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Religion / Modesty', 'matchmaker'); ?></th><td><?php echo esc_html(($pool['religion'] ?? '—') . ' / ' . ($pool['modesty'] ?? '—')); ?></td></tr>
@@ -104,10 +108,14 @@ $photo3 = $meta['user_photo3'] ?? '';
     <!-- Candidate Partner Preferences Card -->
     <div class="mm-card">
         <h3><?php esc_html_e('Candidate Partner Preferences', 'matchmaker'); ?></h3>
+        <?php
+        $p_loc_parts = array_filter([$pool['pref_city'] ?? '', $pool['pref_state'] ?? '', $pool['pref_country'] ?? '']);
+        $p_loc = !empty($p_loc_parts) ? implode(', ', $p_loc_parts) : ($pool['pref_location'] ?: 'Any');
+        ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Preferred Gender', 'matchmaker'); ?></th><td><?php echo esc_html(ucfirst($pool['pref_gender'] ?? 'Any')); ?></td></tr>
             <tr><th><?php esc_html_e('Preferred Age Range', 'matchmaker'); ?></th><td><?php echo esc_html(($pool['preferred_age_min'] ?? 18) . ' – ' . ($pool['preferred_age_max'] ?? 80) . ' yrs'); ?></td></tr>
-            <tr><th><?php esc_html_e('Preferred Location', 'matchmaker'); ?></th><td><?php echo esc_html($pool['pref_location'] ?: 'Any'); ?></td></tr>
+            <tr><th><?php esc_html_e('Preferred Location', 'matchmaker'); ?></th><td><?php echo esc_html($p_loc); ?></td></tr>
             <tr><th><?php esc_html_e('Preferred Citizenship', 'matchmaker'); ?></th><td><?php echo esc_html($meta['pref_citizenship'] ?: 'Any'); ?></td></tr>
             <tr><th><?php esc_html_e('Preferred Origin', 'matchmaker'); ?></th><td><?php echo esc_html($pool['pref_origin'] ?: 'Any'); ?></td></tr>
             <tr><th><?php esc_html_e('Preferred Religion', 'matchmaker'); ?></th><td><?php echo esc_html($pool['pref_religion'] ?: 'Any'); ?></td></tr>
@@ -165,7 +173,7 @@ $photo3 = $meta['user_photo3'] ?? '';
                     $cand_photo= $repo->get_meta($cand_id, 'user_photo1');
                     $cand_type = $cand_pool['user_type'] ?? 'free';
 
-                    $is_free_or_event = in_array($pool['user_type'], ['free', 'event'], true) || in_array($cand_type, ['free', 'event'], true);
+                    $is_event_only = ($pool['user_type'] === 'event') || ($cand_type === 'event');
 
                     $view_match_url = admin_url('admin.php?page=matchmaking-matches&view_match=' . $mid);
                     $approve_url    = wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_action=approve&match_id=' . $mid), 'mm_approve_' . $mid);
@@ -231,9 +239,9 @@ $photo3 = $meta['user_photo3'] ?? '';
                         <td><small style="color:#555;"><?php echo esc_html(substr($m['created_at'] ?? '', 0, 10)); ?></small></td>
                         <td style="text-align:center;">
                             <?php if ($st === 'pending_review') : ?>
-                                <?php if ($is_free_or_event) : ?>
-                                    <span style="display:block; margin-bottom:4px; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b;" title="<?php esc_attr_e('Matching approvals are disabled for Free or Event users.', 'matchmaker'); ?>">
-                                        ⚠️ Free/Event Tier
+                                <?php if ($is_event_only) : ?>
+                                    <span style="display:block; margin-bottom:4px; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b;" title="<?php esc_attr_e('Matching approvals are disabled for Event users.', 'matchmaker'); ?>">
+                                        ⚠️ Event Tier Only
                                     </span>
                                     <a href="<?php echo esc_url($reject_url); ?>" class="button button-small mm-reject-link"><?php esc_html_e('Reject', 'matchmaker'); ?></a>
                                 <?php else : ?>

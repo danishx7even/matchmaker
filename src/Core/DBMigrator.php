@@ -39,7 +39,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.4.0';
+        $new_version = '2.5.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -70,8 +70,12 @@ class DBMigrator {
             birth_date date NOT NULL,
             preferred_age_min tinyint(3) unsigned NOT NULL,
             preferred_age_max tinyint(3) unsigned NOT NULL,
-            location varchar(191) NOT NULL,
-            pref_location varchar(255) NOT NULL,
+            country varchar(100) NOT NULL DEFAULT '',
+            state varchar(100) NOT NULL DEFAULT '',
+            city varchar(100) NOT NULL DEFAULT '',
+            pref_country varchar(255) NOT NULL DEFAULT '',
+            pref_state varchar(255) NOT NULL DEFAULT '',
+            pref_city varchar(255) NOT NULL DEFAULT '',
             religion varchar(100) NOT NULL,
             pref_religion varchar(255) NOT NULL,
             modesty varchar(50) NOT NULL,
@@ -96,7 +100,8 @@ class DBMigrator {
             KEY idx_match_core (is_active, gender, pref_gender),
             KEY idx_active_gender_type (is_active, gender, user_type),
             KEY idx_birth_date (birth_date),
-            KEY idx_location (location),
+            KEY idx_country_city (country, city),
+            KEY idx_country (country),
             KEY idx_religion (religion),
             KEY idx_user_type (user_type)
         ) {$charset_collate};";
@@ -166,10 +171,30 @@ class DBMigrator {
         dbDelta($sql_notifications);
         dbDelta($sql_logs);
 
-        // Direct schema patch: dbDelta does NOT modify existing ENUM definitions
+        // Direct schema patch: dbDelta does NOT modify existing ENUM definitions or always drop columns
         $wpdb->query(
             "ALTER TABLE {$matches_table} MODIFY COLUMN status ENUM('pending_review','approved','admin_rejected','matched','rejected','expired') NOT NULL DEFAULT 'pending_review'"
         );
+
+        $cols = (array) $wpdb->get_col("DESC {$pool_table}", 0);
+        if (!empty($cols)) {
+            if (!in_array('country', $cols, true)) {
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN country varchar(100) NOT NULL DEFAULT '' AFTER preferred_age_max");
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN state varchar(100) NOT NULL DEFAULT '' AFTER country");
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN city varchar(100) NOT NULL DEFAULT '' AFTER state");
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN pref_country varchar(255) NOT NULL DEFAULT '' AFTER city");
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN pref_state varchar(255) NOT NULL DEFAULT '' AFTER pref_country");
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN pref_city varchar(255) NOT NULL DEFAULT '' AFTER pref_state");
+            }
+            if (in_array('location', $cols, true)) {
+                $wpdb->query("UPDATE {$pool_table} SET country = location WHERE country = '' AND location != ''");
+                $wpdb->query("ALTER TABLE {$pool_table} DROP COLUMN location");
+            }
+            if (in_array('pref_location', $cols, true)) {
+                $wpdb->query("UPDATE {$pool_table} SET pref_country = pref_location WHERE pref_country = '' AND pref_location != ''");
+                $wpdb->query("ALTER TABLE {$pool_table} DROP COLUMN pref_location");
+            }
+        }
 
         update_option($option_name, $new_version);
         // Maintain legacy numeric option for older code/tests expecting this.

@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
 }
 ?>
 <!-- STATE 1: DASHBOARD DISCOVERY (STEP 1) -->
-<div id="step-1" class="view-state active">
+<div id="step-1" class="view-state <?php echo (($default_step ?? 1) === 1) ? 'active' : ''; ?>">
     <div class="dashboard-body">
         <main class="main-discovery-content" style="width:100%;">
             <div class="status-pill">★ <?php esc_html_e('Active Match Recommendation', 'matchmaker'); ?></div>

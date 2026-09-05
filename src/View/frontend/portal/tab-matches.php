@@ -21,33 +21,40 @@ $active_match = !empty($matches) ? $matches[0] : null;
 $my_resp      = strtolower((string) ($active_match['my_response'] ?? 'pending'));
 $their_resp   = strtolower((string) ($active_match['their_response'] ?? 'pending'));
 $is_mutual    = ($my_resp === 'accepted' && $their_resp === 'accepted') || (($active_match['status'] ?? '') === 'matched');
+
+$default_step = 1;
+if ($is_mutual) {
+    $default_step = 5;
+} elseif ($my_resp === 'accepted') {
+    $default_step = 3;
+}
 ?>
 <div class="mm-flow-container">
-    <?php if (!$is_premium) : ?>
+    <?php if (empty($matches)) : ?>
         <div class="dashboard-body">
-            <div class="az-card mm-upsell-card" style="margin-bottom:0;">
-                <div class="mm-upsell-badge">★ <?php esc_html_e('Monthly Membership Required', 'matchmaker'); ?></div>
-                <h2><?php esc_html_e('Unlock Your Hand-Picked Matches', 'matchmaker'); ?></h2>
-                <p><?php esc_html_e('You are currently on a Free or Event membership. Upgrade to our Monthly Matchmaking plan to receive curated, bi-directionally compatible matches every cycle.', 'matchmaker'); ?></p>
-                <a href="<?php echo esc_url($pmpro_url); ?>" class="btn btn-primary mm-upsell-btn">
-                    <?php esc_html_e('Get Monthly Membership →', 'matchmaker'); ?>
-                </a>
-            </div>
-        </div>
-    <?php elseif (empty($matches)) : ?>
-        <div class="dashboard-body">
-            <div class="az-card" style="margin-bottom:0; text-align:center; padding:48px 24px;">
-                <div style="font-size:42px; margin-bottom:12px;">✨</div>
-                <h2 style="font-family:'Cormorant SC', serif; font-size:24px; font-weight:700; color:#1e293b; margin-bottom:10px;">
-                    <?php esc_html_e('Hand-Curating Your Next Match', 'matchmaker'); ?>
-                </h2>
-                <p style="max-width:540px; margin:0 auto 18px; color:#64748b; font-size:15px; line-height:1.6;">
-                    <?php esc_html_e('Our expert matchmakers are currently searching and hand-curating the best profile matching your criteria. As soon as your next match is ready, we will notify you via email!', 'matchmaker'); ?>
-                </p>
-                <span class="status-pill" style="display:inline-block; background:#f1f5f9; color:#475569; font-weight:600; padding:6px 14px; border-radius:20px; font-size:13px;">
-                    ⌛ <?php esc_html_e('Status: In Matchmaker Review Queue', 'matchmaker'); ?>
-                </span>
-            </div>
+            <?php if (!$is_premium) : ?>
+                <div class="az-card mm-upsell-card" style="margin-bottom:0;">
+                    <div class="mm-upsell-badge">★ <?php esc_html_e('Monthly Membership Required', 'matchmaker'); ?></div>
+                    <h2><?php esc_html_e('Unlock Your Hand-Picked Matches', 'matchmaker'); ?></h2>
+                    <p><?php esc_html_e('You are currently on a Free membership. Upgrade to our Monthly Matchmaking plan to receive curated, bi-directionally compatible matches every cycle.', 'matchmaker'); ?></p>
+                    <a href="<?php echo esc_url($pmpro_url); ?>" class="btn btn-primary mm-upsell-btn">
+                        <?php esc_html_e('Get Monthly Membership →', 'matchmaker'); ?>
+                    </a>
+                </div>
+            <?php else : ?>
+                <div class="az-card" style="margin-bottom:0; text-align:center; padding:48px 24px;">
+                    <div style="font-size:42px; margin-bottom:12px;">✨</div>
+                    <h2 style="font-family:'Cormorant SC', serif; font-size:24px; font-weight:700; color:#1e293b; margin-bottom:10px;">
+                        <?php esc_html_e('Hand-Curating Your Next Match', 'matchmaker'); ?>
+                    </h2>
+                    <p style="max-width:540px; margin:0 auto 18px; color:#64748b; font-size:15px; line-height:1.6;">
+                        <?php esc_html_e('Our expert matchmakers are currently searching and hand-curating the best profile matching your criteria. As soon as your next match is ready, we will notify you via email!', 'matchmaker'); ?>
+                    </p>
+                    <span class="status-pill" style="display:inline-block; background:#f1f5f9; color:#475569; font-weight:600; padding:6px 14px; border-radius:20px; font-size:13px;">
+                        ⌛ <?php esc_html_e('Status: In Matchmaker Review Queue', 'matchmaker'); ?>
+                    </span>
+                </div>
+            <?php endif; ?>
         </div>
     <?php else : ?>
         <?php
@@ -66,5 +73,18 @@ $is_mutual    = ($my_resp === 'accepted' && $their_resp === 'accepted') || (($ac
         // Step 5: Mutual match celebration & contact reveal
         require __DIR__ . '/steps/step-5-contact.php';
         ?>
+
+        <?php if (!$is_premium) : ?>
+            <div class="dashboard-body" style="margin-top: 24px;">
+                <div class="az-card mm-upsell-card" style="margin-bottom:0;">
+                    <div class="mm-upsell-badge">★ <?php esc_html_e('Upgrade to Monthly Membership', 'matchmaker'); ?></div>
+                    <h2><?php esc_html_e('Enjoy Regular Curated Matches', 'matchmaker'); ?></h2>
+                    <p><?php esc_html_e('You are reviewing a match as a Free member. Upgrade to our Monthly Matchmaking plan to receive guaranteed curated matches every single cycle.', 'matchmaker'); ?></p>
+                    <a href="<?php echo esc_url($pmpro_url); ?>" class="btn btn-primary mm-upsell-btn">
+                        <?php esc_html_e('Get Monthly Membership →', 'matchmaker'); ?>
+                    </a>
+                </div>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 </div>

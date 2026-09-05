@@ -375,8 +375,9 @@ class MatchRepository
             $args[]  = $filters['gender'];
         }
         if (!empty($filters['search'])) {
-            $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s OR p.location LIKE %s)';
+            $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s OR p.country LIKE %s OR p.city LIKE %s)';
             $wc      = '%' . $wpdb->esc_like($filters['search']) . '%';
+            $args[]  = $wc;
             $args[]  = $wc;
             $args[]  = $wc;
             $args[]  = $wc;
@@ -716,6 +717,9 @@ class MatchRepository
                 'pref_additional_info' => (string) get_user_meta($other_id, 'pref_additional_info', true),
             ];
 
+            $candidate_loc = trim(($other_pool['city'] ?? '') . ', ' . ($other_pool['state'] ?? '') . ', ' . ($other_pool['country'] ?? ($other_pool['location'] ?? '')), ', ') ?: '—';
+            $candidate_loc = (string) preg_replace('/,\s*,/', ',', $candidate_loc);
+
             $out[] = [
                 'match_id'             => (int) $row['id'],
                 'candidate_id'         => $other_id,
@@ -728,7 +732,10 @@ class MatchRepository
                 'photo'                => $other_meta['user_photo1'],
                 'pref_additional_info' => $other_meta['pref_additional_info'],
                 'age'                  => $this->calc_age($other_pool['birth_date'] ?? ''),
-                'location'             => $other_pool['location'] ?? '—',
+                'location'             => $candidate_loc,
+                'country'              => $other_pool['country'] ?? '',
+                'state'                => $other_pool['state'] ?? '',
+                'city'                 => $other_pool['city'] ?? '',
                 'origin'               => $other_pool['origin'] ?? '—',
                 'religion'             => $other_pool['religion'] ?? '—',
                 'modesty'              => $other_pool['modesty'] ?? '—',
@@ -776,12 +783,12 @@ class MatchRepository
     }
 
     /**
-     * Search all matches globally (for the admin matches list page).
+     * Get all matches for the admin matches queue, filtered by status / search.
      *
-     * @param array<string, string> $filters Assoc of filter key => value (search, status).
-     * @return array<int, object> Match rows with joined user and pool data.
+     * @param array<string, mixed> $filters Optional filters (status, search).
+     * @return array<int, array<string, mixed>> Match records.
      */
-    public function search_matches(array $filters = []): array
+    public function get_all_matches(array $filters = []): array
     {
         global $wpdb;
         $matches_table = $wpdb->prefix . 'matches';
@@ -790,7 +797,7 @@ class MatchRepository
         $where = ['1=1'];
         $args  = [];
 
-        if (!empty($filters['status']) && $filters['status'] !== 'all') {
+        if (!empty($filters['status'])) {
             $where[] = 'm.status = %s';
             $args[]  = $filters['status'];
         }
@@ -810,8 +817,8 @@ class MatchRepository
             SELECT m.*,
                 u1.display_name AS u1_name, u1.user_email AS u1_email,
                 u2.display_name AS u2_name, u2.user_email AS u2_email,
-                p1.user_type AS u1_type, p1.gender AS u1_gender, p1.location AS u1_location, p1.birth_date AS u1_birth,
-                p2.user_type AS u2_type, p2.gender AS u2_gender, p2.location AS u2_location, p2.birth_date AS u2_birth
+                p1.user_type AS u1_type, p1.gender AS u1_gender, p1.country AS u1_country, p1.city AS u1_city, p1.birth_date AS u1_birth,
+                p2.user_type AS u2_type, p2.gender AS u2_gender, p2.country AS u2_country, p2.city AS u2_city, p2.birth_date AS u2_birth
             FROM {$matches_table} m
             LEFT JOIN {$wpdb->users} u1 ON m.user_one_id = u1.ID
             LEFT JOIN {$wpdb->users} u2 ON m.user_two_id = u2.ID
@@ -859,10 +866,12 @@ class MatchRepository
         // Check for existing pair first to avoid duplicate errors
         $existing = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE user_one_id = %d AND user_two_id = %d LIMIT 1",
-                $u1, $u2
+                "SELECT id FROM {$table} WHERE user_one_id = %d AND user_two_id = %d",
+                $u1,
+                $u2
             )
         );
+
         if (!empty($existing)) {
             return false;
         }
@@ -932,6 +941,8 @@ class MatchRepository
 
         if ($action === 'decline') {
             \Matchmaker\Service\NotificationService::instance()->send_match_expired_admin_email($match_id, 'declined_by_user', $user_id);
+        } elseif ($action === 'accept' && $other_response === 'accepted') {
+            \Matchmaker\Service\NotificationService::instance()->send_mutual_match_notifications($match_id);
         }
 
         $next_step = 3;
@@ -991,6 +1002,7 @@ class MatchRepository
         );
 
         if ($updated !== false) {
+            $this->dismiss_notifications_for_match($match_id, 'match_approved');
             \Matchmaker\Service\NotificationService::instance()->send_match_expired_admin_email($match_id, $reason, $declining_user_id);
             return true;
         }
@@ -1048,7 +1060,7 @@ class MatchRepository
             return ['success' => false, 'message' => __('Match record not found.', 'matchmaker')];
         }
 
-        // Tier gate: free/event users cannot have approved matches
+        // Tier gate: Event users cannot have approved matches
         $u1_type = (string) $wpdb->get_var(
             $wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $match['user_one_id'])
         );
@@ -1056,17 +1068,24 @@ class MatchRepository
             $wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $match['user_two_id'])
         );
 
-        if (in_array($u1_type, ['free', 'event'], true) || in_array($u2_type, ['free', 'event'], true)) {
-            return ['success' => false, 'message' => __('Approval blocked: Matches involving a Free or Event tier user are informational only and cannot be approved.', 'matchmaker')];
+        if ($u1_type === 'event' || $u2_type === 'event') {
+            return ['success' => false, 'message' => __('Approval blocked: Matches involving an Event tier user cannot be approved.', 'matchmaker')];
         }
 
-        // Quota gate: max matches per cycle per initiator (resets on new PMPro cycle month)
-        $initiator_id  = (int) $match['initiator_user_id'];
-        $current_quota = $this->maybe_reset_monthly_quota($initiator_id);
-        $max_quota     = $this->get_max_cycle_matches();
+        // Quota gate: Only paid users (monthly/1-on-1) have monthly cycle quota limits
+        $initiator_id   = (int) $match['initiator_user_id'];
+        $initiator_type = (string) $wpdb->get_var(
+            $wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $initiator_id)
+        );
 
-        if ($current_quota >= $max_quota) {
-            return ['success' => false, 'message' => sprintf(__('Approval blocked: This user has already used their %d-match monthly quota.', 'matchmaker'), $max_quota)];
+        $current_quota = 0;
+        if (!in_array($initiator_type, ['free', 'event'], true)) {
+            $current_quota = $this->maybe_reset_monthly_quota($initiator_id);
+            $max_quota     = $this->get_max_cycle_matches();
+
+            if ($current_quota >= $max_quota) {
+                return ['success' => false, 'message' => sprintf(__('Approval blocked: This user has already used their %d-match monthly quota.', 'matchmaker'), $max_quota)];
+            }
         }
 
         $updated = $wpdb->update(
@@ -1085,10 +1104,13 @@ class MatchRepository
             return ['success' => false, 'message' => __('Database error. Please try again.', 'matchmaker')];
         }
 
-        $this->increment_quota($initiator_id);
+        if (!in_array($initiator_type, ['free', 'event'], true)) {
+            $this->increment_quota($initiator_id);
+        }
 
         return [
             'success'       => true,
+            'message'       => sprintf(__('Match #%d approved successfully. Member notifications dispatched.', 'matchmaker'), $match_id),
             'quota_used'    => $current_quota + 1,
             'match_id'      => $match_id,
             'u1_id'         => (int) $match['user_one_id'],
@@ -1113,7 +1135,11 @@ class MatchRepository
             ['%s'],
             ['%d']
         );
-        return $result !== false;
+        if ($result !== false) {
+            $this->dismiss_notifications_for_match($match_id, 'match_approved');
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -1241,6 +1267,40 @@ class MatchRepository
         );
 
         $this->flush_unread_transient($user_id);
+    }
+
+    /**
+     * Dismiss / mark read all notifications for a specific match (e.g. stale match_approved alerts).
+     *
+     * @param int         $match_id The match ID.
+     * @param string|null $type     Optional specific notification type (e.g. 'match_approved').
+     * @return void
+     */
+    public function dismiss_notifications_for_match(int $match_id, ?string $type = null): void
+    {
+        if ($match_id <= 0) {
+            return;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaker_notifications';
+
+        if (!empty($type)) {
+            $wpdb->query(
+                $wpdb->prepare(
+                    "UPDATE {$table} SET is_read = 1 WHERE match_id = %d AND type = %s",
+                    $match_id,
+                    $type
+                )
+            );
+        } else {
+            $wpdb->query(
+                $wpdb->prepare(
+                    "UPDATE {$table} SET is_read = 1 WHERE match_id = %d",
+                    $match_id
+                )
+            );
+        }
     }
 
     /**

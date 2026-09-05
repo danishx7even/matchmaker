@@ -40,78 +40,23 @@ class MatchService {
     /**
      * Compute flexible score between two users.
      *
-     * @param array $user_pool The user's pool data.
-     * @param array $candidate_pool The candidate's pool data.
+     * @param array<string, mixed> $user_pool The user's pool data.
+     * @param array<string, mixed> $candidate_pool The candidate's pool data.
      * @return int
      */
     public function compute_flexible_score(array $user_pool, array $candidate_pool): int {
-        $score = 0;
-
-        // 1. Origin mutual match
-        if (
-            isset($user_pool['origin_country'], $user_pool['pref_origin'], $candidate_pool['origin_country'], $candidate_pool['pref_origin']) &&
-            $user_pool['pref_origin'] === $candidate_pool['origin_country'] &&
-            $candidate_pool['pref_origin'] === $user_pool['origin_country']
-        ) {
-            $score += 1;
-        }
-
-        // 2. Languages shared overlap
-        if (!empty($user_pool['languages']) && !empty($candidate_pool['languages'])) {
-            $u_langs = is_array($user_pool['languages']) ? $user_pool['languages'] : explode(',', $user_pool['languages']);
-            $c_langs = is_array($candidate_pool['languages']) ? $candidate_pool['languages'] : explode(',', $candidate_pool['languages']);
-            $u_langs = array_map('trim', $u_langs);
-            $c_langs = array_map('trim', $c_langs);
-            if (count(array_intersect($u_langs, $c_langs)) > 0) {
-                $score += 1;
-            }
-        }
-
-        // 3. Height mutual in-range
-        if (isset($user_pool['height'], $user_pool['pref_height_min'], $user_pool['pref_height_max'], $candidate_pool['height'], $candidate_pool['pref_height_min'], $candidate_pool['pref_height_max'])) {
-            $u_h = (int)$user_pool['height'];
-            $c_h = (int)$candidate_pool['height'];
-            $u_h_min = (int)$user_pool['pref_height_min'];
-            $u_h_max = (int)$user_pool['pref_height_max'];
-            $c_h_min = (int)$candidate_pool['pref_height_min'];
-            $c_h_max = (int)$candidate_pool['pref_height_max'];
-
-            if ($c_h >= $u_h_min && $c_h <= $u_h_max && $u_h >= $c_h_min && $u_h <= $c_h_max) {
-                $score += 1;
-            }
-        }
-
-        // 4. Job non-empty
-        if (!empty($user_pool['profession']) && !empty($candidate_pool['profession'])) {
-            $score += 1;
-        }
-
-        // 5. Smoking pref match
-        if (isset($user_pool['smoking'], $candidate_pool['pref_smoking'])) {
-            if ($candidate_pool['pref_smoking'] === 'no_preference' || $user_pool['smoking'] === $candidate_pool['pref_smoking']) {
-                $score += 1;
-            }
-        }
-
-        // 6. Drinking pref match
-        if (isset($user_pool['drinking'], $candidate_pool['pref_drinking'])) {
-            if ($candidate_pool['pref_drinking'] === 'no_preference' || $user_pool['drinking'] === $candidate_pool['pref_drinking']) {
-                $score += 1;
-            }
-        }
-
-        return $score;
+        return \Matchmaker\Core\MatchingEngine::instance()->compute_flexible_score($user_pool, $candidate_pool);
     }
 
     /**
-     * Check if the pair is info-only (free/event users).
+     * Check if the pair is info-only (e.g. event users who do not participate in matching).
      *
      * @param string $type_a The user A type.
      * @param string $type_b The user B type.
      * @return bool
      */
     public function is_info_only_pair(string $type_a, string $type_b): bool {
-        return in_array($type_a, ['free', 'event'], true) || in_array($type_b, ['free', 'event'], true);
+        return in_array($type_a, ['event'], true) || in_array($type_b, ['event'], true);
     }
 
     /**
@@ -147,12 +92,13 @@ class MatchService {
      *
      * @param int $match_id The match ID.
      * @param int $user_id The user ID responding.
-     * @param string $action The action taken ('accepted' or 'rejected').
+     * @param string $action The action taken ('accepted' or 'rejected' or 'decline').
      * @return array
      */
     public function handle_match_response(int $match_id, int $user_id, string $action): array {
         $repo = MatchRepository::instance();
-        $result = $repo->update_match_response($match_id, $user_id, $action);
+        $norm_action = in_array(strtolower(trim($action)), ['decline', 'declined', 'reject', 'rejected'], true) ? 'decline' : 'accept';
+        $result = $repo->update_match_response($match_id, $user_id, $norm_action);
 
         $match = $repo->find_match_by_id($match_id);
         if ($match) {
@@ -160,12 +106,16 @@ class MatchService {
             NotificationService::instance()->flush_user_unread_transient((int) ($match['user_two_id'] ?? 0));
         }
 
+        if ($norm_action === 'decline') {
+            NotificationService::instance()->send_rejection_notification($match_id, $user_id);
+        }
+
         $user_obj = get_userdata($user_id);
         $user_name = $user_obj ? $user_obj->display_name : "User #{$user_id}";
 
         $repo->log_event(
             'match_lifecycle',
-            $action === 'accepted' ? 'user_accepted' : 'user_rejected',
+            $norm_action === 'accept' ? 'user_accepted' : 'user_rejected',
             sprintf(__('Member %s: %s Match #%d', 'matchmaker'), ucfirst($action), $user_name, $match_id),
             sprintf(__('User #%d responded with "%s" for match #%d. Result status: %s.', 'matchmaker'), $user_id, $action, $match_id, $result['status'] ?? 'unknown'),
             [
@@ -178,7 +128,7 @@ class MatchService {
             $match_id,
             $user_id,
             null,
-            $action === 'accepted' ? 'success' : 'warning'
+            $norm_action === 'accept' ? 'success' : 'warning'
         );
 
         return $result;
@@ -202,8 +152,8 @@ class MatchService {
             $type2 = $pool2['user_type'] ?? 'free';
 
             if ($this->is_info_only_pair($type1, $type2)) {
-                $msg = __('Cannot approve match: one or both users belong to Free or Event membership tier (upgrade required).', 'matchmaker');
-                $repo->log_event('match_lifecycle', 'admin_approval_blocked', sprintf(__('Approval Blocked for Match #%d (Free/Event Tier)', 'matchmaker'), $match_id), $msg, ['match_id' => $match_id, 'type1' => $type1, 'type2' => $type2], $match_id, $admin_id, null, 'warning');
+                $msg = __('Cannot approve match: one or both users belong to Event membership tier.', 'matchmaker');
+                $repo->log_event('match_lifecycle', 'admin_approval_blocked', sprintf(__('Approval Blocked for Match #%d (Event Tier)', 'matchmaker'), $match_id), $msg, ['match_id' => $match_id, 'type1' => $type1, 'type2' => $type2], $match_id, $admin_id, null, 'warning');
                 return [
                     'success' => false,
                     'message' => $msg,

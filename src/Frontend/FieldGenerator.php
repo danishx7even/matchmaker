@@ -33,19 +33,180 @@ class FieldGenerator {
     }
 
     /**
-     * Get location options
+     * Get hierarchy location data (Country -> State -> Cities).
+     *
+     * @return array<string, array<string, list<string>>>
+     */
+    public function get_hierarchy_data(): array
+    {
+        static $data = null;
+        if ($data === null) {
+            $json_path = (defined('MM_PATH') ? MM_PATH : dirname(__DIR__, 2) . '/') . 'assets/file/hierarchy_names.json';
+            if (file_exists($json_path)) {
+                $content = @file_get_contents($json_path);
+                if ($content) {
+                    $decoded = json_decode($content, true);
+                    if (is_array($decoded)) {
+                        $data = $decoded;
+                    }
+                }
+            }
+            if ($data === null) {
+                $data = [];
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * Get country options (specific country names)
      *
      * @return array
      */
-    public function options_location(): array { return ['Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'Jordan', 'Lebanon', 'Egypt', 'Iraq', 'Syria', 'Palestine', 'Yemen', 'United States', 'Canada', 'United Kingdom', 'Australia', 'Pakistan', 'India', 'Any Location', 'Other']; }
+    public function options_country(): array
+    {
+        $hierarchy = $this->get_hierarchy_data();
+        if (!empty($hierarchy)) {
+            $countries = array_keys($hierarchy);
+            sort($countries, SORT_STRING | SORT_FLAG_CASE);
+            return array_merge(['Select country'], $countries);
+        }
+
+        return [
+            'Select country',
+            'Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Bahrain', 'Oman',
+            'Jordan', 'Lebanon', 'Egypt', 'Iraq', 'Syria', 'Palestine', 'Yemen',
+            'Morocco', 'Algeria', 'Tunisia', 'Libya', 'Sudan', 'Somalia', 'Mauritania',
+            'United States', 'United Kingdom', 'Canada', 'Australia', 'New Zealand',
+            'Germany', 'France', 'Netherlands', 'Sweden', 'Norway', 'Denmark', 'Switzerland', 'Belgium', 'Austria', 'Italy', 'Spain', 'Turkey',
+            'Pakistan', 'India', 'Bangladesh', 'Indonesia', 'Malaysia', 'Singapore',
+            'South Africa', 'Nigeria', 'Kenya',
+            'Other'
+        ];
+    }
+
+    /**
+     * Get states for a specific country
+     *
+     * @param string $country
+     * @return array
+     */
+    public function options_user_state(string $country = ''): array
+    {
+        $hierarchy = $this->get_hierarchy_data();
+        $clean_country = trim($country);
+        if (!empty($clean_country) && isset($hierarchy[$clean_country]) && is_array($hierarchy[$clean_country])) {
+            $states = array_keys($hierarchy[$clean_country]);
+            sort($states, SORT_STRING | SORT_FLAG_CASE);
+            return array_merge(['Select state'], $states);
+        }
+        return ['Select state'];
+    }
+
+    /**
+     * Get cities for a specific country and state
+     *
+     * @param string $country
+     * @param string $state
+     * @return array
+     */
+    public function options_user_city(string $country = '', string $state = ''): array
+    {
+        $hierarchy = $this->get_hierarchy_data();
+        $clean_country = trim($country);
+        $clean_state   = trim($state);
+        if (!empty($clean_country) && !empty($clean_state) && isset($hierarchy[$clean_country][$clean_state]) && is_array($hierarchy[$clean_country][$clean_state])) {
+            $cities = $hierarchy[$clean_country][$clean_state];
+            sort($cities, SORT_STRING | SORT_FLAG_CASE);
+            return array_merge(['Select city'], $cities);
+        }
+        return ['Select city'];
+    }
+
+    /**
+     * Get preferred country options (with Any Country)
+     *
+     * @return array
+     */
+    public function options_pref_country(): array
+    {
+        $countries = $this->options_country();
+        array_shift($countries); // Remove "Select country"
+        array_unshift($countries, 'Any Country');
+        return $countries;
+    }
+
+    /**
+     * Get preferred states for a specific preferred country (with Any State)
+     *
+     * @param string $country
+     * @return array
+     */
+    public function options_pref_state(string $country = ''): array
+    {
+        $clean_country = trim($country);
+        if (empty($clean_country) || strcasecmp($clean_country, 'Any Country') === 0) {
+            return ['Any State'];
+        }
+        $hierarchy = $this->get_hierarchy_data();
+        if (isset($hierarchy[$clean_country]) && is_array($hierarchy[$clean_country])) {
+            $states = array_keys($hierarchy[$clean_country]);
+            sort($states, SORT_STRING | SORT_FLAG_CASE);
+            return array_merge(['Any State'], $states);
+        }
+        return ['Any State'];
+    }
+
+    /**
+     * Get preferred cities for a specific preferred country and state (with Any City)
+     *
+     * @param string $country
+     * @param string $state
+     * @return array
+     */
+    public function options_pref_city(string $country = '', string $state = ''): array
+    {
+        $clean_country = trim($country);
+        $clean_state   = trim($state);
+        if (empty($clean_state) || strcasecmp($clean_state, 'Any State') === 0 || empty($clean_country) || strcasecmp($clean_country, 'Any Country') === 0) {
+            return ['Any City'];
+        }
+        $hierarchy = $this->get_hierarchy_data();
+        if (isset($hierarchy[$clean_country][$clean_state]) && is_array($hierarchy[$clean_country][$clean_state])) {
+            $cities = $hierarchy[$clean_country][$clean_state];
+            sort($cities, SORT_STRING | SORT_FLAG_CASE);
+            return array_merge(['Any City'], $cities);
+        }
+        return ['Any City'];
+    }
+
+    /**
+     * Get legacy location options fallback
+     *
+     * @return array
+     */
+    public function options_location(): array { return $this->options_country(); }
     
     /**
      * Get citizenship options
      *
      * @return array
      */
-    public function options_citizenship(): array { return ['Select', 'Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'Jordan', 'Lebanon', 'Egypt', 'Iraq', 'Syria', 'Palestine', 'Yemen', 'United States', 'Canada', 'United Kingdom', 'Australia', 'Pakistan', 'India', 'Bangladesh', 'Other']; }
+    public function options_citizenship(): array { return ['Select citizenship', 'Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'Jordan', 'Lebanon', 'Egypt', 'Iraq', 'Syria', 'Palestine', 'Yemen', 'United States', 'Canada', 'United Kingdom', 'Australia', 'Pakistan', 'India', 'Bangladesh', 'Other']; }
     
+    /**
+     * Get preferred citizenship options (with Any Citizenship as first option)
+     *
+     * @return array
+     */
+    public function options_pref_citizenship(): array
+    {
+        $citizenships = $this->options_citizenship();
+        array_shift($citizenships); // Remove "Select citizenship"
+        array_unshift($citizenships, 'Any Citizenship');
+        return $citizenships;
+    }
+
     /**
      * Get origin options
      *
@@ -54,12 +215,26 @@ class FieldGenerator {
     public function options_origin(): array { return ['Arab', 'South Asian', 'Middle Eastern', 'North African', 'African', 'European', 'North American', 'South American', 'Central American', 'Caribbean', 'Central Asian', 'Southeast Asian', 'East Asian', 'Australian / Oceanian', 'Other']; }
     
     /**
+     * Get preferred origin options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_origin(): array { return array_merge($this->options_origin(), ['No Preference']); }
+
+    /**
      * Get religion options
      *
      * @return array
      */
-    public function options_religion(): array { return ['Islam', 'Christianity', 'Judaism', 'Hinduism', 'Sikhism', 'Buddhism', 'Other', 'Prefer not to say']; }
+    public function options_religion(): array { return ['Islam', 'Christianity', 'Judaism', 'Hinduism', 'Sikhism', 'Buddhism', 'Other']; }
     
+    /**
+     * Get preferred religion options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_religion(): array { return array_merge($this->options_religion(), ['No Preference']); }
+
     /**
      * Get marital status options
      *
@@ -68,6 +243,13 @@ class FieldGenerator {
     public function options_marital(): array { return ['Select status', 'Never Married', 'Divorced', 'Widowed', 'Separated', 'Annulled']; }
     
     /**
+     * Get preferred marital status options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_marital(): array { return array_merge($this->options_marital(), ['No Preference']); }
+
+    /**
      * Get children options
      *
      * @return array
@@ -75,33 +257,68 @@ class FieldGenerator {
     public function options_children(): array { return ['Select status', 'Yes', 'No']; }
     
     /**
+     * Get preferred children options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_children(): array { return array_merge($this->options_children(), ['No Preference']); }
+
+    /**
      * Get modesty options
      *
      * @return array
      */
-    public function options_modesty(): array { return ['Select preference', 'Modest', 'Hijab', 'No Hijab', 'Sometimes', 'Niqab', 'Prefer not to say']; }
+    public function options_modesty(): array { return ['Select preference', 'Modest', 'Hijab', 'No Hijab', 'Sometimes', 'Niqab']; }
     
+    /**
+     * Get preferred modesty options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_modesty(): array { return array_merge($this->options_modesty(), ['No Preference']); }
+
     /**
      * Get drinking options
      *
      * @return array
      */
-    public function options_drinking(): array { return ['Select preference', 'Yes', 'No', 'Occasionally', 'Prefer not to say']; }
+    public function options_drinking(): array { return ['Select preference', 'Yes', 'No', 'Occasionally']; }
     
+    /**
+     * Get preferred drinking options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_drinking(): array { return array_merge($this->options_drinking(), ['No Preference']); }
+
     /**
      * Get smoking options
      *
      * @return array
      */
-    public function options_smoking(): array { return ['Select preference', 'Non-Smoker', 'Occasional Smoker', 'Regular Smoker', 'Former Smoker', 'Prefer not to say']; }
+    public function options_smoking(): array { return ['Select preference', 'Non-Smoker', 'Occasional Smoker', 'Regular Smoker', 'Former Smoker']; }
     
+    /**
+     * Get preferred smoking options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_smoking(): array { return array_merge($this->options_smoking(), ['No Preference']); }
+
     /**
      * Get prayer options
      *
      * @return array
      */
-    public function options_prayer(): array { return ['Select preference', 'Pray 5 Times a Day', 'Pray Regularly', 'Pray Occasionally', 'Rarely Pray', 'Do Not Pray', 'Prefer not to say']; }
+    public function options_prayer(): array { return ['Select preference', 'Pray 5 Times a Day', 'Pray Regularly', 'Pray Occasionally', 'Rarely Pray', 'Do Not Pray']; }
     
+    /**
+     * Get preferred prayer options (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_prayer(): array { return array_merge($this->options_prayer(), ['No Preference']); }
+
     /**
      * Get education options
      *
@@ -110,11 +327,25 @@ class FieldGenerator {
     public function options_education(): array { return ['Select education', 'High School', 'Some College', 'Associate Degree', "Bachelor's Degree", "Master's Degree", 'Doctorate (PhD)', 'Professional Degree', 'Other']; }
     
     /**
-     * Get income options
+     * Get preferred education options (with No Preference)
      *
      * @return array
      */
-    public function options_income(): array { return ['Select range', 'Prefer not to say', 'SAR 5,000 – 7,499', 'SAR 7,500 – 9,999', 'SAR 10,000 – 12,499', 'SAR 12,500 – 14,999', 'SAR 15,000 – 19,999', 'SAR 20,000 – 24,999', 'SAR 25,000 – 29,999', 'SAR 30,000 – 39,999', 'SAR 40,000 – 49,999', 'SAR 50,000+']; }
+    public function options_pref_education(): array { return array_merge($this->options_education(), ['No Preference']); }
+
+    /**
+     * Get income options in USD
+     *
+     * @return array
+     */
+    public function options_income(): array { return ['Select range', '0-100k USD', '100k-500k USD', '500k-1million USD', '1 million + USD']; }
+
+    /**
+     * Get preferred income options in USD (with No Preference)
+     *
+     * @return array
+     */
+    public function options_pref_income(): array { return ['Select range', 'No Preference', '0-100k USD', '100k-500k USD', '500k-1million USD', '1 million + USD']; }
     
     /**
      * Get height options
@@ -141,17 +372,20 @@ class FieldGenerator {
     /* Low-level render primitives — return HTML strings */
     private function field_open(string $name, string $extra_class = ''): string { return '<div class="elementor-field-group elementor-field-group-' . esc_attr($name) . ($extra_class ? ' ' . esc_attr($extra_class) : '') . '">'; }
     private function field_close(): string { return '</div>'; }
-    private function label(string $for, string $text): string { return '<label for="form-field-' . esc_attr($for) . '" class="elementor-field-label">' . esc_html($text) . '</label>'; }
-    private function text(string $name, string $type = 'text', string $placeholder = '', $value = ''): string { return '<input size="1" type="' . esc_attr($type) . '" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-field-textual" placeholder="' . esc_attr($placeholder) . '" value="' . esc_attr((string)$value) . '">'; }
-    private function date(string $name, $value = ''): string { return '<input type="date" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-field-textual" value="' . esc_attr((string)$value) . '">'; }
-    private function textarea(string $name, string $placeholder = '', int $rows = 2, $value = ''): string { return '<textarea class="elementor-field-textual elementor-field elementor-size-sm" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" rows="' . (int)$rows . '" placeholder="' . esc_attr($placeholder) . '">' . esc_textarea((string)$value) . '</textarea>'; }
+    private function label(string $for, string $text, bool $required = true): string {
+        $req_html = $required ? ' <span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span>' : '';
+        return '<label for="form-field-' . esc_attr($for) . '" class="elementor-field-label">' . esc_html($text) . $req_html . '</label>';
+    }
+    private function text(string $name, string $type = 'text', string $placeholder = '', $value = ''): string { return '<input size="1" type="' . esc_attr($type) . '" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-field-textual" placeholder="' . esc_attr($placeholder) . '" value="' . esc_attr((string)$value) . '" required>'; }
+    private function date(string $name, $value = ''): string { return '<input type="date" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-field-textual" value="' . esc_attr((string)$value) . '" required>'; }
+    private function textarea(string $name, string $placeholder = '', int $rows = 2, $value = ''): string { return '<textarea class="elementor-field-textual elementor-field elementor-size-sm" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" rows="' . (int)$rows . '" placeholder="' . esc_attr($placeholder) . '" required>' . esc_textarea((string)$value) . '</textarea>'; }
 
     private function select(string $name, array $options, $selected_val = ''): string {
         $field_id = 'form-field-' . $name;
         $current  = (string) $selected_val !== '' ? (string) $selected_val : ($options[0] ?? '');
         $html = '<div class="elementor-field elementor-select-wrapper remove-before">';
         $html .= '<div class="custom-select-wrapper">';
-        $html .= '<select name="form_fields[' . esc_attr($name) . ']" id="' . esc_attr($field_id) . '" class="elementor-field-textual elementor-size-sm">';
+        $html .= '<select name="form_fields[' . esc_attr($name) . ']" id="' . esc_attr($field_id) . '" class="elementor-field-textual elementor-size-sm" required>';
         foreach ($options as $i => $opt) {
             $is_placeholder = (preg_match('/^select\b/i', trim($opt)) === 1);
             $val_attr       = $is_placeholder ? '' : $opt;
@@ -178,7 +412,7 @@ class FieldGenerator {
         $selected_arr = is_array($selected_values) ? $selected_values : array_filter(array_map('trim', explode(',', (string)$selected_values)));
         $html = '<div class="elementor-field elementor-select-wrapper remove-before">';
         $html .= '<div class="custom-select-wrapper custom-multiselect-wrapper">';
-        $html .= '<select name="form_fields[' . esc_attr($name) . '][]" id="' . esc_attr($field_id) . '" multiple class="elementor-field-textual elementor-size-sm">';
+        $html .= '<select name="form_fields[' . esc_attr($name) . '][]" id="' . esc_attr($field_id) . '" multiple class="elementor-field-textual elementor-size-sm" required>';
         foreach ($options as $opt) {
             $selected = in_array($opt, $selected_arr, true) ? ' selected' : '';
             $html .= '<option value="' . esc_attr($opt) . '"' . $selected . '>' . esc_html($opt) . '</option>';
@@ -202,7 +436,7 @@ class FieldGenerator {
         foreach ($options as $i => $opt) {
             $checked = (strcasecmp((string)$selected_val, (string)$opt) === 0) ? ' checked' : '';
             $html .= '<span class="elementor-field-option">';
-            $html .= '<input type="radio" value="' . esc_attr($opt) . '" id="form-field-' . esc_attr($name) . '-' . $i . '" name="form_fields[' . esc_attr($name) . ']"' . $checked . '> ';
+            $html .= '<input type="radio" value="' . esc_attr($opt) . '" id="form-field-' . esc_attr($name) . '-' . $i . '" name="form_fields[' . esc_attr($name) . ']"' . $checked . ' required> ';
             $html .= '<label for="form-field-' . esc_attr($name) . '-' . $i . '">' . esc_html($opt) . '</label>';
             $html .= '</span>';
         }
@@ -214,7 +448,7 @@ class FieldGenerator {
         $has_preview = !empty($preview_url);
         $extra_class = $has_preview ? ' has-preview' : '';
         $html = '<div class="elementor-field-type-upload elementor-field-group elementor-column elementor-field-group-' . esc_attr($name) . $extra_class . '">';
-        $html .= '<input type="file" accept="image/*" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field">';
+        $html .= '<input type="file" accept="image/*" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field"' . ($has_preview ? '' : ' required') . '>';
         if ($has_preview) { $html .= '<img src="' . esc_url($preview_url) . '" class="upload-preview-img" alt="Photo Preview">'; }
         $html .= '</div>';
         return $html;
@@ -222,7 +456,7 @@ class FieldGenerator {
 
     private function range_select(string $name, array $options, string $placeholder, $selected_val = ''): string {
         $html = '<div class="custom-select-wrapper">';
-        $html .= '<select name="form_fields[' . esc_attr($name) . ']" class="elementor-field-textual elementor-size-sm">';
+        $html .= '<select name="form_fields[' . esc_attr($name) . ']" class="elementor-field-textual elementor-size-sm" required>';
         $html .= '<option value="">' . esc_html($placeholder) . '</option>';
         foreach ($options as $opt) {
             $selected = ((string)$opt === (string)$selected_val) ? ' selected' : '';
@@ -244,7 +478,7 @@ class FieldGenerator {
 
     private function range(string $label, string $min_name, string $max_name, array $options, string $min_placeholder, string $max_placeholder, $min_val = '', $max_val = ''): string {
         $html = '<div class="elementor-field-group elementor-column range-field-group">';
-        $html .= '<label class="elementor-field-label">' . esc_html($label) . '</label>';
+        $html .= '<label class="elementor-field-label">' . esc_html($label) . ' <span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span></label>';
         $html .= '<div class="custom-range-field">';
         $html .= $this->range_select($min_name, $options, $min_placeholder, $min_val);
         $html .= '<span class="range-to-label">to</span>';
@@ -306,11 +540,75 @@ class FieldGenerator {
      * @return string
      */
     public function render_single_field(string $name, array $values = []): string {
-        $val = $values[$name] ?? '';
+        $val  = $values[$name] ?? '';
+        $html = '';
+
+        if ($name === 'email') {
+            $html .= $this->field_open('email');
+            $html .= $this->label('email', 'Email');
+            $html .= '<input size="1" type="email" name="form_fields[email]" id="form-field-email" class="elementor-field elementor-size-sm elementor-field-textual is-readonly" placeholder="Enter your email address" value="' . esc_attr((string)$val) . '" readonly tabindex="-1">';
+            $html .= $this->field_close();
+            return $html;
+        }
+
+        if ($name === 'user_country' || $name === 'user_location') {
+            $label = ($name === 'user_location') ? 'Country / Location' : 'Country';
+            $html .= $this->field_open($name, 'location-cascade-group');
+            $html .= $this->label($name, $label);
+            $html .= $this->select($name, $this->options_country(), $val);
+            $html .= $this->field_close();
+            return $html;
+        }
+
+        if ($name === 'user_state') {
+            $country = (string) ($values['user_country'] ?? $values['country'] ?? $values['user_location'] ?? '');
+            $html .= $this->field_open('user_state', 'location-cascade-group');
+            $html .= $this->label('user_state', 'State / Province');
+            $html .= $this->select('user_state', $this->options_user_state($country), $val);
+            $html .= $this->field_close();
+            return $html;
+        }
+
+        if ($name === 'user_city') {
+            $country = (string) ($values['user_country'] ?? $values['country'] ?? $values['user_location'] ?? '');
+            $state   = (string) ($values['user_state'] ?? $values['state'] ?? '');
+            $html .= $this->field_open('user_city', 'location-cascade-group');
+            $html .= $this->label('user_city', 'City');
+            $html .= $this->select('user_city', $this->options_user_city($country, $state), $val);
+            $html .= $this->field_close();
+            return $html;
+        }
+
+        if ($name === 'pref_country' || $name === 'pref_location') {
+            $label = ($name === 'pref_location') ? 'Preferred Country / Location' : 'Preferred Country';
+            $html .= $this->field_open($name, 'location-cascade-group');
+            $html .= $this->label($name, $label);
+            $html .= $this->select($name, $this->options_pref_country(), $val !== '' ? $val : 'Any Country');
+            $html .= $this->field_close();
+            return $html;
+        }
+
+        if ($name === 'pref_state') {
+            $pref_country = (string) ($values['pref_country'] ?? $values['pref_location'] ?? '');
+            $html .= $this->field_open('pref_state', 'location-cascade-group');
+            $html .= $this->label('pref_state', 'Preferred State / Province');
+            $html .= $this->select('pref_state', $this->options_pref_state($pref_country), $val !== '' ? $val : 'Any State');
+            $html .= $this->field_close();
+            return $html;
+        }
+
+        if ($name === 'pref_city') {
+            $pref_country = (string) ($values['pref_country'] ?? $values['pref_location'] ?? '');
+            $pref_state   = (string) ($values['pref_state'] ?? '');
+            $html .= $this->field_open('pref_city', 'location-cascade-group');
+            $html .= $this->label('pref_city', 'Preferred City');
+            $html .= $this->select('pref_city', $this->options_pref_city($pref_country, $pref_state), $val !== '' ? $val : 'Any City');
+            $html .= $this->field_close();
+            return $html;
+        }
 
         $text_configs = [
             'full_name'      => ['text', 'Full Name', 'Enter your full name'],
-            'email'          => ['email', 'Email', 'Enter your email address'],
             'phone_number'   => ['text', 'Phone Number', 'Enter your phone number'],
             'user_languages' => ['text', 'Spoken Languages (Separate multiple selections with commas)', 'Enter the languages you speak'],
             'pref_languages' => ['text', 'Preferred Languages (Separate multiple selections with commas)', 'Enter preferred languages'],
@@ -318,7 +616,6 @@ class FieldGenerator {
         ];
 
         $select_configs = [
-            'user_location'       => ['Current Location', $this->options_location()],
             'user_origin'         => ['Ethnicity / Origin', $this->options_origin()],
             'user_religion'       => ['Religion', $this->options_religion()],
             'user_citizenship'    => ['Citizenship', $this->options_citizenship()],
@@ -330,22 +627,21 @@ class FieldGenerator {
             'user_smoking'        => ['Smoking Habits', $this->options_smoking()],
             'user_prayer'         => ['Prayer Habits', $this->options_prayer()],
             'user_education'      => ['Highest Education Level', $this->options_education()],
-            'user_income'         => ['Income Range (Optional)', $this->options_income()],
-            'pref_origin'         => ['Preferred Origin / Ethnicity', $this->options_origin()],
-            'pref_religion'       => ['Preferred Religion', $this->options_religion()],
-            'pref_marital_status' => ['Preferred Marital Status', $this->options_marital()],
-            'pref_children'       => ['Children Preference', $this->options_children()],
-            'pref_modesty'        => ['Preferred Hijab / Modesty', $this->options_modesty()],
-            'pref_drinking'       => ['Drinking Preference', $this->options_drinking()],
-            'pref_smoking'        => ['Smoking Preference', $this->options_smoking()],
-            'pref_prayer'         => ['Prayer Habits Preference', $this->options_prayer()],
-            'pref_education'      => ['Preferred Education Level', $this->options_education()],
-            'pref_income'         => ['Preferred Income Range (Optional)', $this->options_income()],
+            'user_income'         => ['Income Range', $this->options_income()],
+            'pref_origin'         => ['Preferred Origin / Ethnicity', $this->options_pref_origin()],
+            'pref_religion'       => ['Preferred Religion', $this->options_pref_religion()],
+            'pref_marital_status' => ['Preferred Marital Status', $this->options_pref_marital()],
+            'pref_children'       => ['Children Preference', $this->options_pref_children()],
+            'pref_modesty'        => ['Preferred Hijab / Modesty', $this->options_pref_modesty()],
+            'pref_drinking'       => ['Drinking Preference', $this->options_pref_drinking()],
+            'pref_smoking'        => ['Smoking Preference', $this->options_pref_smoking()],
+            'pref_prayer'         => ['Prayer Habits Preference', $this->options_pref_prayer()],
+            'pref_education'      => ['Preferred Education Level', $this->options_pref_education()],
+            'pref_income'         => ['Preferred Income Range', $this->options_pref_income()],
         ];
 
         $multi_configs = [
-            'pref_location'    => ['Preferred Location', $this->options_location(), 'Any Location'],
-            'pref_citizenship' => ['Preferred Citizenship', $this->options_citizenship(), 'Any Citizenship'],
+            'pref_citizenship' => ['Preferred Citizenship', $this->options_pref_citizenship(), 'Any Citizenship'],
         ];
 
         $html = '';
@@ -382,11 +678,6 @@ class FieldGenerator {
             $html .= $this->field_open('user_social_links');
             $html .= $this->label('user_social_links', 'Social Media Links (Separate multiple selections with commas)');
             $html .= $this->textarea('user_social_links', 'Add your social media links', 2, $val);
-            $html .= $this->field_close();
-        } elseif ($name === 'pref_social_links') {
-            $html .= $this->field_open('pref_social_links');
-            $html .= $this->label('pref_social_links', 'Preferred Social Media Links (Separate multiple selections with commas)');
-            $html .= $this->textarea('pref_social_links', 'Add your social media links', 2, $val);
             $html .= $this->field_close();
         } elseif ($name === 'pref_additional_info') {
             $html .= $this->field_open('pref_additional_info');
