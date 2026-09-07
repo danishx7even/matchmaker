@@ -53,7 +53,7 @@
 
 /* Typography */
 .font-cormorant, h1, h2, h3, .nav-tab, .discovery-title, .profile-view-title, .state-main-title {
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     letter-spacing: 0.8px;
     font-weight: 600;
 }
@@ -107,7 +107,7 @@
 }
 
 .mm-toast-text strong {
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 15px;
     display: block;
     color: var(--text-dark);
@@ -325,7 +325,7 @@
 }
 
 .az-card-title {
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 16px;
     letter-spacing: .5px;
     text-transform: uppercase;
@@ -469,7 +469,7 @@ a.az-edit-btn:hover {
     border: 1px solid #EFEAE2;
     padding: 6px 14px;
     border-radius: 20px;
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 13px;
     text-transform: uppercase;
     margin-bottom: 12px;
@@ -552,7 +552,7 @@ a.az-edit-btn:hover {
     border: 1px solid #e8ded0;
     padding: 4px 14px;
     border-radius: 20px;
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 13px;
     text-transform: uppercase;
     font-weight: 600;
@@ -567,7 +567,7 @@ a.az-edit-btn:hover {
 .action-column h3 {
     font-size: 14px;
     text-transform: uppercase;
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-weight: 600;
     margin-bottom: 6px;
 }
@@ -591,7 +591,7 @@ a.az-edit-btn:hover {
 }
 
 .timer-card .timer-title {
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 13px;
     text-transform: uppercase;
     font-weight: 600;
@@ -793,7 +793,7 @@ a.az-edit-btn:hover {
 }
 
 .about-quote-card .about-title {
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 18px;
     text-transform: uppercase;
     font-weight: 600;
@@ -871,7 +871,7 @@ a.az-edit-btn:hover {
 }
 
 .looking-for-card .lf-title {
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 18px;
     text-transform: uppercase;
     font-weight: 600;
@@ -913,7 +913,7 @@ a.az-edit-btn:hover {
 }
 
 .footer-cta-prompt h4 {
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 18px;
     font-weight: 600;
     text-transform: uppercase;
@@ -977,7 +977,7 @@ a.az-edit-btn:hover {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-family: 'Cormorant SC', serif;
+    font-family: 'Inter', serif;
     font-size: 15px;
     text-transform: uppercase;
     font-weight: 600;
