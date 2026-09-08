@@ -28,7 +28,7 @@ add_action('admin_init', function () {
 
     $users = $wpdb->get_results(
         "SELECT user_id, gender, pref_gender, birth_date, preferred_age_min, preferred_age_max,
-                location, pref_location, religion, pref_religion, modesty, pref_modesty,
+                country, state, city, pref_country, pref_state, pref_city, religion, pref_religion, modesty, pref_modesty,
                 user_type, is_active
          FROM {$pool_table} ORDER BY user_id", ARRAY_A
     );
@@ -39,11 +39,12 @@ add_action('admin_init', function () {
         if (!empty($u['birth_date']) && $u['birth_date'] !== '0000-00-00') {
             try { $age = (string)(int)(new DateTime())->diff(new DateTime($u['birth_date']))->y; } catch(Throwable $e) { $age = 'ERR'; }
         }
+        $loc_disp = trim(($u['city'] ? $u['city'] . ', ' : '') . ($u['country'] ?: '—'));
         echo sprintf(
             "  ID:%-5d %-7s→%-7s Age:%-3s(%d-%d) Loc:%-15s Type:%-10s Active:%s\n",
             $u['user_id'], $u['gender'], $u['pref_gender'], $age,
             $u['preferred_age_min'], $u['preferred_age_max'],
-            $u['location'], $u['user_type'], $u['is_active']
+            $loc_disp, $u['user_type'], $u['is_active']
         );
     }
 
@@ -72,8 +73,8 @@ add_action('admin_init', function () {
     $uid = (int) $test_user['user_id'];
     $user_gender   = strtolower(trim((string)($test_user['gender'] ?? '')));
     $pref_gender   = strtolower(trim((string)($test_user['pref_gender'] ?? '')));
-    $user_location = trim((string)($test_user['location'] ?? ''));
-    $pref_location = trim((string)($test_user['pref_location'] ?? ''));
+    $user_country  = trim((string)($test_user['country'] ?? ''));
+    $pref_country  = trim((string)($test_user['pref_country'] ?? ''));
     $user_religion = trim((string)($test_user['religion'] ?? ''));
     $pref_religion = trim((string)($test_user['pref_religion'] ?? ''));
     $user_modesty  = trim((string)($test_user['modesty'] ?? ''));
@@ -86,7 +87,7 @@ add_action('admin_init', function () {
         try { $user_age = (int)(new DateTime())->diff(new DateTime($test_user['birth_date']))->y; } catch(Throwable $e) {}
     }
 
-    echo "User #{$uid}: gender={$user_gender} pref={$pref_gender} age={$user_age} loc={$user_location} rel={$user_religion} mod={$user_modesty}\n\n";
+    echo "User #{$uid}: gender={$user_gender} pref={$pref_gender} age={$user_age} country={$user_country} rel={$user_religion} mod={$user_modesty}\n\n";
 
     $tcg = ($pref_gender !== '' && $pref_gender !== 'any') ? $pref_gender : '';
     $tug = ($user_gender !== '' && $user_gender !== 'any') ? $user_gender : '';
@@ -116,7 +117,7 @@ add_action('admin_init', function () {
     ));
     echo "G3 +age: {$g3}" . ($g3 < $g2 ? " (dropped ".($g2-$g3).")" : "") . "\n";
 
-    // Gate 4: location
+    // Gate 4: country
     $g4 = (int)$wpdb->get_var($wpdb->prepare(
         "SELECT COUNT(*) FROM {$pool_table} c WHERE c.user_id != %d AND (c.is_active = 1 OR c.is_active IS NULL)
          AND (%s = '' OR LOWER(TRIM(c.gender)) = %s)
@@ -124,13 +125,13 @@ add_action('admin_init', function () {
          AND (c.preferred_age_min IS NULL OR c.preferred_age_min <= 0 OR %d >= c.preferred_age_min)
          AND (c.preferred_age_max IS NULL OR c.preferred_age_max <= 0 OR %d <= c.preferred_age_max)
          AND (c.birth_date IS NULL OR c.birth_date = '0000-00-00' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)
-         AND (c.pref_location IS NULL OR c.pref_location = '' OR LOWER(TRIM(c.pref_location)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_location, ', ', ',')) > 0 OR LOWER(c.pref_location) LIKE CONCAT('%%', %s, '%%'))
-         AND (%s = '' OR LOWER(%s) = 'any' OR c.location IS NULL OR c.location = '' OR FIND_IN_SET(c.location, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.location, '%%'))",
+         AND (c.pref_country IS NULL OR c.pref_country = '' OR LOWER(TRIM(c.pref_country)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_country, ', ', ',')) > 0 OR LOWER(c.pref_country) LIKE CONCAT('%%', %s, '%%'))
+         AND (%s = '' OR LOWER(%s) = 'any' OR c.country IS NULL OR c.country = '' OR FIND_IN_SET(c.country, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.country, '%%'))",
         $uid, $tcg, $tcg, $tug, $tug, $user_age, $user_age, $user_age_min, $user_age_max,
-        $user_location, $user_location, strtolower($user_location),
-        $pref_location, $pref_location, $pref_location, strtolower($pref_location)
+        $user_country, $user_country, strtolower($user_country),
+        $pref_country, $pref_country, $pref_country, strtolower($pref_country)
     ));
-    echo "G4 +location: {$g4}" . ($g4 < $g3 ? " (dropped ".($g3-$g4).")" : "") . "\n";
+    echo "G4 +country: {$g4}" . ($g4 < $g3 ? " (dropped ".($g3-$g4).")" : "") . "\n";
 
     // Gate 5: religion
     $g5 = (int)$wpdb->get_var($wpdb->prepare(
@@ -140,13 +141,13 @@ add_action('admin_init', function () {
          AND (c.preferred_age_min IS NULL OR c.preferred_age_min <= 0 OR %d >= c.preferred_age_min)
          AND (c.preferred_age_max IS NULL OR c.preferred_age_max <= 0 OR %d <= c.preferred_age_max)
          AND (c.birth_date IS NULL OR c.birth_date = '0000-00-00' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)
-         AND (c.pref_location IS NULL OR c.pref_location = '' OR LOWER(TRIM(c.pref_location)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_location, ', ', ',')) > 0 OR LOWER(c.pref_location) LIKE CONCAT('%%', %s, '%%'))
-         AND (%s = '' OR LOWER(%s) = 'any' OR c.location IS NULL OR c.location = '' OR FIND_IN_SET(c.location, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.location, '%%'))
+         AND (c.pref_country IS NULL OR c.pref_country = '' OR LOWER(TRIM(c.pref_country)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_country, ', ', ',')) > 0 OR LOWER(c.pref_country) LIKE CONCAT('%%', %s, '%%'))
+         AND (%s = '' OR LOWER(%s) = 'any' OR c.country IS NULL OR c.country = '' OR FIND_IN_SET(c.country, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.country, '%%'))
          AND (c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_religion, ', ', ',')) > 0)
          AND (%s = '' OR c.religion IS NULL OR c.religion = '' OR FIND_IN_SET(c.religion, REPLACE(%s, ', ', ',')) > 0)",
         $uid, $tcg, $tcg, $tug, $tug, $user_age, $user_age, $user_age_min, $user_age_max,
-        $user_location, $user_location, strtolower($user_location),
-        $pref_location, $pref_location, $pref_location, strtolower($pref_location),
+        $user_country, $user_country, strtolower($user_country),
+        $pref_country, $pref_country, $pref_country, strtolower($pref_country),
         $user_religion, $user_religion,
         $pref_religion, $pref_religion
     ));
@@ -160,15 +161,15 @@ add_action('admin_init', function () {
          AND (c.preferred_age_min IS NULL OR c.preferred_age_min <= 0 OR %d >= c.preferred_age_min)
          AND (c.preferred_age_max IS NULL OR c.preferred_age_max <= 0 OR %d <= c.preferred_age_max)
          AND (c.birth_date IS NULL OR c.birth_date = '0000-00-00' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)
-         AND (c.pref_location IS NULL OR c.pref_location = '' OR LOWER(TRIM(c.pref_location)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_location, ', ', ',')) > 0 OR LOWER(c.pref_location) LIKE CONCAT('%%', %s, '%%'))
-         AND (%s = '' OR LOWER(%s) = 'any' OR c.location IS NULL OR c.location = '' OR FIND_IN_SET(c.location, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.location, '%%'))
+         AND (c.pref_country IS NULL OR c.pref_country = '' OR LOWER(TRIM(c.pref_country)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_country, ', ', ',')) > 0 OR LOWER(c.pref_country) LIKE CONCAT('%%', %s, '%%'))
+         AND (%s = '' OR LOWER(%s) = 'any' OR c.country IS NULL OR c.country = '' OR FIND_IN_SET(c.country, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.country, '%%'))
          AND (c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_religion, ', ', ',')) > 0)
          AND (%s = '' OR c.religion IS NULL OR c.religion = '' OR FIND_IN_SET(c.religion, REPLACE(%s, ', ', ',')) > 0)
          AND (c.pref_modesty IS NULL OR c.pref_modesty = '' OR LOWER(TRIM(c.pref_modesty)) = 'any' OR %s = '' OR FIND_IN_SET(%s, REPLACE(c.pref_modesty, ', ', ',')) > 0)
          AND (%s = '' OR c.modesty IS NULL OR c.modesty = '' OR FIND_IN_SET(c.modesty, REPLACE(%s, ', ', ',')) > 0)",
         $uid, $tcg, $tcg, $tug, $tug, $user_age, $user_age, $user_age_min, $user_age_max,
-        $user_location, $user_location, strtolower($user_location),
-        $pref_location, $pref_location, $pref_location, strtolower($pref_location),
+        $user_country, $user_country, strtolower($user_country),
+        $pref_country, $pref_country, $pref_country, strtolower($pref_country),
         $user_religion, $user_religion,
         $pref_religion, $pref_religion,
         $user_modesty, $user_modesty,

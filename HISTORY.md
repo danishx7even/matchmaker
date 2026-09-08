@@ -855,6 +855,23 @@ This document maintains a chronological, step-by-step history of all features, a
     - Added tests asserting Country, State, City, and Citizenship filters in manual matchmaking and Matching Engine SQL candidate queries.
   - Verified test suite: all 71 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
 
+---
+
+### Task 51: Fix Unknown column 'c.location' Database Error
+- **Objective**:
+  - Resolve `WordPress database error Unknown column 'c.location' in 'where clause' for query` occurring during manual matchmaking searches.
+- **Root Cause**:
+  - In DB schema v2.3.0 / v2.5.0, the `location` and `pref_location` columns in `wp_matchmaking_pool` were migrated to `country`, `state`, `city` and `pref_country`, `pref_state`, `pref_city`.
+  - `MatchRepository::get_manual_match_candidates()` still referenced `c.location` as a fallback column in its `WHERE` clauses.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Removed `c.location` from all `WHERE` clauses in `get_manual_match_candidates()`.
+    - Keyword location fallback (`f_location`) now safely evaluates `(c.country LIKE %s OR c.state LIKE %s OR c.city LIKE %s)`.
+  - `test-matching-diagnostic.php`:
+    - Updated diagnostic script queries to use `country`, `state`, `city`.
+  - Verified test suite: all 71 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+
 
 
 

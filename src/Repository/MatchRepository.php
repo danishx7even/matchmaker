@@ -481,9 +481,8 @@ class MatchRepository
         if (!empty($filters['f_country']) && !in_array(strtolower(trim($filters['f_country'])), ['any', 'any country', 'select country', ''], true)) {
             $c_val = trim((string)$filters['f_country']);
             $like = '%' . $wpdb->esc_like(strtolower($c_val)) . '%';
-            $where[] = "(c.country = %s OR LOWER(c.country) LIKE %s OR (c.location IS NOT NULL AND LOWER(c.location) LIKE %s) OR FIND_IN_SET(LOWER(c.country), REPLACE(LOWER(%s), ', ', ',')) > 0)";
+            $where[] = "(c.country = %s OR LOWER(c.country) LIKE %s OR FIND_IN_SET(LOWER(c.country), REPLACE(LOWER(%s), ', ', ',')) > 0)";
             $args[]  = $c_val;
-            $args[]  = $like;
             $args[]  = $like;
             $args[]  = $c_val;
         }
@@ -491,26 +490,24 @@ class MatchRepository
         if (!empty($filters['f_state']) && !in_array(strtolower(trim($filters['f_state'])), ['any', 'any state', 'select state', ''], true)) {
             $s_val = trim((string)$filters['f_state']);
             $like = '%' . $wpdb->esc_like(strtolower($s_val)) . '%';
-            $where[] = "(c.state = %s OR LOWER(c.state) LIKE %s OR (c.location IS NOT NULL AND LOWER(c.location) LIKE %s))";
+            $where[] = "(c.state = %s OR LOWER(c.state) LIKE %s)";
             $args[]  = $s_val;
-            $args[]  = $like;
             $args[]  = $like;
         }
 
         if (!empty($filters['f_city']) && !in_array(strtolower(trim($filters['f_city'])), ['any', 'any city', 'select city', ''], true)) {
             $city_val = trim((string)$filters['f_city']);
             $like = '%' . $wpdb->esc_like(strtolower($city_val)) . '%';
-            $where[] = "(c.city = %s OR LOWER(c.city) LIKE %s OR (c.location IS NOT NULL AND LOWER(c.location) LIKE %s))";
+            $where[] = "(c.city = %s OR LOWER(c.city) LIKE %s)";
             $args[]  = $city_val;
-            $args[]  = $like;
             $args[]  = $like;
         }
 
-        // 3b. General location filter fallback (f_location)
+        // 3b. Keyword location filter fallback (f_location) searching across country, state, or city
         if (!empty($filters['f_location']) && strtolower(trim($filters['f_location'])) !== 'any') {
             $loc_val = trim((string)$filters['f_location']);
             $like = '%' . $wpdb->esc_like(strtolower($loc_val)) . '%';
-            $where[] = "((c.location IS NOT NULL AND LOWER(c.location) LIKE %s) OR (c.country IS NOT NULL AND LOWER(c.country) LIKE %s) OR (c.city IS NOT NULL AND LOWER(c.city) LIKE %s))";
+            $where[] = "((c.country IS NOT NULL AND LOWER(c.country) LIKE %s) OR (c.state IS NOT NULL AND LOWER(c.state) LIKE %s) OR (c.city IS NOT NULL AND LOWER(c.city) LIKE %s))";
             $args[]  = $like;
             $args[]  = $like;
             $args[]  = $like;
