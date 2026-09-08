@@ -90,8 +90,8 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                         <?php if ($st === 'pending_review') :
                             $p1 = $repo->get_user_pool((int)($m['user_one_id'] ?? 0));
                             $p2 = $repo->get_user_pool((int)($m['user_two_id'] ?? 0));
-                            $t1 = $p1['user_type'] ?? 'free';
-                            $t2 = $p2['user_type'] ?? 'free';
+                            $t1 = is_array($p1) ? ($p1['user_type'] ?? 'free') : 'free';
+                            $t2 = is_array($p2) ? ($p2['user_type'] ?? 'free') : 'free';
                             $is_foe = in_array($t1, ['free', 'event'], true) || in_array($t2, ['free', 'event'], true);
                         ?>
                             <?php if ($is_foe) : ?>

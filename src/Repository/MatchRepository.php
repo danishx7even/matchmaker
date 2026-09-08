@@ -783,9 +783,20 @@ class MatchRepository
     }
 
     /**
-     * Get all matches for the admin matches queue, filtered by status / search.
+     * Search and retrieve matches for the admin matches queue, filtered by status / search / source.
      *
-     * @param array<string, mixed> $filters Optional filters (status, search).
+     * @param array<string, mixed> $filters Optional filters (status, search, source).
+     * @return array<int, array<string, mixed>> Match records.
+     */
+    public function search_matches(array $filters = []): array
+    {
+        return $this->get_all_matches($filters);
+    }
+
+    /**
+     * Get all matches for the admin matches queue, filtered by status / search / source.
+     *
+     * @param array<string, mixed> $filters Optional filters (status, search, source).
      * @return array<int, array<string, mixed>> Match records.
      */
     public function get_all_matches(array $filters = []): array
@@ -800,6 +811,11 @@ class MatchRepository
         if (!empty($filters['status'])) {
             $where[] = 'm.status = %s';
             $args[]  = $filters['status'];
+        }
+
+        if (!empty($filters['source'])) {
+            $where[] = 'm.match_source = %s';
+            $args[]  = $filters['source'];
         }
 
         if (!empty($filters['search'])) {

@@ -59,4 +59,28 @@ class AdminWorkflowTest
             throw new \RuntimeException("Expected environment mode to be test mode");
         }
     }
+
+    public function test_search_matches_query_generation(): void
+    {
+        global $wpdb;
+        $wpdb->queries = [];
+
+        $filters = [
+            'search' => 'Farhan',
+            'status' => 'pending_review',
+            'source' => 'auto',
+        ];
+
+        $matches = $this->repo->search_matches($filters);
+
+        $queries_str = implode("\n", $wpdb->queries);
+        if (!str_contains($queries_str, 'wp_matches') || !str_contains($queries_str, 'm.status =') || !str_contains($queries_str, 'm.match_source =')) {
+            throw new \RuntimeException("Expected matches search query with status and match_source, executed:\n{$queries_str}");
+        }
+
+        if (!is_array($matches)) {
+            throw new \RuntimeException("Expected search_matches to return an array");
+        }
+    }
 }
+

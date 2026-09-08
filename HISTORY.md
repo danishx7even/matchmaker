@@ -813,5 +813,24 @@ This document maintains a chronological, step-by-step history of all features, a
     - Added `test_citizenship_and_pref_citizenship_contain_full_country_list` asserting that both citizenship and preferred citizenship dropdowns contain all 240+ countries with correct leading placeholders.
   - Verified test suite: all 69 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
 
+---
+
+### Task 49: Fix Critical Error on Matches Queue Admin Page
+- **Objective**:
+  - Resolve the critical fatal error encountered when opening the Matches Queue admin page (`/wp-admin/admin.php?page=matchmaking-matches`).
+- **Root Cause**:
+  - `AdminPortal::render_matches_list_view()` called `$repo->search_matches($filters)`, but `MatchRepository` only defined `get_all_matches()`, throwing `Fatal error: Uncaught Error: Call to undefined method MatchRepository::search_matches()`.
+  - In addition, array access on `$p1` / `$p2` in `matches-list.php` and `match-single.php` lacked null-safety guards when match candidate pool records are missing or null.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Added `search_matches(array $filters = []): array` supporting `status`, `source`, and `search` query parameters.
+    - Updated `get_all_matches(array $filters = []): array` with `source` filtering support.
+  - `src/View/admin/matches/matches-list.php` & `src/View/admin/matches/match-single.php`:
+    - Added null-safe checks (`is_array($p1)` / `is_array($p2)`) for pool records and candidate attributes.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Added `test_search_matches_query_generation` verifying query structure and filter parameters.
+  - Verified test suite: all 70 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+
 
 

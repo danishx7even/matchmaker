@@ -40,8 +40,8 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     </div>
     <div>
         <?php if ($st === 'pending_review') :
-            $t1 = $p1['user_type'] ?? 'free';
-            $t2 = $p2['user_type'] ?? 'free';
+            $t1 = is_array($p1) ? ($p1['user_type'] ?? 'free') : 'free';
+            $t2 = is_array($p2) ? ($p2['user_type'] ?? 'free') : 'free';
             $is_event_only = ($t1 === 'event') || ($t2 === 'event');
         ?>
             <?php if ($is_event_only) : ?>
@@ -60,8 +60,8 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 <div class="mm-grid-two">
     <!-- User 1 Card -->
     <?php
-    $p1_loc_parts = array_filter([$p1['city'] ?? '', $p1['state'] ?? '', $p1['country'] ?? '']);
-    $p1_loc = !empty($p1_loc_parts) ? implode(', ', $p1_loc_parts) : ($p1['location'] ?? '—');
+    $p1_loc_parts = is_array($p1) ? array_filter([$p1['city'] ?? '', $p1['state'] ?? '', $p1['country'] ?? '']) : [];
+    $p1_loc = !empty($p1_loc_parts) ? implode(', ', $p1_loc_parts) : (is_array($p1) ? ($p1['location'] ?? '—') : '—');
     ?>
     <div class="mm-card">
         <h3><?php echo esc_html($u1 ? $u1->display_name : 'User #' . $u1_id); ?> (User 1)</h3>
@@ -70,20 +70,20 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u1 ? $u1->user_email : '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Age', 'matchmaker'); ?></th><td><?php echo esc_html($repo->calc_age($p1['birth_date'] ?? '')); ?></td></tr>
-            <tr><th><?php esc_html_e('Gender', 'matchmaker'); ?></th><td><?php echo esc_html(ucfirst($p1['gender'] ?? '')); ?></td></tr>
+            <tr><th><?php esc_html_e('Age', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? $repo->calc_age($p1['birth_date'] ?? '') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Gender', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ucfirst($p1['gender'] ?? '') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Location', 'matchmaker'); ?></th><td><?php echo esc_html($p1_loc); ?></td></tr>
-            <tr><th><?php esc_html_e('Origin', 'matchmaker'); ?></th><td><?php echo esc_html($p1['origin'] ?? '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html($p1['religion'] ?? '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html($p1['modesty'] ?? '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Origin', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['origin'] ?? '—') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['religion'] ?? '—') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['modesty'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Response', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($match['user_one_response'] ?? 'pending')); ?></strong></td></tr>
         </table>
     </div>
 
     <!-- User 2 Card -->
     <?php
-    $p2_loc_parts = array_filter([$p2['city'] ?? '', $p2['state'] ?? '', $p2['country'] ?? '']);
-    $p2_loc = !empty($p2_loc_parts) ? implode(', ', $p2_loc_parts) : ($p2['location'] ?? '—');
+    $p2_loc_parts = is_array($p2) ? array_filter([$p2['city'] ?? '', $p2['state'] ?? '', $p2['country'] ?? '']) : [];
+    $p2_loc = !empty($p2_loc_parts) ? implode(', ', $p2_loc_parts) : (is_array($p2) ? ($p2['location'] ?? '—') : '—');
     ?>
     <div class="mm-card">
         <h3><?php echo esc_html($u2 ? $u2->display_name : 'User #' . $u2_id); ?> (User 2)</h3>
@@ -92,12 +92,12 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u2 ? $u2->user_email : '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Age', 'matchmaker'); ?></th><td><?php echo esc_html($repo->calc_age($p2['birth_date'] ?? '')); ?></td></tr>
-            <tr><th><?php esc_html_e('Gender', 'matchmaker'); ?></th><td><?php echo esc_html(ucfirst($p2['gender'] ?? '')); ?></td></tr>
+            <tr><th><?php esc_html_e('Age', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? $repo->calc_age($p2['birth_date'] ?? '') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Gender', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ucfirst($p2['gender'] ?? '') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Location', 'matchmaker'); ?></th><td><?php echo esc_html($p2_loc); ?></td></tr>
-            <tr><th><?php esc_html_e('Origin', 'matchmaker'); ?></th><td><?php echo esc_html($p2['origin'] ?? '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html($p2['religion'] ?? '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html($p2['modesty'] ?? '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Origin', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['origin'] ?? '—') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['religion'] ?? '—') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['modesty'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Response', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($match['user_two_response'] ?? 'pending')); ?></strong></td></tr>
         </table>
     </div>
