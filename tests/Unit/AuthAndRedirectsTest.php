@@ -73,4 +73,15 @@ class AuthAndRedirectsTest
             throw new \RuntimeException("Expected logout_url shortcode to output logout link: " . $out);
         }
     }
+
+    public function test_matchmaker_admin_login_redirects_to_matchmaking_pool(): void
+    {
+        $mm_admin = new FakeWP_User(77, 'mm_agent', 'agent@example.com');
+        $mm_admin->roles = ['matchmaker_admin'];
+
+        $dest = $this->auth->custom_role_based_login_redirect('https://example.com/', '', $mm_admin);
+        if (!str_contains($dest, 'page=matchmaking-pool')) {
+            throw new \RuntimeException("Expected matchmaker_admin to redirect to page=matchmaking-pool, got: " . $dest);
+        }
+    }
 }

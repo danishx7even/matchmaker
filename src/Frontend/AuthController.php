@@ -215,6 +215,13 @@ class AuthController
                 return admin_url();
             }
 
+            if (in_array('matchmaker_admin', (array) $user->roles, true) || user_can($user, 'manage_matchmaker')) {
+                if (!empty($request) && strpos((string) $request, 'wp-admin') !== false) {
+                    return (string) $request;
+                }
+                return admin_url('admin.php?page=matchmaking-pool');
+            }
+
             // Check if member has completed their profile in wp_matchmaking_pool
             $pool = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool((int) $user->ID);
             if (empty($pool) || empty($pool['gender'])) {
@@ -252,7 +259,7 @@ class AuthController
     {
         if (is_user_logged_in()) {
             $user = wp_get_current_user();
-            if (in_array('subscriber', (array) $user->roles, true)) {
+            if (in_array('subscriber', (array) $user->roles, true) && !user_can($user, 'manage_matchmaker') && !user_can($user, 'manage_options')) {
                 return false;
             }
         }

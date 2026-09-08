@@ -128,8 +128,53 @@ function get_userdata($user_id) {
     return false;
 }
 
+class WP_Role {
+    public string $name;
+    public array $capabilities = [];
+
+    public function __construct(string $role, array $capabilities = []) {
+        $this->name = $role;
+        $this->capabilities = $capabilities;
+    }
+
+    public function add_cap(string $cap, bool $grant = true): void {
+        $this->capabilities[$cap] = $grant;
+    }
+
+    public function remove_cap(string $cap): void {
+        unset($this->capabilities[$cap]);
+    }
+
+    public function has_cap(string $cap): bool {
+        return !empty($this->capabilities[$cap]);
+    }
+}
+
+function get_role(string $role): ?WP_Role {
+    if (!isset($GLOBALS['wp_roles'])) {
+        $GLOBALS['wp_roles'] = [
+            'administrator'   => new WP_Role('administrator', ['manage_options' => true, 'manage_matchmaker' => true, 'read' => true]),
+            'matchmaker_admin'=> new WP_Role('matchmaker_admin', ['manage_matchmaker' => true, 'read' => true]),
+            'subscriber'      => new WP_Role('subscriber', ['read' => true]),
+        ];
+    }
+    return $GLOBALS['wp_roles'][$role] ?? null;
+}
+
+function add_role(string $role, string $display_name, array $capabilities = []): ?WP_Role {
+    if (!isset($GLOBALS['wp_roles'])) {
+        get_role('administrator');
+    }
+    $GLOBALS['wp_roles'][$role] = new WP_Role($role, $capabilities);
+    return $GLOBALS['wp_roles'][$role];
+}
+
+function remove_role(string $role): void {
+    unset($GLOBALS['wp_roles'][$role]);
+}
+
 function get_current_user_id(): int {
-    return 1;
+    return $GLOBALS['__mm_current_user_id'] ?? 1;
 }
 
 function is_user_logged_in(): bool {
@@ -137,7 +182,8 @@ function is_user_logged_in(): bool {
 }
 
 function current_user_can($cap): bool {
-    return true;
+    $uid = get_current_user_id();
+    return user_can($uid, $cap);
 }
 
 function wp_create_user($username, $password, $email) {
@@ -463,9 +509,54 @@ function wp_get_current_user() {
 function user_can($user, $capability) {
     $u = is_numeric($user) ? get_userdata((int)$user) : $user;
     if ($u instanceof FakeWP_User) {
-        return in_array('administrator', (array)$u->roles, true);
+        if (in_array('administrator', (array)$u->roles, true)) {
+            return true;
+        }
+        foreach ((array) $u->roles as $r) {
+            $role_obj = get_role($r);
+            if ($role_obj && $role_obj->has_cap($capability)) {
+                return true;
+            }
+        }
     }
     return false;
+}
+
+function add_menu_page($page_title, $menu_title, $capability, $menu_slug, $callback = null, $icon_url = '', $position = null) {
+    $GLOBALS['admin_menu_pages'][$menu_slug] = [
+        'page_title' => $page_title,
+        'menu_title' => $menu_title,
+        'capability' => $capability,
+        'menu_slug'  => $menu_slug,
+        'callback'   => $callback,
+    ];
+}
+
+function add_submenu_page($parent_slug, $page_title, $menu_title, $capability, $menu_slug, $callback = null, $position = null) {
+    $GLOBALS['admin_submenu_pages'][$parent_slug][$menu_slug] = [
+        'parent_slug' => $parent_slug,
+        'page_title'  => $page_title,
+        'menu_title'  => $menu_title,
+        'capability'  => $capability,
+        'menu_slug'   => $menu_slug,
+        'callback'    => $callback,
+    ];
+}
+
+function remove_menu_page($menu_slug) {
+    $GLOBALS['admin_removed_menus'][$menu_slug] = true;
+    unset($GLOBALS['admin_menu_pages'][$menu_slug]);
+    return true;
+}
+
+function remove_submenu_page($menu_slug, $submenu_slug) {
+    $GLOBALS['admin_removed_submenus'][$menu_slug][$submenu_slug] = true;
+    unset($GLOBALS['admin_submenu_pages'][$menu_slug][$submenu_slug]);
+    return true;
+}
+
+function wp_doing_ajax(): bool {
+    return defined('DOING_AJAX') && DOING_AJAX;
 }
 
 function add_query_arg($key, $val, $url = '') {

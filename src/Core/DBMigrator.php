@@ -32,6 +32,7 @@ class DBMigrator {
     {
         $self = self::instance();
         $self->maybe_migrate();
+        \Matchmaker\Admin\AdminPortal::register_role_and_caps();
     }
 
     public function maybe_migrate(): void

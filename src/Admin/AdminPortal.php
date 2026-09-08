@@ -51,9 +51,132 @@ class AdminPortal
      */
     private function boot(): void
     {
+        add_action('init',                  [self::class, 'register_role_and_caps']);
         add_action('admin_menu',            [$this, 'register_menu'], 30);
+        add_action('admin_menu',            [$this, 'restrict_admin_menus_for_matchmaker_admin'], 9999);
+        add_action('admin_init',            [$this, 'enforce_matchmaker_admin_screen_restrictions']);
         add_action('admin_init',            [$this, 'handle_admin_actions']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
+    }
+
+    /**
+     * Register Matchmaker Admin role and custom capabilities.
+     *
+     * @return void
+     */
+    public static function register_role_and_caps(): void
+    {
+        // 1. Grant manage_matchmaker to Full Administrator
+        if (function_exists('get_role')) {
+            $admin_role = get_role('administrator');
+            if ($admin_role && method_exists($admin_role, 'add_cap')) {
+                $admin_role->add_cap('manage_matchmaker', true);
+            }
+        }
+
+        // 2. Register or update matchmaker_admin role
+        if (function_exists('get_role') && function_exists('add_role')) {
+            $mm_role = get_role('matchmaker_admin');
+            if (!$mm_role) {
+                add_role(
+                    'matchmaker_admin',
+                    __('Matchmaker Admin', 'matchmaker'),
+                    [
+                        'read'              => true,
+                        'manage_matchmaker' => true,
+                    ]
+                );
+            } else {
+                if (method_exists($mm_role, 'add_cap')) {
+                    $mm_role->add_cap('read', true);
+                    $mm_role->add_cap('manage_matchmaker', true);
+                }
+            }
+        }
+    }
+
+    /**
+     * Remove non-matchmaking admin menus for Matchmaker Admin users.
+     * Ensures they can only see and access matchmaking management screens (and their profile).
+     *
+     * @return void
+     */
+    public function restrict_admin_menus_for_matchmaker_admin(): void
+    {
+        if (!current_user_can('manage_matchmaker') || current_user_can('manage_options')) {
+            return;
+        }
+
+        if (!function_exists('remove_menu_page')) {
+            return;
+        }
+
+        $disallowed_menus = [
+            'index.php',                  // Dashboard
+            'edit.php',                    // Posts
+            'upload.php',                  // Media
+            'edit.php?post_type=page',     // Pages
+            'edit-comments.php',           // Comments
+            'themes.php',                  // Appearance
+            'plugins.php',                 // Plugins
+            'users.php',                   // Users
+            'tools.php',                   // Tools
+            'options-general.php',         // Settings
+            'pmpro-membershiplevels',      // PMPro
+            'pmpro-memberslist',
+            'pmpro-orders',
+            'pmpro-reports',
+            'pmpro-discountcodes',
+            'pmpro-pagesettings',
+            'pmpro-paymentsettings',
+            'pmpro-emailsettings',
+            'pmpro-advancedsettings',
+            'pmpro-addons',
+            'elementor',                   // Elementor
+            'edit.php?post_type=elementor_library',
+        ];
+
+        foreach ($disallowed_menus as $menu_slug) {
+            remove_menu_page($menu_slug);
+        }
+    }
+
+    /**
+     * Enforce strict page-level gating for Matchmaker Admin users.
+     * Redirects visits to wp-admin/ or index.php or other unauthorized backend screens to the Pool Browser.
+     *
+     * @return void
+     */
+    public function enforce_matchmaker_admin_screen_restrictions(): void
+    {
+        if (!current_user_can('manage_matchmaker') || current_user_can('manage_options')) {
+            return;
+        }
+
+        // Allow AJAX, cron, and standard API calls
+        if ((function_exists('wp_doing_ajax') && wp_doing_ajax()) || (defined('DOING_CRON') && DOING_CRON)) {
+            return;
+        }
+
+        global $pagenow;
+
+        // Allow user editing their own profile or submitting admin forms/actions
+        if (in_array($pagenow, ['profile.php', 'admin-post.php', 'async-upload.php'], true)) {
+            return;
+        }
+
+        $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
+        $allowed_matchmaking_pages = [
+            'matchmaking-pool',
+            'matchmaking-matches',
+            'matchmaking-settings',
+            'matchmaking-logs',
+        ];
+
+        if (!in_array($page, $allowed_matchmaking_pages, true)) {
+            wp_safe_redirect(admin_url('admin.php?page=matchmaking-pool'));
+            exit;
+        }
     }
 
     /**
@@ -97,7 +220,7 @@ class AdminPortal
         add_menu_page(
             __('Matchmaking', 'matchmaker'),
             __('Matchmaking', 'matchmaker'),
-            'manage_options',
+            'manage_matchmaker',
             'matchmaking-pool',
             [$this, 'render_admin_page'],
             'dashicons-heart',
@@ -108,7 +231,7 @@ class AdminPortal
             'matchmaking-pool',
             __('Pool Browser', 'matchmaker'),
             __('Pool Browser', 'matchmaker'),
-            'manage_options',
+            'manage_matchmaker',
             'matchmaking-pool',
             [$this, 'render_admin_page']
         );
@@ -117,7 +240,7 @@ class AdminPortal
             'matchmaking-pool',
             __('Matches Queue', 'matchmaker'),
             __('Matches Queue', 'matchmaker'),
-            'manage_options',
+            'manage_matchmaker',
             'matchmaking-matches',
             [$this, 'render_matches_page']
         );
@@ -126,7 +249,7 @@ class AdminPortal
             'matchmaking-pool',
             __('Settings', 'matchmaker'),
             __('Settings', 'matchmaker'),
-            'manage_options',
+            'manage_matchmaker',
             'matchmaking-settings',
             [$this, 'render_settings_page']
         );
@@ -135,7 +258,7 @@ class AdminPortal
             'matchmaking-pool',
             __('Match Logs & Diagnostics', 'matchmaker'),
             __('Match Logs', 'matchmaker'),
-            'manage_options',
+            'manage_matchmaker',
             'matchmaking-logs',
             [$this, 'render_logs_page']
         );
@@ -153,7 +276,7 @@ class AdminPortal
             return;
         }
 
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('manage_matchmaker')) {
             return;
         }
 
@@ -663,7 +786,7 @@ class AdminPortal
      */
     public function render_logs_page(): void
     {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('manage_matchmaker')) {
             wp_die(__('Unauthorized', 'matchmaker'));
         }
 

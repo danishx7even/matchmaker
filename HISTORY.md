@@ -876,21 +876,32 @@ This document maintains a chronological, step-by-step history of all features, a
     - Verified registration relies solely on core `user_register` hook integration for clean single-code generation.
   - `src/Admin/AdminPortal.php`:
     - Updated `$default_verify_template` to match the enhanced layout structure with `{code}`, `{user_name}`, `{site_name}`, and `{expiry_hours}` placeholders.
-### Task 53: Add "Pause Subscription" CTA to 5th Stage of Match Steps
+### Task 54: Add "Matchmaker Admin" Role with Restricted WP-Admin Access
 - **Objective**:
-  - Add a dedicated "Pause Subscription" CTA button at the bottom of Stage 5 (Mutual Match Celebration & Contact Details Reveal) in the Member Portal, allowing matched members to navigate directly to their PMPro membership account page to pause/cancel recurring billing.
+  - Add a dedicated `matchmaker_admin` ("Matchmaker Admin") user role with custom capability `manage_matchmaker` that can access exclusively matchmaking-related administrative screens in WordPress wp-admin.
 - **Implemented**:
-  - `src/View/frontend/portal/steps/step-5-contact.php`:
-    - Added a responsive vertical action group containing:
-      1. Primary action: `Back to Profile Dashboard →` (`btn btn-primary`).
-      2. Pause CTA: `Pause Subscription` (`btn btn-outline-dark`) with a pause icon, dynamically resolving the PMPro account URL via `ProfileService::instance()->get_membership_account_url()`.
-  - `tests/Unit/PortalAndEventsTest.php`:
-    - Added unit test `test_step_5_renders_pause_subscription_cta_with_membership_url` confirming button presence, dynamic URL resolution, and proper rendering.
-  - `context/member_portal.md`:
-    - Updated State 5 documentation to reflect the new CTA and routing behavior.
-  - Verified test suite: all 72 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+  - `src/Admin/AdminPortal.php`:
+    - Added `register_role_and_caps()` method that registers the `matchmaker_admin` role with `manage_matchmaker` and `read` capabilities, and grants `manage_matchmaker` to `administrator`.
+    - Hooked `register_role_and_caps` to `init` and `DBMigrator::activate()`.
+    - Updated all menu and submenu capability requirements from `manage_options` to `manage_matchmaker`.
+    - Added `restrict_admin_menus_for_matchmaker_admin()` on `admin_menu` (priority 9999) to remove core WordPress menus (Dashboard, Posts, Media, Pages, Comments, Appearance, Plugins, Users, Tools, Settings) and third-party plugin menus (PMPro, Elementor) for users with `manage_matchmaker` who do not have full `manage_options`.
+    - Added `enforce_matchmaker_admin_screen_restrictions()` on `admin_init` redirecting non-whitelisted admin screen visits to `admin.php?page=matchmaking-pool`.
+    - Updated `handle_admin_actions()` and `render_logs_page()` to authorize using `manage_matchmaker`.
+  - `src/Frontend/AuthController.php`:
+    - Updated `custom_role_based_login_redirect()` to automatically direct `matchmaker_admin` users directly to the Pool Browser (`admin.php?page=matchmaking-pool`).
+    - Updated `custom_hide_admin_bar_for_subscribers()` to preserve admin bar visibility for `manage_matchmaker` holders.
+  - `src/Service/EmailVerificationService.php`:
+    - Updated `is_user_verified()` so `manage_matchmaker` holders bypass verification gating.
+  - `tests/bootstrap.php`:
+    - Added WP Role, menu registration, and capability mocking stubs.
+  - `tests/Unit/AdminWorkflowTest.php` & `tests/Unit/AuthAndRedirectsTest.php`:
+    - Added automated unit tests verifying role registration, capability inheritance, menu stripping, and login redirects.
+  - `context/admin_portal.md`:
+    - Documented Matchmaker Admin role, capabilities, and screen gating architecture.
+  - Verified test suite: all 76 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
 
 ---
+
 
 
 

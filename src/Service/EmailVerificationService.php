@@ -182,7 +182,7 @@ class EmailVerificationService
             return false;
         }
 
-        if (function_exists('user_can') && user_can($user_id, 'manage_options')) {
+        if (function_exists('user_can') && (user_can($user_id, 'manage_options') || user_can($user_id, 'manage_matchmaker'))) {
             return true;
         }
 

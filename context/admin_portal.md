@@ -39,3 +39,15 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
   - If **either** User 1 or User 2 is in `free` or `event` tier, the match is rendered for information only.
   - The Approve button is replaced with an `Info Only (Free/Event)` badge to prevent free users from consuming paid match workflows.
 - **Reject Action**: Sets status to `admin_rejected`. Preserves initiator quota.
+
+---
+
+## 3. Matchmaker Admin Role & Access Control
+- **Role Slug**: `matchmaker_admin` (Display Name: `Matchmaker Admin`).
+- **Capability**: `manage_matchmaker` (also assigned to `administrator`).
+- **Restricted wp-admin Access**:
+  - Matchmaker Admins only see and can only access matchmaking pages (`matchmaking-pool`, `matchmaking-matches`, `matchmaking-settings`, `matchmaking-logs`) and their own profile (`profile.php`).
+  - Standard WordPress core menus (`index.php`, `plugins.php`, `themes.php`, `users.php`, `tools.php`, `options-general.php`, `edit.php`, etc.) and third-party menus (PMPro, Elementor) are stripped via `restrict_admin_menus_for_matchmaker_admin()`.
+  - Direct navigation to `wp-admin/` or `index.php` automatically redirects to `admin_url('admin.php?page=matchmaking-pool')`.
+  - Login redirect (`AuthController::custom_role_based_login_redirect`) automatically sends Matchmaker Admins to the Pool Browser.
+
