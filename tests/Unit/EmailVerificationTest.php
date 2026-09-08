@@ -14,6 +14,7 @@ final class EmailVerificationTest extends TestCase
         $GLOBALS['__mm_usermeta'] = [];
         $GLOBALS['__mm_users'] = [];
         $GLOBALS['__mm_sent_mails'] = [];
+        EmailVerificationService::reset_in_memory_state();
     }
 
     public function test_admin_is_always_verified(): void

@@ -645,10 +645,10 @@ class AdminPortal
         $verify_from_name        = (string) get_option('mm_email_verify_from_name', '');
         $verify_subject          = (string) get_option('mm_email_verify_subject', __('Your Arab Zawaj Verification Code: {code}', 'matchmaker'));
         $default_verify_template = "<p>Assalamu Alaikum, {user_name}!</p>\n"
-            . "<p>Please use the 6-digit verification code below to verify your email address and access your Arab Zawaj matchmaking portal:</p>\n"
-            . "<div style=\"font-size: 32px; font-weight: 800; letter-spacing: 0.25em; padding: 14px 28px; background: #F8F2ED; border: 2px dashed #CC723F; border-radius: 10px; display: inline-block; margin: 15px 0; color: #1D1E20;\">{code}</div>\n"
-            . "<p>This code is valid for <strong>{expiry_hours} hours</strong>. If you did not request this verification, please disregard this email.</p>\n"
-            . "<p>Warm regards,<br>Arab Zawaj Matchmaking Team</p>";
+            . "<p>Thank you for joining {site_name}. To protect the integrity and security of our matrimony community, please enter the one-time verification code below to confirm your email address:</p>\n"
+            . "<div style=\"font-size: 36px; font-weight: 800; letter-spacing: 10px; padding: 18px 24px; background: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; display: inline-block; margin: 20px 0; color: #1D1E20; font-family: monospace;\">{code}</div>\n"
+            . "<p>⏱ This code is valid for <strong>{expiry_hours} hours</strong>. If you did not create an account on {site_name}, you can safely disregard this email.</p>\n"
+            . "<p>Warm regards,<br><strong>Arab Zawaj Matchmaking Team</strong></p>";
         $verify_template         = (string) get_option('mm_email_verify_template', $default_verify_template);
         $verify_expiry_hours     = (int) get_option('mm_email_verify_expiry_hours', 24);
         $verify_cooldown_seconds = (int) get_option('mm_email_verify_cooldown_seconds', 60);

@@ -51,6 +51,9 @@ When an approved match is available, the Matches tab renders an interactive 5-st
 - Triggered when **both** parties accept (`user_one_response = 'accepted'` AND `user_two_response = 'accepted'`).
 - Status automatically updates to `matched` and `contact_revealed = 1`.
 - Unlocks candidate full name, verified phone number, email address, and direct messaging link.
+- **CTAs**:
+  - `Back to Profile Dashboard →` (Navigates to the Profile tab).
+  - `Pause Subscription` (Direct dynamic link to PMPro membership account page `ProfileService::get_membership_account_url()` allowing users connecting with their match to cancel/pause recurring membership).
 
 ---
 

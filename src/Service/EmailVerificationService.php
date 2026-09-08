@@ -20,6 +20,14 @@ class EmailVerificationService
 {
     private static ?self $instance = null;
 
+    /**
+     * In-memory tracking of users who already had a code generated & sent in the current PHP request lifecycle.
+     * Prevents duplicate emails when multiple WordPress/PMPro hooks fire simultaneously on registration.
+     *
+     * @var array<int, int> [user_id => timestamp]
+     */
+    private static array $sent_in_request = [];
+
     public const CODE_EXPIRY_SECONDS     = 86400; // 24 hours (default fallback)
     public const RESEND_COOLDOWN_SECONDS = 60;    // 60 seconds (default fallback)
 
@@ -224,6 +232,16 @@ class EmailVerificationService
     }
 
     /**
+     * Reset in-memory request cache (useful for testing & long-running processes).
+     *
+     * @return void
+     */
+    public static function reset_in_memory_state(): void
+    {
+        self::$sent_in_request = [];
+    }
+
+    /**
      * Generate and dispatch a 6-digit numeric verification code to user email.
      *
      * @param int  $user_id
@@ -240,12 +258,14 @@ class EmailVerificationService
             ];
         }
 
+        $now            = time();
         $cooldown_limit = $this->get_cooldown_seconds();
         $expiry_limit   = $this->get_expiry_seconds();
 
         $last_sent = (int) get_user_meta($user_id, 'mm_verification_last_sent_at', true);
-        $time_diff = time() - $last_sent;
+        $time_diff = $now - $last_sent;
 
+        // 1. Cooldown check: if not forced (e.g. user clicking Resend) AND within cooldown, reject
         if (!$force && $last_sent > 0 && $time_diff < $cooldown_limit) {
             $remaining = $cooldown_limit - $time_diff;
             return [
@@ -253,6 +273,21 @@ class EmailVerificationService
                 'message'            => sprintf(__('Please wait %d seconds before requesting another code.', 'matchmaker'), $remaining),
                 'cooldown_remaining' => $remaining,
             ];
+        }
+
+        // 2. Forced hook deduplication: prevent duplicate emails if multiple hooks fire in the same request or < 15s apart
+        if ($force && (isset(self::$sent_in_request[$user_id]) || ($last_sent > 0 && $time_diff < 15))) {
+            $stored_code = (string) get_user_meta($user_id, 'mm_verification_code', true);
+            if (!empty($stored_code)) {
+                self::$sent_in_request[$user_id] = $now;
+                $user = get_userdata($user_id);
+                $user_email = $user ? $user->user_email : '';
+                return [
+                    'success'            => true,
+                    'message'            => sprintf(__('Verification code already sent to %s.', 'matchmaker'), esc_html($user_email)),
+                    'cooldown_remaining' => max(0, $cooldown_limit - $time_diff),
+                ];
+            }
         }
 
         $user = get_userdata($user_id);
@@ -316,6 +351,7 @@ class EmailVerificationService
                 );
 
                 update_user_meta($user_id, 'mm_verification_last_sent_at', $now);
+                self::$sent_in_request[$user_id] = $now;
 
                 return [
                     'success'            => true,
@@ -356,6 +392,7 @@ class EmailVerificationService
 
         // Only enforce resend cooldown upon confirmed dispatch
         update_user_meta($user_id, 'mm_verification_last_sent_at', $now);
+        self::$sent_in_request[$user_id] = $now;
 
         $repo->log_event(
             'email',
@@ -485,6 +522,7 @@ class EmailVerificationService
 
     /**
      * Wrap custom HTML body content inside standard responsive email outer shell.
+     * Uses 100% inline CSS and nested tables for universal rendering across Gmail, Outlook, Apple Mail, etc.
      *
      * @param string $body_inner
      * @return string
@@ -492,30 +530,79 @@ class EmailVerificationService
     private function wrap_email_layout(string $body_inner): string
     {
         return '<!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Arab Zawaj Verification Code</title>
+<!--[if mso]>
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #F8F2ED; margin: 0; padding: 30px 10px; color: #1D1E20; }
-.email-container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid rgba(204,114,63,0.15); }
-.email-header { background: #1D1E20; padding: 28px 24px; text-align: center; border-bottom: 3px solid #CC723F; }
-.email-header h1 { font-family: Georgia, serif; font-size: 22px; color: #ffffff; margin: 0; letter-spacing: 0.05em; }
-.email-body { padding: 36px 28px; text-align: center; font-size: 15px; line-height: 1.6; color: #4b5563; }
-.email-footer { background: #fdfbf9; padding: 18px 24px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; }
+body,table,td { font-family: Arial, Helvetica, sans-serif !important; }
+</style>
+<![endif]-->
+<style>
+body { margin: 0 !important; padding: 0 !important; -webkit-text-size-adjust: 100% !important; -ms-text-size-adjust: 100% !important; background-color: #F5EFEB !important; }
+table { border-collapse: collapse !important; mso-table-lspace: 0pt !important; mso-table-rspace: 0pt !important; }
+td { padding: 0; }
+img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+@media only screen and (max-width: 600px) {
+    .email-container-table { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
+    .email-body-td { padding: 28px 20px !important; }
+    .email-otp-box { font-size: 30px !important; letter-spacing: 8px !important; padding: 18px 12px !important; }
+    .email-header-td { padding: 28px 20px 22px !important; }
+}
 </style>
 </head>
-<body>
-<div class="email-container">
-    <div class="email-header">
-        <h1>ARAB ZAWAJ</h1>
-    </div>
-    <div class="email-body">
-        ' . $body_inner . '
-    </div>
-    <div class="email-footer">
-        &copy; ' . gmdate('Y') . ' Arab Zawaj. All rights reserved.
-    </div>
-</div>
+<body style="margin: 0; padding: 0; background-color: #F5EFEB; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif; color: #1D1E20;">
+<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#F5EFEB" style="background-color: #F5EFEB; width: 100%; margin: 0; padding: 35px 10px;">
+    <tr>
+        <td align="center">
+            <!-- Email Container (Max Width 580px) -->
+            <table role="presentation" class="email-container-table" width="580" border="0" cellspacing="0" cellpadding="0" bgcolor="#FFFFFF" style="max-width: 580px; width: 100%; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(29,30,32,0.08); border: 1px solid rgba(204,114,63,0.2);">
+                
+                <!-- Premium Brand Header -->
+                <tr>
+                    <td class="email-header-td" bgcolor="#1D1E20" align="center" style="background-color: #1D1E20; padding: 34px 30px 26px; border-bottom: 4px solid #CC723F; text-align: center;">
+                        <table role="presentation" border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 0 auto;">
+                            <tr>
+                                <td align="center" style="padding-bottom: 6px;">
+                                    <span style="display: inline-block; font-size: 18px; color: #CC723F; line-height: 1;">✦</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center">
+                                    <h1 style="font-family: \'Marcellus\', Georgia, \'Times New Roman\', serif; font-size: 24px; font-weight: 700; color: #FFFFFF; margin: 0; letter-spacing: 0.15em; text-transform: uppercase; line-height: 1.2;">ARAB ZAWAJ</h1>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center" style="padding-top: 6px;">
+                                    <span style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; font-size: 11px; font-weight: 600; color: #CC723F; letter-spacing: 0.22em; text-transform: uppercase;">PREMIUM MUSLIM MATCHMAKING</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- Email Body Content -->
+                <tr>
+                    <td class="email-body-td" style="padding: 38px 34px 30px; font-size: 15px; line-height: 1.65; color: #4B5563; text-align: left;">
+                        ' . $body_inner . '
+                    </td>
+                </tr>
+
+                <!-- Email Footer -->
+                <tr>
+                    <td bgcolor="#FDFBF9" align="center" style="background-color: #FDFBF9; padding: 24px 30px; border-top: 1px solid #F1ECE6; text-align: center;">
+                        <p style="font-family: Georgia, serif; font-style: italic; font-size: 13px; color: #8C532B; margin: 0 0 8px; line-height: 1.4;">Barakallahu Feekum &bull; May Allah bless your journey</p>
+                        <p style="font-size: 12px; color: #9CA3AF; margin: 0; line-height: 1.5;">&copy; ' . gmdate('Y') . ' Arab Zawaj Matrimony. All rights reserved.</p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
 </body>
 </html>';
     }
@@ -546,11 +633,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helve
             return $this->wrap_email_layout($body_content);
         }
 
-        $default_inner = '<p style="font-size: 17px; font-weight: 600; color: #1D1E20;">Assalamu Alaikum, ' . esc_html($display_name ?: 'Member') . '!</p>'
-            . '<p>Please use the 6-digit verification code below to verify your email address and access your Arab Zawaj matchmaking portal:</p>'
-            . '<div style="display: inline-block; background: #F8F2ED; border: 2px dashed #CC723F; border-radius: 12px; padding: 16px 36px; font-size: 32px; font-weight: 800; letter-spacing: 0.25em; color: #1D1E20; margin: 10px 0 24px;">' . esc_html($code) . '</div>'
-            . '<p style="font-size: 14px; color: #6b7280;">This code is valid for <strong>' . $expiry_hours . ' hours</strong>. If you did not request this email, please ignore it.</p>'
-            . '<p style="font-size: 13px; color: #9ca3af; margin-top: 20px;">Need assistance? Contact our support team directly.</p>';
+        $default_inner = '
+            <div style="margin-bottom: 22px;">
+                <h2 style="font-family: \'Marcellus\', Georgia, serif; font-size: 21px; font-weight: 700; color: #1D1E20; margin: 0 0 10px; line-height: 1.3;">Assalamu Alaikum, ' . esc_html($display_name ?: 'Member') . '!</h2>
+                <p style="margin: 0; font-size: 15px; color: #4B5563; line-height: 1.6;">Thank you for joining Arab Zawaj. To protect the integrity and security of our matrimony community, please enter the one-time verification code below to confirm your email address:</p>
+            </div>
+
+            <!-- OTP Code Card -->
+            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0 24px;">
+                <tr>
+                    <td align="center" bgcolor="#FAF5F0" style="background-color: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; padding: 24px 16px; text-align: center;">
+                        <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #8C532B; margin-bottom: 8px;">YOUR VERIFICATION CODE</div>
+                        <div class="email-otp-box" style="font-family: \'Courier New\', Courier, monospace; font-size: 38px; font-weight: 800; letter-spacing: 12px; color: #1D1E20; text-indent: 12px; margin: 4px 0 8px; line-height: 1;">' . esc_html($code) . '</div>
+                        <div style="font-size: 12px; color: #78716C; font-weight: 500;">⏱ Valid for <strong>' . $expiry_hours . ' hours</strong></div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Security Notice Box -->
+            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 0 0 24px;">
+                <tr>
+                    <td bgcolor="#FFFDFB" style="background-color: #FFFDFB; border-left: 3px solid #CC723F; border-radius: 0 8px 8px 0; padding: 14px 18px;">
+                        <p style="margin: 0; font-size: 13px; color: #6B7280; line-height: 1.5;"><strong>Security Reminder:</strong> Never share this 6-digit code with anyone. Arab Zawaj representatives will never ask for your verification code.</p>
+                    </td>
+                </tr>
+            </table>
+
+            <p style="margin: 0 0 24px; font-size: 14px; color: #6B7280; line-height: 1.6;">If you did not create an account on Arab Zawaj, you can safely disregard this email.</p>
+
+            <p style="margin: 0; font-size: 14px; color: #4B5563; line-height: 1.5;">Warm regards,<br><strong style="color: #1D1E20;">Arab Zawaj Matchmaking Team</strong></p>
+        ';
 
         return $this->wrap_email_layout($default_inner);
     }

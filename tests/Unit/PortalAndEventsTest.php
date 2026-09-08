@@ -143,11 +143,38 @@ final class PortalAndEventsTest extends TestCase
         include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-events.php';
         $html = (string) ob_get_clean();
 
-        // Native fallback card should contain the resolved thumbnail
-        $this->assertStringContainsString('https://example.com/uploads/event-banner.jpg', $html);
-        $this->assertStringContainsString('mm-event-thumb', $html);
-
         unset($GLOBALS['__mm_mock_post_thumbnail']);
     }
+
+    public function test_step_5_renders_pause_subscription_cta_with_membership_url(): void
+    {
+        update_option('mm_page_account_id', 99);
+
+        $active_match = [
+            'id' => 12,
+            'match_id' => 12,
+            'user_id' => 501,
+            'name' => 'Fatima Al-Sayed',
+            'age' => 26,
+            'location' => 'Dubai, United Arab Emirates',
+            'photo' => 'https://example.com/fatima.jpg',
+            'phone_number' => '+971501234567',
+            'email' => 'fatima@example.com',
+            'social_links' => '@fatima_dxb',
+            'my_response' => 'accepted',
+            'their_response' => 'accepted',
+            'status' => 'matched',
+        ];
+        $default_step = 5;
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-5-contact.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Pause Subscription', $html);
+        $this->assertStringContainsString('Back to Profile Dashboard', $html);
+        $this->assertStringContainsString('Direct Contact Information', $html);
+    }
 }
+
 

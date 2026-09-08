@@ -857,19 +857,42 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
-### Task 51: Fix Unknown column 'c.location' Database Error
+### Task 52: Improved Verification Email Design & Fix Duplicate Code Email Issue
 - **Objective**:
-  - Resolve `WordPress database error Unknown column 'c.location' in 'where clause' for query` occurring during manual matchmaking searches.
-- **Root Cause**:
-  - In DB schema v2.3.0 / v2.5.0, the `location` and `pref_location` columns in `wp_matchmaking_pool` were migrated to `country`, `state`, `city` and `pref_country`, `pref_state`, `pref_city`.
-  - `MatchRepository::get_manual_match_candidates()` still referenced `c.location` as a fallback column in its `WHERE` clauses.
+  - Redesign the verification code email template to feature a luxury, modern, responsive layout compatible across all email clients (Gmail, Apple Mail, Outlook) with inline CSS, bold OTP card, security callout, and brand header/footer.
+  - Investigate and resolve the issue where users received two emails with different verification codes simultaneously upon registration.
+- **Root Cause of Duplicate Code Emails**:
+  - `FreeRegHandler.php` called `wp_create_user()`, which automatically fired the WordPress core `user_register` action hook (triggering `EmailVerificationService::on_user_register` and sending Code #1).
+  - Immediately following `wp_create_user()`, `FreeRegHandler.php` invoked `generate_and_send_code($user_id, true)` explicitly, generating Code #2, overwriting Code #1, and triggering a second simultaneous email.
+  - Furthermore, on PMPro checkout both `user_register` and `pmpro_after_checkout` fired back-to-back with `$force = true` lacking in-flight deduplication.
 - **Implemented**:
-  - `src/Repository/MatchRepository.php`:
-    - Removed `c.location` from all `WHERE` clauses in `get_manual_match_candidates()`.
-    - Keyword location fallback (`f_location`) now safely evaluates `(c.country LIKE %s OR c.state LIKE %s OR c.city LIKE %s)`.
-  - `test-matching-diagnostic.php`:
-    - Updated diagnostic script queries to use `country`, `state`, `city`.
-  - Verified test suite: all 71 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+  - `src/Service/EmailVerificationService.php`:
+    - Added static in-memory request-level tracking `$sent_in_request` to eliminate duplicate email dispatches during the same PHP request lifecycle.
+    - Added near-instant hook deduplication check: if a forced dispatch request (`$force = true`) occurs within 15 seconds of a code already generated, it reuses the existing code without generating a new one or sending another email.
+    - Updated cooldown logic: on non-forced requests (e.g. user-initiated resend), cooldown check is strictly enforced with user-friendly countdown timer.
+    - Redesigned `wrap_email_layout()` and `get_email_html()` with 100% inline CSS and nested tables, dark luxury brand header (`#1D1E20`), gold/copper accents (`#CC723F`), styled OTP card with 38px monospace digits, security guidance callout box, and Islamic signoff ("Barakallahu Feekum").
+    - Added `reset_in_memory_state()` utility for testing and long-running processes.
+  - `src/Core/FreeRegHandler.php`:
+    - Verified registration relies solely on core `user_register` hook integration for clean single-code generation.
+  - `src/Admin/AdminPortal.php`:
+    - Updated `$default_verify_template` to match the enhanced layout structure with `{code}`, `{user_name}`, `{site_name}`, and `{expiry_hours}` placeholders.
+### Task 53: Add "Pause Subscription" CTA to 5th Stage of Match Steps
+- **Objective**:
+  - Add a dedicated "Pause Subscription" CTA button at the bottom of Stage 5 (Mutual Match Celebration & Contact Details Reveal) in the Member Portal, allowing matched members to navigate directly to their PMPro membership account page to pause/cancel recurring billing.
+- **Implemented**:
+  - `src/View/frontend/portal/steps/step-5-contact.php`:
+    - Added a responsive vertical action group containing:
+      1. Primary action: `Back to Profile Dashboard →` (`btn btn-primary`).
+      2. Pause CTA: `Pause Subscription` (`btn btn-outline-dark`) with a pause icon, dynamically resolving the PMPro account URL via `ProfileService::instance()->get_membership_account_url()`.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added unit test `test_step_5_renders_pause_subscription_cta_with_membership_url` confirming button presence, dynamic URL resolution, and proper rendering.
+  - `context/member_portal.md`:
+    - Updated State 5 documentation to reflect the new CTA and routing behavior.
+  - Verified test suite: all 72 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
 
 

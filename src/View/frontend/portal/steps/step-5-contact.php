@@ -81,8 +81,21 @@ if (!defined('ABSPATH')) {
             <strong>ⓘ <?php esc_html_e('Important Note:', 'matchmaker'); ?></strong> <?php esc_html_e('Our platform does not provide internal chat messaging. You can now contact each other directly using the information above. Please communicate respectfully.', 'matchmaker'); ?>
         </div>
 
-        <button type="button" class="btn btn-primary" style="width: 100%;" data-mm-action="switch-tab" data-tab="profile">
-            <?php esc_html_e('Back to Profile Dashboard →', 'matchmaker'); ?>
-        </button>
+        <div class="step-5-actions" style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+            <button type="button" class="btn btn-primary" style="width: 100%;" data-mm-action="switch-tab" data-tab="profile">
+                <?php esc_html_e('Back to Profile Dashboard →', 'matchmaker'); ?>
+            </button>
+
+            <?php
+            $account_url = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
+            ?>
+            <a href="<?php echo esc_url($account_url); ?>" class="btn btn-outline-dark" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+                <?php esc_html_e('Pause Subscription', 'matchmaker'); ?>
+            </a>
+        </div>
     </div>
 </div>
