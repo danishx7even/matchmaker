@@ -107,4 +107,59 @@ final class SettingsAndPlanMappingTest extends TestCase
         $sync->sync_all_membership_levels($user_id_2);
         $this->assertEquals('one_on_one', get_user_meta($user_id_2, 'user_type', true));
     }
+
+    public function test_pmpro_membership_cancellation_downgrades_user_type_to_free(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 703;
+
+        // User starts with Monthly membership
+        pmpro_changeMembershipLevel(3, $user_id);
+        $sync->sync_pmpro_level_to_user_type(3, $user_id, 2);
+        $this->assertEquals('monthly', get_user_meta($user_id, 'user_type', true));
+
+        // User cancels membership (level 0)
+        pmpro_changeMembershipLevel(0, $user_id);
+        $sync->sync_pmpro_level_to_user_type(0, $user_id, 3);
+
+        $this->assertEquals('free', get_user_meta($user_id, 'user_type', true));
+        $this->assertEquals('free', ProfileService::instance()->get_user_type($user_id));
+        $this->assertEquals('free', $sync->get_current_user_type($user_id));
+    }
+
+    public function test_pmpro_membership_downgrade_updates_user_type(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 704;
+
+        // User starts as 1-on-1 VIP
+        pmpro_changeMembershipLevel(4, $user_id);
+        $sync->sync_pmpro_level_to_user_type(4, $user_id, 2);
+        $this->assertEquals('one_on_one', get_user_meta($user_id, 'user_type', true));
+
+        // User changes plan to Event Single Pass (level 6)
+        pmpro_changeMembershipLevel(6, $user_id);
+        $sync->sync_pmpro_level_to_user_type(6, $user_id, 4);
+        $this->assertEquals('event', get_user_meta($user_id, 'user_type', true));
+        $this->assertEquals('event', ProfileService::instance()->get_user_type($user_id));
+    }
+
+    public function test_pmpro_expiry_sync_downgrades_to_free(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 705;
+
+        // User starts with monthly membership
+        pmpro_changeMembershipLevel(3, $user_id);
+        $sync->sync_pmpro_level_to_user_type(3, $user_id, 0);
+        $this->assertEquals('monthly', get_user_meta($user_id, 'user_type', true));
+
+        // Membership expires
+        pmpro_changeMembershipLevel(0, $user_id);
+        $sync->handle_expiry_sync($user_id, 3);
+
+        $this->assertEquals('free', get_user_meta($user_id, 'user_type', true));
+        $this->assertEquals('free', ProfileService::instance()->get_user_type($user_id));
+    }
 }
+

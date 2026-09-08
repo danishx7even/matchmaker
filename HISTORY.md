@@ -776,3 +776,26 @@ This document maintains a chronological, step-by-step history of all features, a
     - Added `test_ajax_hooks_are_registered` confirming all verification and resend AJAX hooks are active.
   - Verified test suite: all 65 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
 
+---
+
+### Task 47: Fix User Type Synchronization on PMPro Membership Cancellation & Modification
+- **Objective**:
+  - Resolve issue where cancelling or modifying a PMPro membership level (e.g. cancelling Monthly for a user) left the member stuck as `monthly` in both `wp_usermeta` and `wp_matchmaking_pool`.
+- **Root Cause**:
+  - `PMProSync::get_current_user_type()` was falling back to stale `usermeta` `user_type` (`monthly`) when PMPro reported 0 active levels upon cancellation. Furthermore, `sync_pmpro_level_to_user_type()` only updated `resolved_user_type` when the new level rank was strictly greater than the old rank, preventing any downgrade or cancellation to `free`.
+- **Implemented**:
+  - `src/Core/PMProSync.php`:
+    - Refactored `get_current_user_type()`: When PMPro functions are available and report no active levels (or level ID is 0), it returns `'free'`. The `usermeta` fallback is only used if PMPro functions are completely absent from the environment.
+    - Updated `sync_pmpro_level_to_user_type()` to accept flexible parameter types (`mixed $level_id`, `int $user_id`, `mixed $old_level_id = null`) and properly downgrade `user_type` to `'free'` or the new lower tier in both `wp_usermeta` and `wp_matchmaking_pool`.
+    - Added `pmpro_membership_post_membership_expiry` action hook via `handle_expiry_sync()`.
+  - `src/Service/ProfileService.php`:
+    - Updated `get_user_type()` to delegate directly to `PMProSync::instance()->get_current_user_type()` with self-healing synchronization for `usermeta` and `wp_matchmaking_pool`.
+  - `src/Admin/AdminPortal.php`:
+    - Updated `render_single_user_view()` to self-heal and sync `user_type` if PMPro membership state has changed.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_pmpro_membership_cancellation_downgrades_user_type_to_free`.
+    - Added `test_pmpro_membership_downgrade_updates_user_type`.
+    - Added `test_pmpro_expiry_sync_downgrades_to_free`.
+  - Verified test suite: all 68 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+

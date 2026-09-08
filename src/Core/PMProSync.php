@@ -56,6 +56,7 @@ class PMProSync {
         add_action('pmpro_after_all_membership_level_changes', [$this, 'sync_all_membership_levels'], 10, 1);
         add_action('pmpro_after_checkout', [$this, 'handle_checkout_sync'], 10, 2);
         add_action('pmpro_subscription_payment_completed', [$this, 'reset_user_quota_on_renewal'], 10, 1);
+        add_action('pmpro_membership_post_membership_expiry', [$this, 'handle_expiry_sync'], 10, 2);
     }
 
     /**
@@ -139,28 +140,36 @@ class PMProSync {
     /**
      * Syncs PMPro level changes to our system.
      *
-     * @param int $level_id
-     * @param int $user_id
-     * @param int|null $old_level_id
+     * @param mixed $level_id
+     * @param int   $user_id
+     * @param mixed $old_level_id
      */
-    public function sync_pmpro_level_to_user_type(int $level_id, int $user_id, ?int $old_level_id): void
+    public function sync_pmpro_level_to_user_type(mixed $level_id, int $user_id, mixed $old_level_id = null): void
     {
         if ($user_id <= 0) {
             return;
         }
 
-        $new_tier = $this->get_user_type_by_level_id($level_id);
+        $int_level_id = is_numeric($level_id) ? (int) $level_id : 0;
 
-        // If user upgraded to a paid tier, cancel any lingering Free tier level from separate PMPro level groups
-        if (in_array($new_tier, ['monthly', 'one_on_one', 'event'], true)) {
-            $this->maybe_cancel_free_levels($user_id);
+        // If user changed/upgraded to a paid tier, cancel any lingering Free tier level from separate PMPro level groups
+        if ($int_level_id > 0) {
+            $new_tier = $this->get_user_type_by_level_id($int_level_id);
+            if (in_array($new_tier, ['monthly', 'one_on_one', 'event'], true)) {
+                $this->maybe_cancel_free_levels($user_id);
+            }
         }
 
         $resolved_user_type = $this->get_current_user_type($user_id);
-        $new_rank = self::TIER_PRIORITY[$new_tier] ?? 1;
-        $resolved_rank = self::TIER_PRIORITY[$resolved_user_type] ?? 1;
-        if ($new_rank > $resolved_rank) {
-            $resolved_user_type = $new_tier;
+
+        // If a specific level > 0 was passed and PMPro internal cache hasn't flushed yet
+        if ($int_level_id > 0) {
+            $direct_tier = $this->get_user_type_by_level_id($int_level_id);
+            $direct_rank = self::TIER_PRIORITY[$direct_tier] ?? 1;
+            $resolved_rank = self::TIER_PRIORITY[$resolved_user_type] ?? 1;
+            if ($direct_rank > $resolved_rank) {
+                $resolved_user_type = $direct_tier;
+            }
         }
         
         \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
@@ -240,6 +249,22 @@ class PMProSync {
     }
 
     /**
+     * Hook on PMPro membership post membership expiry.
+     *
+     * @param int   $user_id
+     * @param mixed $membership_id
+     * @return void
+     */
+    public function handle_expiry_sync(int $user_id, mixed $membership_id = null): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $this->sync_all_membership_levels($user_id);
+    }
+
+    /**
      * Cancels any active Free tier levels for a user if they hold a paid tier.
      *
      * @param int $user_id
@@ -281,6 +306,8 @@ class PMProSync {
             return 'free';
         }
 
+        $pmpro_available = function_exists('pmpro_getMembershipLevelsForUser') || function_exists('pmpro_getMembershipLevelForUser');
+
         // 1. Check all active membership levels for user (supporting PMPro multiple level groups)
         if (function_exists('pmpro_getMembershipLevelsForUser')) {
             $levels = pmpro_getMembershipLevelsForUser($user_id);
@@ -309,12 +336,17 @@ class PMProSync {
         // 2. Fallback to single level getter
         if (function_exists('pmpro_getMembershipLevelForUser')) {
             $membership = pmpro_getMembershipLevelForUser($user_id);
-            if (!empty($membership->id)) {
+            if (is_object($membership) && !empty($membership->id)) {
                 return $this->get_user_type_by_level_id((int) $membership->id);
             }
         }
 
-        // 3. Fallback to usermeta
+        // If PMPro functions are present and reported no active levels, the user has no active tier -> 'free'
+        if ($pmpro_available) {
+            return 'free';
+        }
+
+        // 3. Fallback to usermeta ONLY if PMPro functions are not loaded in the runtime
         $meta_type = (string) get_user_meta($user_id, 'user_type', true);
         return !empty($meta_type) ? $meta_type : 'free';
     }

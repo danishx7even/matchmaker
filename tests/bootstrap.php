@@ -574,25 +574,28 @@ function pmpro_getAllLevels($include_hidden = false, $force = false) {
 
 function pmpro_getMembershipLevelForUser(int $user_id) {
     if (isset($GLOBALS['__mm_user_pmpro_level'][$user_id])) {
-        $lvl_id = $GLOBALS['__mm_user_pmpro_level'][$user_id];
-        return new FakePMProLevel($lvl_id, 'Level ' . $lvl_id);
+        $lvl_id = (int) $GLOBALS['__mm_user_pmpro_level'][$user_id];
+        return $lvl_id > 0 ? new FakePMProLevel($lvl_id, 'Level ' . $lvl_id) : null;
     }
     if (isset($GLOBALS['__mm_pmpro_levels'][$user_id])) {
         return $GLOBALS['__mm_pmpro_levels'][$user_id];
     }
-    $user_type = get_user_meta($user_id, 'user_type', true);
-    if ($user_type === 'monthly') return new FakePMProLevel(3, 'Monthly Matchmaking');
-    if ($user_type === 'one_on_one') return new FakePMProLevel(4, '1-on-1 VIP Matchmaking');
-    if ($user_type === 'event') return new FakePMProLevel(6, 'Event Single Pass');
+    if (isset($GLOBALS['__mm_user_pmpro_levels'][$user_id])) {
+        $levels = $GLOBALS['__mm_user_pmpro_levels'][$user_id];
+        return !empty($levels) ? reset($levels) : null;
+    }
     return null;
 }
 
 function pmpro_changeMembershipLevel($level_id, $user_id) {
-    $GLOBALS['__mm_user_pmpro_level'][(int)$user_id] = (int)$level_id;
-    if (!isset($GLOBALS['__mm_user_pmpro_levels'][(int)$user_id])) {
-        $GLOBALS['__mm_user_pmpro_levels'][(int)$user_id] = [];
+    $lid = (int) $level_id;
+    $uid = (int) $user_id;
+    $GLOBALS['__mm_user_pmpro_level'][$uid] = $lid;
+    if ($lid === 0) {
+        $GLOBALS['__mm_user_pmpro_levels'][$uid] = [];
+    } else {
+        $GLOBALS['__mm_user_pmpro_levels'][$uid] = [new FakePMProLevel($lid, 'Level ' . $lid)];
     }
-    $GLOBALS['__mm_user_pmpro_levels'][(int)$user_id][] = new FakePMProLevel((int)$level_id, 'Level ' . $level_id);
     return true;
 }
 
@@ -601,8 +604,8 @@ function pmpro_getMembershipLevelsForUser(int $user_id) {
         return $GLOBALS['__mm_user_pmpro_levels'][$user_id];
     }
     if (isset($GLOBALS['__mm_user_pmpro_level'][$user_id])) {
-        $lvl_id = $GLOBALS['__mm_user_pmpro_level'][$user_id];
-        return [new FakePMProLevel($lvl_id, 'Level ' . $lvl_id)];
+        $lvl_id = (int) $GLOBALS['__mm_user_pmpro_level'][$user_id];
+        return $lvl_id > 0 ? [new FakePMProLevel($lvl_id, 'Level ' . $lvl_id)] : [];
     }
     $single = pmpro_getMembershipLevelForUser($user_id);
     return $single ? [$single] : [];

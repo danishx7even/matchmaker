@@ -426,6 +426,13 @@ class AdminPortal
             return;
         }
 
+        $current_tier = \Matchmaker\Core\PMProSync::instance()->get_current_user_type($user_id);
+        if (($pool['user_type'] ?? '') !== $current_tier) {
+            $pool['user_type'] = $current_tier;
+            $repo->save_meta($user_id, 'user_type', $current_tier);
+            $repo->update_pool_user_type($user_id, $current_tier);
+        }
+
         $age          = $repo->calc_age($pool['birth_date'] ?? '');
         $height       = $repo->cm_to_feet((int) ($pool['height_cm'] ?? 0));
         $quota_used   = (int) get_user_meta($user_id, 'cycle_matches_count', true);
