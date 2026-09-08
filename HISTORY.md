@@ -798,4 +798,20 @@ This document maintains a chronological, step-by-step history of all features, a
     - Added `test_pmpro_expiry_sync_downgrades_to_free`.
   - Verified test suite: all 68 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
 
+---
+
+### Task 48: Full Country Options in Citizenship and Preferred Citizenship
+- **Objective**:
+  - Show the comprehensive country dataset (all 240+ countries from `hierarchy_names.json`) in the Step 1 `user_citizenship` dropdown and Step 2 `pref_citizenship` multiselect dropdown.
+  - Maintain `'Select citizenship'` as placeholder for user citizenship and keep `'Any Citizenship'` intact as the primary option for preferred citizenship.
+  - Ensure citizenship selection remains completely independent with zero side-effects on state and city dropdowns.
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `options_citizenship()` to dynamically pull the full country list from `options_country()` and replace `'Select country'` with `'Select citizenship'`.
+    - Updated `options_pref_citizenship()` to include the full country list with `'Any Citizenship'` as the leading option.
+  - `tests/Unit/LocationCascadeTest.php`:
+    - Added `test_citizenship_and_pref_citizenship_contain_full_country_list` asserting that both citizenship and preferred citizenship dropdowns contain all 240+ countries with correct leading placeholders.
+  - Verified test suite: all 69 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+
 

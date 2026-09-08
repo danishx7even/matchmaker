@@ -78,4 +78,26 @@ final class LocationCascadeTest extends TestCase
         $this->assertStringContainsString('is-readonly', $html);
         $this->assertStringContainsString('user@example.com', $html);
     }
+
+    public function test_citizenship_and_pref_citizenship_contain_full_country_list(): void
+    {
+        $fg = FieldGenerator::instance();
+
+        $citizenships = $fg->options_citizenship();
+        $this->assertEquals('Select citizenship', $citizenships[0]);
+        $this->assertContains('Saudi Arabia', $citizenships);
+        $this->assertContains('United States', $citizenships);
+        $this->assertContains('Morocco', $citizenships);
+        $this->assertContains('Pakistan', $citizenships);
+        $this->assertGreaterThan(200, count($citizenships));
+
+        $pref_citizenships = $fg->options_pref_citizenship();
+        $this->assertEquals('Any Citizenship', $pref_citizenships[0]);
+        $this->assertContains('Saudi Arabia', $pref_citizenships);
+        $this->assertContains('United States', $pref_citizenships);
+        $this->assertContains('Morocco', $pref_citizenships);
+        $this->assertContains('Pakistan', $pref_citizenships);
+        $this->assertGreaterThan(200, count($pref_citizenships));
+    }
 }
+

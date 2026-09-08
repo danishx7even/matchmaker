@@ -188,11 +188,18 @@ class FieldGenerator {
     public function options_location(): array { return $this->options_country(); }
     
     /**
-     * Get citizenship options
+     * Get citizenship options (full country list from hierarchy dataset)
      *
      * @return array
      */
-    public function options_citizenship(): array { return ['Select citizenship', 'Saudi Arabia', 'United Arab Emirates', 'Qatar', 'Kuwait', 'Bahrain', 'Oman', 'Jordan', 'Lebanon', 'Egypt', 'Iraq', 'Syria', 'Palestine', 'Yemen', 'United States', 'Canada', 'United Kingdom', 'Australia', 'Pakistan', 'India', 'Bangladesh', 'Other']; }
+    public function options_citizenship(): array
+    {
+        $countries = $this->options_country();
+        if (!empty($countries) && $countries[0] === 'Select country') {
+            $countries[0] = 'Select citizenship';
+        }
+        return $countries;
+    }
     
     /**
      * Get preferred citizenship options (with Any Citizenship as first option)
