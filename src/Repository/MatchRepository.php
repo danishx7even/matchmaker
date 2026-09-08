@@ -477,8 +477,61 @@ class MatchRepository
         $args[]    = $f_age_min;
         $args[]    = $f_age_max;
 
-        // 3. Pool Profile Text Criteria (Location, Religion, Modesty, Origin)
-        foreach (['f_location' => 'location', 'f_religion' => 'religion', 'f_modesty' => 'modesty', 'f_origin' => 'origin'] as $filter_key => $col) {
+        // 3. Country / State / City Location Filters
+        if (!empty($filters['f_country']) && !in_array(strtolower(trim($filters['f_country'])), ['any', 'any country', 'select country', ''], true)) {
+            $c_val = trim((string)$filters['f_country']);
+            $like = '%' . $wpdb->esc_like(strtolower($c_val)) . '%';
+            $where[] = "(c.country = %s OR LOWER(c.country) LIKE %s OR (c.location IS NOT NULL AND LOWER(c.location) LIKE %s) OR FIND_IN_SET(LOWER(c.country), REPLACE(LOWER(%s), ', ', ',')) > 0)";
+            $args[]  = $c_val;
+            $args[]  = $like;
+            $args[]  = $like;
+            $args[]  = $c_val;
+        }
+
+        if (!empty($filters['f_state']) && !in_array(strtolower(trim($filters['f_state'])), ['any', 'any state', 'select state', ''], true)) {
+            $s_val = trim((string)$filters['f_state']);
+            $like = '%' . $wpdb->esc_like(strtolower($s_val)) . '%';
+            $where[] = "(c.state = %s OR LOWER(c.state) LIKE %s OR (c.location IS NOT NULL AND LOWER(c.location) LIKE %s))";
+            $args[]  = $s_val;
+            $args[]  = $like;
+            $args[]  = $like;
+        }
+
+        if (!empty($filters['f_city']) && !in_array(strtolower(trim($filters['f_city'])), ['any', 'any city', 'select city', ''], true)) {
+            $city_val = trim((string)$filters['f_city']);
+            $like = '%' . $wpdb->esc_like(strtolower($city_val)) . '%';
+            $where[] = "(c.city = %s OR LOWER(c.city) LIKE %s OR (c.location IS NOT NULL AND LOWER(c.location) LIKE %s))";
+            $args[]  = $city_val;
+            $args[]  = $like;
+            $args[]  = $like;
+        }
+
+        // 3b. General location filter fallback (f_location)
+        if (!empty($filters['f_location']) && strtolower(trim($filters['f_location'])) !== 'any') {
+            $loc_val = trim((string)$filters['f_location']);
+            $like = '%' . $wpdb->esc_like(strtolower($loc_val)) . '%';
+            $where[] = "((c.location IS NOT NULL AND LOWER(c.location) LIKE %s) OR (c.country IS NOT NULL AND LOWER(c.country) LIKE %s) OR (c.city IS NOT NULL AND LOWER(c.city) LIKE %s))";
+            $args[]  = $like;
+            $args[]  = $like;
+            $args[]  = $like;
+        }
+
+        // 3c. Citizenship Filter (f_citizenship)
+        if (!empty($filters['f_citizenship']) && !in_array(strtolower(trim($filters['f_citizenship'])), ['any', 'any citizenship', 'select citizenship', ''], true)) {
+            $cit_val = trim((string)$filters['f_citizenship']);
+            $like = '%' . $wpdb->esc_like(strtolower($cit_val)) . '%';
+            $where[] = "EXISTS (
+                SELECT 1 FROM {$usermeta_table} um_cit 
+                WHERE um_cit.user_id = c.user_id 
+                  AND um_cit.meta_key = 'user_citizenship' 
+                  AND (LOWER(um_cit.meta_value) = %s OR LOWER(um_cit.meta_value) LIKE %s)
+            )";
+            $args[]  = strtolower($cit_val);
+            $args[]  = $like;
+        }
+
+        // 3d. Pool Profile Text Criteria (Religion, Modesty, Origin)
+        foreach (['f_religion' => 'religion', 'f_modesty' => 'modesty', 'f_origin' => 'origin'] as $filter_key => $col) {
             if (!empty($filters[$filter_key]) && strtolower($filters[$filter_key]) !== 'any') {
                 $val = trim((string)$filters[$filter_key]);
                 $like = '%' . $wpdb->esc_like(strtolower($val)) . '%';
@@ -515,6 +568,15 @@ class MatchRepository
         $scoring_profile = $pool;
         if (!empty($filters['f_gender']) && strtolower($filters['f_gender']) !== 'any') {
             $scoring_profile['pref_gender'] = $filters['f_gender'];
+        }
+        if (!empty($filters['f_country']) && !in_array(strtolower(trim($filters['f_country'])), ['any', 'any country', 'select country', ''], true)) {
+            $scoring_profile['pref_country'] = $filters['f_country'];
+        }
+        if (!empty($filters['f_state']) && !in_array(strtolower(trim($filters['f_state'])), ['any', 'any state', 'select state', ''], true)) {
+            $scoring_profile['pref_state'] = $filters['f_state'];
+        }
+        if (!empty($filters['f_city']) && !in_array(strtolower(trim($filters['f_city'])), ['any', 'any city', 'select city', ''], true)) {
+            $scoring_profile['pref_city'] = $filters['f_city'];
         }
         if (!empty($filters['f_location']) && strtolower($filters['f_location']) !== 'any') {
             $scoring_profile['pref_location'] = $filters['f_location'];

@@ -140,4 +140,49 @@ final class MatchingEngineTest extends TestCase
         $this->assertContains('Pakistan', $countries);
         $this->assertContains('Saudi Arabia', $countries);
     }
+
+    public function test_matching_engine_sql_query_evaluates_country_state_city_gates(): void
+    {
+        global $wpdb;
+        $wpdb->queries = [];
+
+        $engine = MatchingEngine::instance();
+        
+        $user = [
+            'user_id'            => 10,
+            'gender'             => 'male',
+            'pref_gender'        => 'female',
+            'birth_date'         => '1992-05-15',
+            'preferred_age_min'  => 20,
+            'preferred_age_max'  => 35,
+            'country'            => 'Saudi Arabia',
+            'pref_country'       => 'Saudi Arabia',
+            'state'              => 'Riyadh Region',
+            'pref_state'         => 'Riyadh Region',
+            'city'               => 'Riyadh',
+            'pref_city'          => 'Riyadh',
+            'religion'           => 'Muslim',
+            'pref_religion'      => 'Muslim',
+            'modesty'            => 'Hijab',
+            'pref_modesty'       => 'Hijab',
+            'user_type'          => 'monthly',
+        ];
+
+        // Set mock pool return for get_user_pool
+        $wpdb->mock_results = [];
+
+        // Reflection to call private query_candidates
+        $ref = new \ReflectionClass($engine);
+        $method = $ref->getMethod('query_candidates');
+        $method->setAccessible(true);
+        $candidates = $method->invoke($engine, $user, 32);
+
+        $queries_str = implode("\n", $wpdb->queries);
+        $this->assertStringContainsString('c.pref_country', $queries_str);
+        $this->assertStringContainsString('c.pref_state', $queries_str);
+        $this->assertStringContainsString('c.pref_city', $queries_str);
+        $this->assertStringContainsString('c.country', $queries_str);
+        $this->assertStringContainsString('c.state', $queries_str);
+        $this->assertStringContainsString('c.city', $queries_str);
+    }
 }

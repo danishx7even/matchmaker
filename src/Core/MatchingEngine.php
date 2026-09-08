@@ -440,6 +440,34 @@ class MatchingEngine {
                    OR (%s != '' AND %s LIKE CONCAT('%%', c.country, '%%'))
                )
 
+               -- State bi-directional gate (if specified)
+               AND (
+                   c.pref_state IS NULL OR c.pref_state = '' OR LOWER(TRIM(c.pref_state)) = 'any' OR LOWER(TRIM(c.pref_state)) = 'any state'
+                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any state'
+                   OR FIND_IN_SET(%s, REPLACE(c.pref_state, ', ', ',')) > 0
+                   OR LOWER(c.pref_state) LIKE CONCAT('%%', %s, '%%')
+               )
+               AND (
+                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any state'
+                   OR c.state IS NULL OR c.state = ''
+                   OR FIND_IN_SET(c.state, REPLACE(%s, ', ', ',')) > 0
+                   OR (%s != '' AND %s LIKE CONCAT('%%', c.state, '%%'))
+               )
+
+               -- City bi-directional gate (if specified)
+               AND (
+                   c.pref_city IS NULL OR c.pref_city = '' OR LOWER(TRIM(c.pref_city)) = 'any' OR LOWER(TRIM(c.pref_city)) = 'any city'
+                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any city'
+                   OR FIND_IN_SET(%s, REPLACE(c.pref_city, ', ', ',')) > 0
+                   OR LOWER(c.pref_city) LIKE CONCAT('%%', %s, '%%')
+               )
+               AND (
+                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any city'
+                   OR c.city IS NULL OR c.city = ''
+                   OR FIND_IN_SET(c.city, REPLACE(%s, ', ', ',')) > 0
+                   OR (%s != '' AND %s LIKE CONCAT('%%', c.city, '%%'))
+               )
+
                -- Religion bi-directional gate
                AND (
                    c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) = 'any' OR LOWER(TRIM(c.pref_religion)) = 'no preference' OR LOWER(TRIM(c.pref_religion)) = 'prefer not to say'
@@ -493,6 +521,12 @@ class MatchingEngine {
             // Country
             $user_country, $user_country, $user_country, $user_country, strtolower($user_country),
             $pref_country, $pref_country, $pref_country, $pref_country, strtolower($pref_country),
+            // State
+            $user_state, $user_state, $user_state, $user_state, strtolower($user_state),
+            $pref_state, $pref_state, $pref_state, $pref_state, strtolower($pref_state),
+            // City
+            $user_city, $user_city, $user_city, $user_city, strtolower($user_city),
+            $pref_city, $pref_city, $pref_city, $pref_city, strtolower($pref_city),
             // Religion
             $user_religion, $user_religion, $user_religion, $user_religion, strtolower($user_religion),
             $pref_religion, $pref_religion, $pref_religion, $pref_religion, strtolower($pref_religion),

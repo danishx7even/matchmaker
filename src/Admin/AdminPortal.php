@@ -476,22 +476,30 @@ class AdminPortal
             $pref_g = ($user_g === 'male') ? 'female' : (($user_g === 'female') ? 'male' : 'any');
         }
 
-        $f_gender   = sanitize_text_field(wp_unslash($_GET['f_gender']   ?? $pref_g));
-        $f_age_min  = isset($_GET['f_age_min'])  ? (int) $_GET['f_age_min']  : (int) ($pool['preferred_age_min'] ?? 18);
-        $f_age_max  = isset($_GET['f_age_max'])  ? (int) $_GET['f_age_max']  : (int) ($pool['preferred_age_max'] ?? 80);
-        $f_location = sanitize_text_field(wp_unslash($_GET['f_location'] ?? $pool['pref_location'] ?? ''));
-        $f_origin   = sanitize_text_field(wp_unslash($_GET['f_origin']   ?? $pool['pref_origin'] ?? ''));
-        $f_religion = sanitize_text_field(wp_unslash($_GET['f_religion'] ?? $pool['pref_religion'] ?? ''));
-        $f_modesty  = sanitize_text_field(wp_unslash($_GET['f_modesty']  ?? $pool['pref_modesty'] ?? ''));
+        $f_gender      = sanitize_text_field(wp_unslash($_GET['f_gender']      ?? $pref_g));
+        $f_age_min     = isset($_GET['f_age_min'])     ? (int) $_GET['f_age_min']     : (int) ($pool['preferred_age_min'] ?? 18);
+        $f_age_max     = isset($_GET['f_age_max'])     ? (int) $_GET['f_age_max']     : (int) ($pool['preferred_age_max'] ?? 80);
+        $f_country     = sanitize_text_field(wp_unslash($_GET['f_country']     ?? $pool['pref_country'] ?? ''));
+        $f_state       = sanitize_text_field(wp_unslash($_GET['f_state']       ?? $pool['pref_state'] ?? ''));
+        $f_city        = sanitize_text_field(wp_unslash($_GET['f_city']        ?? $pool['pref_city'] ?? ''));
+        $f_citizenship = sanitize_text_field(wp_unslash($_GET['f_citizenship'] ?? $meta['pref_citizenship'] ?? ''));
+        $f_location    = sanitize_text_field(wp_unslash($_GET['f_location']    ?? $pool['pref_location'] ?? ''));
+        $f_origin      = sanitize_text_field(wp_unslash($_GET['f_origin']      ?? $pool['pref_origin'] ?? ''));
+        $f_religion    = sanitize_text_field(wp_unslash($_GET['f_religion']    ?? $pool['pref_religion'] ?? ''));
+        $f_modesty     = sanitize_text_field(wp_unslash($_GET['f_modesty']     ?? $pool['pref_modesty'] ?? ''));
 
         $filters = [
-            'f_gender'   => $f_gender,
-            'f_age_min'  => $f_age_min,
-            'f_age_max'  => $f_age_max,
-            'f_location' => $f_location,
-            'f_origin'   => $f_origin,
-            'f_religion' => $f_religion,
-            'f_modesty'  => $f_modesty,
+            'f_gender'      => $f_gender,
+            'f_age_min'     => $f_age_min,
+            'f_age_max'     => $f_age_max,
+            'f_country'     => $f_country,
+            'f_state'       => $f_state,
+            'f_city'        => $f_city,
+            'f_citizenship' => $f_citizenship,
+            'f_location'    => $f_location,
+            'f_origin'      => $f_origin,
+            'f_religion'    => $f_religion,
+            'f_modesty'     => $f_modesty,
         ];
 
         $candidates = $repo->get_manual_match_candidates($user_id, $pool, $filters);

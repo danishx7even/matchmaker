@@ -831,6 +831,31 @@ This document maintains a chronological, step-by-step history of all features, a
     - Added `test_search_matches_query_generation` verifying query structure and filter parameters.
   - Verified test suite: all 70 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
 
+---
+
+### Task 50: Manual Matchmaker Location Filters & Matching Engine Verification
+- **Objective**:
+  - Add Country, State, and City filters (with hierarchy dataset options & dynamic cascading JavaScript) as well as Citizenship filter to the Admin Manual Matchmaking tool.
+  - Audit and verify how Country, State, City, and Citizenship participate in the automated matching engine (`MatchingEngine.php` SQL bi-directional hard gates and `MatchService.php` 6-point flexible scoring).
+  - Update `context/matching_engine.md` with complete, crystal-clear architectural documentation explaining the matching feature end-to-end.
+- **Implemented**:
+  - `src/Admin/AdminPortal.php`:
+    - Updated `render_manual_match_view(int $user_id)` to extract `f_country`, `f_state`, `f_city`, and `f_citizenship` from `$_GET` with smart fallbacks from the target user's pool profile (`pref_country`, `pref_state`, `pref_city`, `pref_citizenship`), passing them into `$filters`.
+  - `src/View/admin/pool/manual-match.php`:
+    - Added Country (`f_country`), State / Region (`f_state`), City (`f_city`), and Citizenship (`f_citizenship`) select dropdowns populated with full datasets from `FieldGenerator`.
+    - Integrated dynamic cascading JavaScript so selecting a Country automatically populates corresponding States, and selecting a State populates Cities.
+    - Updated Candidate Results Table with dedicated columns for `Country / City`, `Citizenship / Origin`, and `Religion / Modesty`.
+  - `src/Repository/MatchRepository.php`:
+    - Enhanced `get_manual_match_candidates()` to evaluate `f_country`, `f_state`, `f_city`, `f_citizenship`, and `f_location` in SQL where clauses and forward them into the `$scoring_profile`.
+  - `src/Core/MatchingEngine.php`:
+    - Verified and wired bi-directional SQL hard gates for `country` / `pref_country`, `state` / `pref_state`, and `city` / `pref_city` with full `'Any Country'`, `'Any State'`, `'Any City'`, and wildcard/fallback support.
+  - `context/matching_engine.md`:
+    - Completely rewritten and expanded with comprehensive documentation covering triggers, Action Scheduler async processing, Phase 1 bi-directional SQL hard gates, Phase 2 6-point flexible scoring, limits, billing quota rules, manual matchmaker comparison, and database index mapping.
+  - `tests/Unit/ManualMatchmakerTest.php` & `tests/Unit/MatchingEngineTest.php`:
+    - Added tests asserting Country, State, City, and Citizenship filters in manual matchmaking and Matching Engine SQL candidate queries.
+  - Verified test suite: all 71 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+
+
 
 
 

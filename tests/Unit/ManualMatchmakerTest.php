@@ -44,13 +44,17 @@ class ManualMatchmakerTest
         ];
 
         $filters = [
-            'f_gender'    => 'female',
-            'f_age_min'   => 20,
-            'f_age_max'   => 35,
-            'f_location'  => 'Riyadh',
-            'f_origin'    => 'Arab',
-            'f_religion'  => 'Muslim',
-            'f_modesty'   => 'Hijab',
+            'f_gender'      => 'female',
+            'f_age_min'     => 20,
+            'f_age_max'     => 35,
+            'f_country'     => 'Saudi Arabia',
+            'f_state'       => 'Riyadh Region',
+            'f_city'        => 'Riyadh',
+            'f_citizenship' => 'Saudi Arabia',
+            'f_location'    => '',
+            'f_origin'      => 'Arab',
+            'f_religion'    => 'Muslim',
+            'f_modesty'     => 'Hijab',
         ];
 
         // Mock two candidates: Candidate A (high match) and Candidate B (lower match)
@@ -58,11 +62,15 @@ class ManualMatchmakerTest
             'user_id'      => 21,
             'gender'       => 'female',
             'birth_date'   => '1995-05-10',
+            'country'      => 'Saudi Arabia',
+            'state'        => 'Riyadh Region',
+            'city'         => 'Riyadh',
             'location'     => 'Riyadh',
             'origin'       => 'Arab',
             'religion'     => 'Muslim',
             'modesty'      => 'Hijab',
             'pref_gender'  => 'male',
+            'pref_country' => 'Saudi Arabia',
             'pref_location'=> 'Riyadh',
             'pref_origin'  => 'Arab',
             'pref_religion'=> 'Muslim',
@@ -76,11 +84,15 @@ class ManualMatchmakerTest
             'user_id'      => 22,
             'gender'       => 'female',
             'birth_date'   => '1998-02-15',
-            'location'     => 'Riyadh',
+            'country'      => 'Saudi Arabia',
+            'state'        => 'Makkah Region',
+            'city'         => 'Jeddah',
+            'location'     => 'Jeddah',
             'origin'       => 'Other',
             'religion'     => 'Muslim',
             'modesty'      => 'Modest',
             'pref_gender'  => 'male',
+            'pref_country' => 'Any',
             'pref_location'=> 'Any',
             'pref_origin'  => 'Any',
             'pref_religion'=> 'Muslim',
@@ -97,14 +109,12 @@ class ManualMatchmakerTest
 
         // We can override Fakewpdb get_results by matching query substring
         $wpdb->mock_results = [];
-        // Let's ensure Fakewpdb returns candidates when SELECT from pool table is called
-        // Since Fakewpdb matches exact query string in $mock_results, let's test execution
         $results = $this->repo->get_manual_match_candidates($target_user_id, $pool, $filters);
 
-        // Verify the search query was executed
+        // Verify the search query was executed with country, state, city, and citizenship filters
         $queries_str = implode("\n", $wpdb->queries);
-        if (!str_contains($queries_str, 'wp_matchmaking_pool') || !str_contains($queries_str, 'NOT EXISTS')) {
-            throw new \RuntimeException("Expected manual match search query with NOT EXISTS for wp_matches, executed:\n{$queries_str}");
+        if (!str_contains($queries_str, 'wp_matchmaking_pool') || !str_contains($queries_str, 'c.country') || !str_contains($queries_str, 'c.state') || !str_contains($queries_str, 'c.city') || !str_contains($queries_str, 'user_citizenship')) {
+            throw new \RuntimeException("Expected manual match search query with country, state, city, and citizenship filters, executed:\n{$queries_str}");
         }
 
         // Verify that manual_match_search event was logged
