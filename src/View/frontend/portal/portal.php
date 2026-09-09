@@ -81,12 +81,6 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
         </div>
     </header>
 
-    <?php
-    if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
-        echo \Matchmaker\Service\EmailVerificationService::instance()->render_pending_email_notice($user_id);
-    }
-    ?>
-
     <!-- TAB 1: PROFILE VIEW -->
     <div class="portal-tab-panel active" id="mm-tab-profile">
         <?php include __DIR__ . '/tab-profile.php'; ?>

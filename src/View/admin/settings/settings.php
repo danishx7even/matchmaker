@@ -426,6 +426,43 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     </td>
                 </tr>
                 <tr>
+                    <th scope="row"><label for="mm_email_verify_update_subject"><?php esc_html_e('Email Update Verification Subject', 'matchmaker'); ?></label></th>
+                    <td>
+                        <input type="text" name="mm_email_verify_update_subject" id="mm_email_verify_update_subject" value="<?php echo esc_attr($verify_update_subject ?? ''); ?>" class="large-text">
+                        <p class="description"><?php esc_html_e('Subject line for email change verification OTP. Supports {code} placeholder.', 'matchmaker'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="mm_email_verify_update_template"><?php esc_html_e('Email Update Verification Body', 'matchmaker'); ?></label></th>
+                    <td>
+                        <?php
+                        wp_editor($verify_update_template ?? '', 'mm_email_verify_update_template', [
+                            'textarea_name' => 'mm_email_verify_update_template',
+                            'textarea_rows' => 10,
+                            'media_buttons' => true,
+                            'teeny'         => false,
+                        ]);
+                        ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e('Available Update Placeholders', 'matchmaker'); ?></th>
+                    <td>
+                        <table class="widefat compact striped" style="max-width:550px;">
+                            <thead>
+                                <tr><th><?php esc_html_e('Variable Tag', 'matchmaker'); ?></th><th><?php esc_html_e('Description', 'matchmaker'); ?></th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>{code}</code></td><td><strong><?php esc_html_e('The 6-digit verification security code (REQUIRED)', 'matchmaker'); ?></strong></td></tr>
+                                <tr><td><code>{user_name}</code></td><td><?php esc_html_e('Member display name', 'matchmaker'); ?></td></tr>
+                                <tr><td><code>{new_email}</code></td><td><?php esc_html_e('New pending email address being verified', 'matchmaker'); ?></td></tr>
+                                <tr><td><code>{site_name}</code></td><td><?php esc_html_e('Website title', 'matchmaker'); ?></td></tr>
+                                <tr><td><code>{expiry_hours}</code></td><td><?php esc_html_e('Code expiry duration in hours', 'matchmaker'); ?></td></tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
                     <th scope="row"><label for="mm_email_verify_expiry_hours"><?php esc_html_e('Code Expiration (Hours)', 'matchmaker'); ?></label></th>
                     <td>
                         <input type="number" name="mm_email_verify_expiry_hours" id="mm_email_verify_expiry_hours" value="<?php echo (int) ($verify_expiry_hours ?? 24); ?>" min="1" max="168" class="small-text">

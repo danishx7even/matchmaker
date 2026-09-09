@@ -380,6 +380,12 @@ class AdminPortal
             if (isset($_POST['mm_email_verify_template'])) {
                 update_option('mm_email_verify_template', wp_kses_post(wp_unslash($_POST['mm_email_verify_template'])));
             }
+            if (isset($_POST['mm_email_verify_update_subject'])) {
+                update_option('mm_email_verify_update_subject', sanitize_text_field(wp_unslash($_POST['mm_email_verify_update_subject'])));
+            }
+            if (isset($_POST['mm_email_verify_update_template'])) {
+                update_option('mm_email_verify_update_template', wp_kses_post(wp_unslash($_POST['mm_email_verify_update_template'])));
+            }
             if (isset($_POST['mm_email_verify_expiry_hours'])) {
                 update_option('mm_email_verify_expiry_hours', max(1, (int) $_POST['mm_email_verify_expiry_hours']));
             }
@@ -767,12 +773,22 @@ class AdminPortal
         $verify_from_email       = (string) get_option('mm_email_verify_from_email', '');
         $verify_from_name        = (string) get_option('mm_email_verify_from_name', '');
         $verify_subject          = (string) get_option('mm_email_verify_subject', __('Your Arab Zawaj Verification Code: {code}', 'matchmaker'));
-        $default_verify_template = "<p>Assalamu Alaikum, {user_name}!</p>\n"
+        $default_verify_template = "<p>Hello {user_name},</p>\n"
             . "<p>Thank you for joining {site_name}. To protect the integrity and security of our matrimony community, please enter the one-time verification code below to confirm your email address:</p>\n"
             . "<div style=\"font-size: 36px; font-weight: 800; letter-spacing: 10px; padding: 18px 24px; background: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; display: inline-block; margin: 20px 0; color: #1D1E20; font-family: monospace;\">{code}</div>\n"
             . "<p>⏱ This code is valid for <strong>{expiry_hours} hours</strong>. If you did not create an account on {site_name}, you can safely disregard this email.</p>\n"
             . "<p>Warm regards,<br><strong>Arab Zawaj Matchmaking Team</strong></p>";
         $verify_template         = (string) get_option('mm_email_verify_template', $default_verify_template);
+
+        // 6A. Email Update Verification Settings
+        $verify_update_subject          = (string) get_option('mm_email_verify_update_subject', __('Verify Your New Arab Zawaj Email: {code}', 'matchmaker'));
+        $default_verify_update_template = "<p>Hello {user_name},</p>\n"
+            . "<p>You recently requested to update your account email address on {site_name} to <strong>{new_email}</strong>. Please enter the verification code below to confirm this change:</p>\n"
+            . "<div style=\"font-size: 36px; font-weight: 800; letter-spacing: 10px; padding: 18px 24px; background: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; display: inline-block; margin: 20px 0; color: #1D1E20; font-family: monospace;\">{code}</div>\n"
+            . "<p>⏱ This code is valid for <strong>{expiry_hours} hours</strong>. If you did not request this email change, please log into your account to review your settings.</p>\n"
+            . "<p>Warm regards,<br><strong>Arab Zawaj Matchmaking Team</strong></p>";
+        $verify_update_template         = (string) get_option('mm_email_verify_update_template', $default_verify_update_template);
+
         $verify_expiry_hours     = (int) get_option('mm_email_verify_expiry_hours', 24);
         $verify_cooldown_seconds = (int) get_option('mm_email_verify_cooldown_seconds', 60);
 

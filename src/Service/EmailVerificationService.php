@@ -618,7 +618,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                             </tr>
                             <tr>
                                 <td align="center" style="padding-top: 6px;">
-                                    <span style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; font-size: 11px; font-weight: 600; color: #CC723F; letter-spacing: 0.22em; text-transform: uppercase;">PREMIUM MUSLIM MATCHMAKING</span>
+                                    <span style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; font-size: 11px; font-weight: 600; color: #CC723F; letter-spacing: 0.22em; text-transform: uppercase;">PREMIUM ARAB MATCHMAKING</span>
                                 </td>
                             </tr>
                         </table>
@@ -635,7 +635,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                 <!-- Email Footer -->
                 <tr>
                     <td bgcolor="#FDFBF9" align="center" style="background-color: #FDFBF9; padding: 24px 30px; border-top: 1px solid #F1ECE6; text-align: center;">
-                        <p style="font-family: Georgia, serif; font-style: italic; font-size: 13px; color: #8C532B; margin: 0 0 8px; line-height: 1.4;">Barakallahu Feekum &bull; May Allah bless your journey</p>
+                        <p style="font-family: Georgia, serif; font-style: italic; font-size: 13px; color: #8C532B; margin: 0 0 8px; line-height: 1.4;">Thank you for being part of Arab Zawaj</p>
                         <p style="font-size: 12px; color: #9CA3AF; margin: 0; line-height: 1.5;">&copy; ' . gmdate('Y') . ' Arab Zawaj Matrimony. All rights reserved.</p>
                     </td>
                 </tr>
@@ -676,7 +676,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
 
         $default_inner = '
             <div style="margin-bottom: 22px;">
-                <h2 style="font-family: \'Marcellus\', Georgia, serif; font-size: 21px; font-weight: 700; color: #1D1E20; margin: 0 0 10px; line-height: 1.3;">Assalamu Alaikum, ' . esc_html($display_name ?: 'Member') . '!</h2>
+                <h2 style="font-family: \'Marcellus\', Georgia, serif; font-size: 21px; font-weight: 700; color: #1D1E20; margin: 0 0 10px; line-height: 1.3;">Hello, ' . esc_html($display_name ?: 'Member') . '!</h2>
                 <p style="margin: 0; font-size: 15px; color: #4B5563; line-height: 1.6;">Thank you for joining Arab Zawaj. To protect the integrity and security of our matrimony community, please enter the one-time verification code below to confirm your email address:</p>
             </div>
 
@@ -1137,7 +1137,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
     }
 
     /**
-     * Filter the_content to prepend the pending email notice banner on PMPro and Dashboard pages.
+     * Filter the_content to prepend the pending email notice banner strictly on PMPro Account and Edit Profile pages.
      *
      * @param string $content
      * @return string
@@ -1154,14 +1154,22 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
             return $content;
         }
 
-        // Check if page contains PMPro or Portal shortcodes or is a PMPro page
-        $is_pmpro_page = (function_exists('pmpro_is_pmpro_page') && pmpro_is_pmpro_page());
-        $has_shortcode = str_contains($content, '[pmpro_')
-            || str_contains($content, 'pmpro_')
-            || str_contains($content, '[az_profile')
-            || str_contains($content, '[matchmaker_member_portal');
+        // Never render notice on dashboard or questionnaire/form wizard pages
+        $is_dashboard_or_form = str_contains($content, '[az_profile')
+            || str_contains($content, '[matchmaker_member_portal')
+            || str_contains($content, '[matchmaking_form')
+            || str_contains($content, '[matchmaking_field');
 
-        if ($is_pmpro_page || $has_shortcode) {
+        if ($is_dashboard_or_form) {
+            return $content;
+        }
+
+        // Check if page contains PMPro account or profile edit shortcodes, or is a PMPro account/edit profile page
+        $is_pmpro_account_page = function_exists('pmpro_is_pmpro_page') && (pmpro_is_pmpro_page('account') || pmpro_is_pmpro_page('member_profile_edit'));
+        $has_pmpro_shortcode   = str_contains($content, '[pmpro_account')
+            || str_contains($content, '[pmpro_member_profile_edit');
+
+        if ($is_pmpro_account_page || $has_pmpro_shortcode) {
             // Avoid duplicate rendering
             if (!str_contains($content, 'mm-pending-email-notice')) {
                 $notice_html = $this->render_pending_email_notice($user_id);
@@ -1440,38 +1448,57 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
      */
     public function send_pending_email_verification(string $to_email, string $display_name, string $code, ?string &$mail_error = null): bool
     {
-        $subject = sprintf(__('Verify Your New Arab Zawaj Email: %s', 'matchmaker'), $code);
+        $custom_subject = (string) get_option('mm_email_verify_update_subject', '');
+        $subject = !empty(trim($custom_subject))
+            ? str_replace('{code}', $code, $custom_subject)
+            : sprintf(__('Verify Your New Arab Zawaj Email: %s', 'matchmaker'), $code);
         
-        $inner = '
-            <div style="margin-bottom: 22px;">
-                <h2 style="font-family: \'Marcellus\', Georgia, serif; font-size: 21px; font-weight: 700; color: #1D1E20; margin: 0 0 10px; line-height: 1.3;">Assalamu Alaikum, ' . esc_html($display_name ?: 'Member') . '!</h2>
-                <p style="margin: 0; font-size: 15px; color: #4B5563; line-height: 1.6;">You recently requested to update your account email address on Arab Zawaj to <strong>' . esc_html($to_email) . '</strong>. Please enter the verification code below to confirm this change:</p>
-            </div>
+        $custom_template = (string) get_option('mm_email_verify_update_template', '');
+        $sitename        = $this->get_sender_name();
+        $expiry_hours    = (string) max(1, (int) get_option('mm_email_verify_expiry_hours', 1));
 
-            <!-- OTP Code Card -->
-            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0 24px;">
-                <tr>
-                    <td align="center" bgcolor="#FAF5F0" style="background-color: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; padding: 24px 16px; text-align: center;">
-                        <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #8C532B; margin-bottom: 8px;">EMAIL UPDATE VERIFICATION CODE</div>
-                        <div class="email-otp-box" style="font-family: \'Courier New\', Courier, monospace; font-size: 38px; font-weight: 800; letter-spacing: 12px; color: #1D1E20; text-indent: 12px; margin: 4px 0 8px; line-height: 1;">' . esc_html($code) . '</div>
-                        <div style="font-size: 12px; color: #78716C; font-weight: 500;">⏱ Valid for <strong>60 minutes</strong></div>
-                    </td>
-                </tr>
-            </table>
+        if (!empty(trim($custom_template))) {
+            $body_content = str_replace(
+                ['{code}', '{user_name}', '{new_email}', '{user_email}', '{site_name}', '{expiry_hours}'],
+                [$code, $display_name ?: 'Member', $to_email, $to_email, $sitename, $expiry_hours],
+                $custom_template
+            );
+            if (str_contains($body_content, '<html') || str_contains($body_content, '<body')) {
+                $html = $body_content;
+            } else {
+                $html = $this->wrap_email_layout($body_content);
+            }
+        } else {
+            $inner = '
+                <div style="margin-bottom: 22px;">
+                    <h2 style="font-family: \'Marcellus\', Georgia, serif; font-size: 21px; font-weight: 700; color: #1D1E20; margin: 0 0 10px; line-height: 1.3;">Hello, ' . esc_html($display_name ?: 'Member') . '!</h2>
+                    <p style="margin: 0; font-size: 15px; color: #4B5563; line-height: 1.6;">You recently requested to update your account email address on Arab Zawaj to <strong>' . esc_html($to_email) . '</strong>. Please enter the verification code below to confirm this change:</p>
+                </div>
 
-            <!-- Security Notice Box -->
-            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 0 0 24px;">
-                <tr>
-                    <td bgcolor="#FFFDFB" style="background-color: #FFFDFB; border-left: 3px solid #CC723F; border-radius: 0 8px 8px 0; padding: 14px 18px;">
-                        <p style="margin: 0; font-size: 13px; color: #6B7280; line-height: 1.5;"><strong>Security Reminder:</strong> If you did not request this email change, please log into your account immediately to review your settings.</p>
-                    </td>
-                </tr>
-            </table>
+                <!-- OTP Code Card -->
+                <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0 24px;">
+                    <tr>
+                        <td align="center" bgcolor="#FAF5F0" style="background-color: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; padding: 24px 16px; text-align: center;">
+                            <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #8C532B; margin-bottom: 8px;">EMAIL UPDATE VERIFICATION CODE</div>
+                            <div class="email-otp-box" style="font-family: \'Courier New\', Courier, monospace; font-size: 38px; font-weight: 800; letter-spacing: 12px; color: #1D1E20; text-indent: 12px; margin: 4px 0 8px; line-height: 1;">' . esc_html($code) . '</div>
+                            <div style="font-size: 12px; color: #78716C; font-weight: 500;">⏱ Valid for <strong>' . (((int) $expiry_hours === 1) ? '60 minutes' : ($expiry_hours . ' hours')) . '</strong></div>
+                        </td>
+                    </tr>
+                </table>
 
-            <p style="margin: 0; font-size: 14px; color: #4B5563; line-height: 1.5;">Warm regards,<br><strong style="color: #1D1E20;">Arab Zawaj Matchmaking Team</strong></p>
-        ';
+                <!-- Security Notice Box -->
+                <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 0 0 24px;">
+                    <tr>
+                        <td bgcolor="#FFFDFB" style="background-color: #FFFDFB; border-left: 3px solid #CC723F; border-radius: 0 8px 8px 0; padding: 14px 18px;">
+                            <p style="margin: 0; font-size: 13px; color: #6B7280; line-height: 1.5;"><strong>Security Reminder:</strong> If you did not request this email change, please log into your account immediately to review your settings.</p>
+                        </td>
+                    </tr>
+                </table>
 
-        $html = $this->wrap_email_layout($inner);
+                <p style="margin: 0; font-size: 14px; color: #4B5563; line-height: 1.5;">Warm regards,<br><strong style="color: #1D1E20;">Arab Zawaj Matchmaking Team</strong></p>
+            ';
+            $html = $this->wrap_email_layout($inner);
+        }
 
         $from_email = $this->get_sender_email();
         $from_name  = $this->get_sender_name();
@@ -1731,52 +1758,62 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
 
         ob_start();
         ?>
-        <div class="mm-pending-email-notice-wrap" id="mm-pending-email-notice-wrap" style="margin: 0 0 20px;">
+        <div class="mm-pending-email-notice-wrap" id="mm-pending-email-notice-wrap" style="margin: 0 0 24px;">
             <!-- Notice Banner -->
-            <div class="mm-pending-email-notice" style="background:#FFFBEB; border:1px solid #FDE68A; border-left:4px solid #D97706; padding:12px 18px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                <div style="color:#92400E; font-size:14px; font-weight:500; display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:18px;">⚠️</span>
-                    <span><?php printf(esc_html__('Please verify your email %s to update your account.', 'matchmaker'), '<strong>' . esc_html($pending_email) . '</strong>'); ?></span>
+            <div class="mm-pending-email-notice" style="background: linear-gradient(135deg, #FFFDFB 0%, #FAF5F0 100%); border: 1px solid rgba(204,114,63,0.3); border-left: 4px solid #CC723F; padding: 16px 20px; border-radius: 12px; box-shadow: 0 4px 14px rgba(204,114,63,0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 260px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(204,114,63,0.12); color: #CC723F; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CC723F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #CC723F; margin-bottom: 2px;"><?php esc_html_e('Email Verification Pending', 'matchmaker'); ?></div>
+                        <div style="color: #374151; font-size: 14px; line-height: 1.4;">
+                            <?php printf(esc_html__('Please verify %s to complete your email update.', 'matchmaker'), '<strong style="color:#1D1E20;">' . esc_html($pending_email) . '</strong>'); ?>
+                        </div>
+                    </div>
                 </div>
                 <div>
-                    <button type="button" id="mm-open-pending-verify-modal-btn" style="background:#CC723F; color:#ffffff; border:none; padding:7px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; transition: background 0.15s ease;">
-                        <?php esc_html_e('Verify Email', 'matchmaker'); ?>
+                    <button type="button" id="mm-open-pending-verify-modal-btn" style="background: #CC723F; color: #ffffff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(204,114,63,0.25); display: inline-flex; align-items: center; gap: 6px;">
+                        <span><?php esc_html_e('Verify Email', 'matchmaker'); ?></span>
+                        <span style="font-size: 14px;">&rarr;</span>
                     </button>
                 </div>
             </div>
 
             <!-- Pending Email OTP Verification Modal -->
-            <div id="mm-pending-verify-modal" class="mm-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99999; justify-content:center; align-items:center; padding:15px; box-sizing:border-box;">
-                <div class="mm-modal-card" style="background:#ffffff; max-width:440px; width:100%; border-radius:14px; padding:28px 24px; box-shadow:0 20px 40px rgba(0,0,0,0.2); position:relative; text-align:center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    <button type="button" id="mm-close-pending-modal-btn" style="position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; color:#9ca3af; cursor:pointer; line-height:1;">&times;</button>
+            <div id="mm-pending-verify-modal" class="mm-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(29,30,32,0.65); backdrop-filter:blur(4px); z-index:99999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
+                <div class="mm-modal-card" style="background:#ffffff; max-width:440px; width:100%; border-radius:18px; padding:32px 26px; box-shadow:0 24px 48px rgba(29,30,32,0.22); border:1px solid rgba(204,114,63,0.18); position:relative; text-align:center; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    <button type="button" id="mm-close-pending-modal-btn" style="position:absolute; top:16px; right:18px; background:none; border:none; font-size:24px; color:#9ca3af; cursor:pointer; line-height:1; transition:color 0.15s ease;" title="<?php esc_attr_e('Close', 'matchmaker'); ?>">&times;</button>
                     
-                    <div style="font-size:36px; margin-bottom:8px;">✉️</div>
-                    <h3 style="font-family:'Marcellus', Georgia, serif; font-size:20px; font-weight:700; color:#1D1E20; margin:0 0 6px;">
+                    <div style="width:52px; height:52px; background:#FAF5F0; border:1px solid rgba(204,114,63,0.25); border-radius:50%; color:#CC723F; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CC723F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    </div>
+                    <h3 style="font-family:'Marcellus', Georgia, serif; font-size:22px; font-weight:700; color:#1D1E20; margin:0 0 8px; letter-spacing:0.02em;">
                         <?php esc_html_e('Verify New Email', 'matchmaker'); ?>
                     </h3>
                     <p style="font-size:14px; color:#6b7280; margin:0 0 20px; line-height:1.5;">
-                        <?php printf(esc_html__('We sent a 6-digit code to %s. Enter it below to confirm your new email.', 'matchmaker'), '<br><strong style="color:#1D1E20;">' . esc_html($pending_email) . '</strong>'); ?>
+                        <?php printf(esc_html__('We sent a 6-digit verification code to %s. Enter it below to update your email.', 'matchmaker'), '<br><span style="display:inline-block; margin-top:4px; padding:3px 10px; background:#FAF5F0; border-radius:6px; font-weight:600; color:#CC723F; font-size:13px;">' . esc_html($pending_email) . '</span>'); ?>
                     </p>
 
-                    <div id="mm-pending-verify-alert" style="display:none; padding:10px 14px; border-radius:6px; font-size:13px; margin-bottom:16px; text-align:left;"></div>
+                    <div id="mm-pending-verify-alert" style="display:none; padding:12px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; text-align:left; line-height:1.4;"></div>
 
                     <form id="mm-pending-verify-form" style="margin:0 0 16px;">
                         <input type="hidden" name="action" value="mm_verify_pending_email_code">
                         <input type="hidden" name="nonce" value="<?php echo esc_attr($nonce); ?>">
                         <input type="hidden" name="user_id" value="<?php echo (int) $user_id; ?>">
 
-                        <div style="margin-bottom:16px;">
-                            <input type="text" id="mm-pending-otp-input" name="code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="· · · · · ·" style="font-family:'Courier New', monospace; font-size:28px; letter-spacing:8px; text-align:center; width:200px; padding:10px; border:2px solid #e5e7eb; border-radius:8px; outline:none; transition:border-color 0.2s;" autocomplete="one-time-code" required>
+                        <div style="margin-bottom:18px;">
+                            <input type="text" id="mm-pending-otp-input" name="code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="· · · · · ·" style="font-family:'Courier New', monospace; font-size:30px; font-weight:700; letter-spacing:10px; text-align:center; width:220px; padding:12px 8px; border:2px solid #E5E7EB; border-radius:10px; outline:none; transition:border-color 0.2s, box-shadow 0.2s; background:#FAFAFA;" autocomplete="one-time-code" required>
                         </div>
 
-                        <button type="submit" id="mm-pending-verify-submit-btn" style="width:100%; background:#CC723F; color:#ffffff; border:none; padding:12px; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; transition: background 0.15s ease;">
+                        <button type="submit" id="mm-pending-verify-submit-btn" style="width:100%; background:#CC723F; color:#ffffff; border:none; padding:13px; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; transition:background 0.15s ease; box-shadow: 0 2px 10px rgba(204,114,63,0.3);">
                             <?php esc_html_e('Confirm &amp; Update Email', 'matchmaker'); ?>
                         </button>
                     </form>
 
                     <div style="font-size:13px; color:#6b7280;">
                         <?php esc_html_e("Didn't receive the code?", 'matchmaker'); ?>
-                        <button type="button" id="mm-pending-resend-btn" style="background:none; border:none; color:#CC723F; font-weight:600; cursor:pointer; padding:0; text-decoration:underline; font-size:13px;" <?php echo ($cooldown_remaining > 0) ? 'disabled' : ''; ?>>
+                        <button type="button" id="mm-pending-resend-btn" style="background:none; border:none; color:#CC723F; font-weight:600; cursor:pointer; padding:0 0 0 4px; text-decoration:underline; font-size:13px;" <?php echo ($cooldown_remaining > 0) ? 'disabled' : ''; ?>>
                             <?php echo ($cooldown_remaining > 0) ? sprintf(esc_html__('Resend in %ds', 'matchmaker'), $cooldown_remaining) : esc_html__('Resend Code', 'matchmaker'); ?>
                         </button>
                     </div>

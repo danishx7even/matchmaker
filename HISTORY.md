@@ -1016,6 +1016,33 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+### Task 60: PMPro Notice Page Scoping, Enhanced UI Design, Email Update Settings & Religion-Neutral Templates
+- **Objective**:
+  1. Scope pending email verification notice strictly to PMPro Membership Account and Edit Profile pages (remove from dashboard and questionnaire/form wizard).
+  2. Redesign the pending email notice banner and OTP popup modal with a modern, elegant, brand-aligned UI (`#CC723F`, `#1D1E20`, rounded pill buttons, subtle shadows, clean typography, SVG icons).
+  3. Add admin settings fields for Email Update Verification subject and body template (`mm_email_verify_update_subject`, `mm_email_verify_update_template`) in the Admin Settings page with WYSIWYG editor and tag variables table.
+  4. Remove religion-specific greetings and footer text (e.g. "Assalamu Alaikum", "Barakallahu Feekum • May Allah bless your journey", "PREMIUM MUSLIM MATCHMAKING") across all default email templates.
+- **Implemented**:
+  - `src/View/frontend/portal/portal.php`:
+    - Removed `render_pending_email_notice()` call so the Member Dashboard is clean and uncluttered.
+  - `src/Service/EmailVerificationService.php`:
+    - Updated `filter_the_content_for_pending_email_notice()` to strictly allow PMPro account / edit profile pages while explicitly blocking dashboard and questionnaire shortcodes (`[az_profile]`, `[matchmaker_member_portal]`, `[matchmaking_form]`, `[matchmaking_field]`).
+    - Redesigned `render_pending_email_notice()` with warm gradient banner, SVG email icon, terracotta `#CC723F` interactive button, and an elegant OTP modal with backdrop blur, rounded corners, and clear PIN inputs.
+    - Updated `send_pending_email_verification()` to dynamically pull custom subject (`mm_email_verify_update_subject`) and template (`mm_email_verify_update_template`) with merge tags (`{code}`, `{user_name}`, `{new_email}`, `{site_name}`, `{expiry_hours}`).
+    - Removed religion-specific text from `wrap_email_layout()` (sub-badge updated to "PREMIUM ARAB MATCHMAKING", footer updated to "Thank you for being part of Arab Zawaj") and greetings in `get_email_html()` and `send_pending_email_verification()`.
+  - `src/Admin/AdminPortal.php` & `src/View/admin/settings/settings.php`:
+    - Added settings options saving and retrieval for `mm_email_verify_update_subject` and `mm_email_verify_update_template`.
+    - Added rich WYSIWYG editor and available placeholders table in the Email Verification Settings card.
+    - Updated default verification email template preview to remove religious terms.
+  - `tests/Unit/EmailVerificationTest.php`:
+    - Added unit test `test_dashboard_and_form_wizard_do_not_render_pending_email_notice()`.
+    - Added unit test `test_custom_update_email_settings_affect_subject_and_template()`.
+    - Added unit test `test_default_emails_do_not_contain_religious_terms()`.
+  - **Verification**: Ran automated test runner (`tests/run_tests.php`) — all 92 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
 
 

@@ -521,6 +521,80 @@ final class EmailVerificationTest extends TestCase
         $shortcode_filtered = $service->filter_pmpro_shortcode_notice($shortcode_output);
         $this->assertStringContainsString('mm-pending-email-notice', $shortcode_filtered);
     }
+
+    public function test_dashboard_and_form_wizard_do_not_render_pending_email_notice(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 610;
+        $user = new \FakeWP_User($uid, 'member610', 'old610@example.com');
+        $GLOBALS['__mm_users'][$uid] = $user;
+        $GLOBALS['__mm_current_user_id'] = $uid;
+
+        update_user_meta($uid, 'mm_pending_new_email', 'pending610@example.com');
+
+        // Dashboard shortcode content
+        $dashboard_content = '<p>Welcome</p>[az_profile]';
+        $filtered_dashboard = $service->filter_the_content_for_pending_email_notice($dashboard_content);
+        $this->assertStringNotContainsString('mm-pending-email-notice', $filtered_dashboard);
+
+        // Member portal shortcode content
+        $portal_content = '<p>Portal</p>[matchmaker_member_portal]';
+        $filtered_portal = $service->filter_the_content_for_pending_email_notice($portal_content);
+        $this->assertStringNotContainsString('mm-pending-email-notice', $filtered_portal);
+
+        // Form wizard shortcode content
+        $form_content = '<p>Questionnaire</p>[matchmaking_form]';
+        $filtered_form = $service->filter_the_content_for_pending_email_notice($form_content);
+        $this->assertStringNotContainsString('mm-pending-email-notice', $filtered_form);
+    }
+
+    public function test_custom_update_email_settings_affect_subject_and_template(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        update_option('mm_email_verify_update_subject', 'Confirm Security PIN: {code}');
+        update_option('mm_email_verify_update_template', '<p>Hello {user_name}, update PIN for {new_email} is {code}. Valid for {expiry_hours} hours on {site_name}.</p>');
+
+        $mail_error = null;
+        $sent = $service->send_pending_email_verification('newdest@example.com', 'Aisha', '998877', $mail_error);
+        $this->assertTrue($sent);
+
+        $last_mail = end($GLOBALS['__mm_sent_mails']);
+        $this->assertEquals('newdest@example.com', $last_mail['to']);
+        $this->assertEquals('Confirm Security PIN: 998877', $last_mail['subject']);
+        $this->assertStringContainsString('Hello Aisha', $last_mail['message']);
+        $this->assertStringContainsString('newdest@example.com', $last_mail['message']);
+        $this->assertStringContainsString('998877', $last_mail['message']);
+
+        // Clean up
+        delete_option('mm_email_verify_update_subject');
+        delete_option('mm_email_verify_update_template');
+    }
+
+    public function test_default_emails_do_not_contain_religious_terms(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        delete_option('mm_email_verify_template');
+        delete_option('mm_email_verify_update_template');
+
+        // Registration OTP email
+        $html1 = $service->get_email_html('Tariq', '112233', 'tariq@example.com');
+        $this->assertStringNotContainsString('Assalamu', $html1);
+        $this->assertStringNotContainsString('Barakallahu', $html1);
+        $this->assertStringNotContainsString('Muslim', $html1);
+        $this->assertStringContainsString('Hello, Tariq!', $html1);
+
+        // Email update OTP email
+        $mail_error = null;
+        $service->send_pending_email_verification('tariq.new@example.com', 'Tariq', '445566', $mail_error);
+        $last_mail = end($GLOBALS['__mm_sent_mails']);
+        $this->assertStringNotContainsString('Assalamu', $last_mail['message']);
+        $this->assertStringNotContainsString('Barakallahu', $last_mail['message']);
+        $this->assertStringNotContainsString('Muslim', $last_mail['message']);
+        $this->assertStringContainsString('Hello, Tariq!', $last_mail['message']);
+    }
 }
 
 
