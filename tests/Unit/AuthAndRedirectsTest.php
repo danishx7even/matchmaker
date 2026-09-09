@@ -84,4 +84,19 @@ class AuthAndRedirectsTest
             throw new \RuntimeException("Expected matchmaker_admin to redirect to page=matchmaking-pool, got: " . $dest);
         }
     }
+
+    public function test_pmpro_profile_update_redirects_to_membership_account_page(): void
+    {
+        $_POST['action'] = 'update-profile';
+        $GLOBALS['__mm_last_redirect'] = '';
+
+        $this->auth->redirect_after_pmpro_profile_update(50);
+
+        if (empty($GLOBALS['__mm_last_redirect']) || !str_contains($GLOBALS['__mm_last_redirect'], 'account')) {
+            throw new \RuntimeException("Expected redirect to membership account, got: " . ($GLOBALS['__mm_last_redirect'] ?? 'none'));
+        }
+
+        unset($_POST['action'], $GLOBALS['__mm_last_redirect']);
+    }
 }
+

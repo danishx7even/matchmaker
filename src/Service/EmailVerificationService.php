@@ -1773,7 +1773,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                     </div>
                 </div>
                 <div>
-                    <button type="button" id="mm-open-pending-verify-modal-btn" style="background: #CC723F; color: #ffffff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(204,114,63,0.25); display: inline-flex; align-items: center; gap: 6px;">
+                    <button type="button" id="mm-open-pending-verify-modal-btn" class="mm-open-pending-verify-btn" onclick="window.mmOpenPendingVerifyModal && window.mmOpenPendingVerifyModal(event)" style="background: #CC723F; color: #ffffff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(204,114,63,0.25); display: inline-flex; align-items: center; gap: 6px;">
                         <span><?php esc_html_e('Verify Email', 'matchmaker'); ?></span>
                         <span style="font-size: 14px;">&rarr;</span>
                     </button>
@@ -1781,9 +1781,9 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
             </div>
 
             <!-- Pending Email OTP Verification Modal -->
-            <div id="mm-pending-verify-modal" class="mm-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(29,30,32,0.65); backdrop-filter:blur(4px); z-index:99999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
+            <div id="mm-pending-verify-modal" class="mm-modal-overlay" onclick="if(event.target === this) { window.mmClosePendingVerifyModal && window.mmClosePendingVerifyModal(event); }" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(29,30,32,0.65); backdrop-filter:blur(4px); z-index:999999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
                 <div class="mm-modal-card" style="background:#ffffff; max-width:440px; width:100%; border-radius:18px; padding:32px 26px; box-shadow:0 24px 48px rgba(29,30,32,0.22); border:1px solid rgba(204,114,63,0.18); position:relative; text-align:center; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    <button type="button" id="mm-close-pending-modal-btn" style="position:absolute; top:16px; right:18px; background:none; border:none; font-size:24px; color:#9ca3af; cursor:pointer; line-height:1; transition:color 0.15s ease;" title="<?php esc_attr_e('Close', 'matchmaker'); ?>">&times;</button>
+                    <button type="button" id="mm-close-pending-modal-btn" class="mm-close-pending-modal-btn" onclick="window.mmClosePendingVerifyModal && window.mmClosePendingVerifyModal(event)" style="position:absolute; top:16px; right:18px; background:none; border:none; font-size:24px; color:#9ca3af; cursor:pointer; line-height:1; transition:color 0.15s ease;" title="<?php esc_attr_e('Close', 'matchmaker'); ?>">&times;</button>
                     
                     <div style="width:52px; height:52px; background:#FAF5F0; border:1px solid rgba(204,114,63,0.25); border-radius:50%; color:#CC723F; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CC723F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
@@ -1821,10 +1821,31 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
             </div>
 
             <script>
+            window.mmOpenPendingVerifyModal = function(e) {
+                if (e && e.preventDefault) e.preventDefault();
+                var modal = document.getElementById('mm-pending-verify-modal');
+                if (modal) {
+                    if (modal.parentNode !== document.body) {
+                        document.body.appendChild(modal);
+                    }
+                    modal.style.display = 'flex';
+                    var otpInput = document.getElementById('mm-pending-otp-input');
+                    if (otpInput) {
+                        setTimeout(function() { otpInput.focus(); }, 50);
+                    }
+                }
+            };
+
+            window.mmClosePendingVerifyModal = function(e) {
+                if (e && e.preventDefault) e.preventDefault();
+                var modal = document.getElementById('mm-pending-verify-modal');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+            };
+
             (function() {
                 var modal = document.getElementById('mm-pending-verify-modal');
-                var openBtn = document.getElementById('mm-open-pending-verify-modal-btn');
-                var closeBtn = document.getElementById('mm-close-pending-modal-btn');
                 var form = document.getElementById('mm-pending-verify-form');
                 var otpInput = document.getElementById('mm-pending-otp-input');
                 var submitBtn = document.getElementById('mm-pending-verify-submit-btn');
@@ -1865,19 +1886,16 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                     startCooldown(cooldown);
                 }
 
-                if (openBtn && modal) {
-                    openBtn.addEventListener('click', function(e) {
+                document.addEventListener('click', function(e) {
+                    if (e.target && (e.target.closest('#mm-open-pending-verify-modal-btn') || e.target.closest('.mm-open-pending-verify-btn'))) {
                         e.preventDefault();
-                        modal.style.display = 'flex';
-                        if (otpInput) otpInput.focus();
-                    });
-                }
-
-                if (closeBtn && modal) {
-                    closeBtn.addEventListener('click', function() {
-                        modal.style.display = 'none';
-                    });
-                }
+                        window.mmOpenPendingVerifyModal(e);
+                    }
+                    if (e.target && (e.target.closest('#mm-close-pending-modal-btn') || e.target.closest('.mm-close-pending-modal-btn'))) {
+                        e.preventDefault();
+                        window.mmClosePendingVerifyModal(e);
+                    }
+                });
 
                 if (form) {
                     form.addEventListener('submit', function(e) {

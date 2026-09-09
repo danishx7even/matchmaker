@@ -20,6 +20,10 @@ if (!defined('ARRAY_A')) {
 if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');
 }
+if (!defined('MM_UNIT_TESTS')) {
+    define('MM_UNIT_TESTS', true);
+}
+
 
 $GLOBALS['__mm_dbdelta_sql']     = null;
 $GLOBALS['__mm_options']         = [];
@@ -299,6 +303,17 @@ function wp_send_json_error($data = null, $status_code = null, $options = 0): vo
     echo json_encode($response, $options);
     throw new \RuntimeException('wp_send_json_error');
 }
+
+function wp_safe_redirect(string $location, int $status = 302, string $x_redirect_by = 'WordPress'): bool {
+    $GLOBALS['__mm_last_redirect'] = $location;
+    return true;
+}
+
+function wp_redirect(string $location, int $status = 302, string $x_redirect_by = 'WordPress'): bool {
+    $GLOBALS['__mm_last_redirect'] = $location;
+    return true;
+}
+
 
 function esc_html($text) {
     return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');

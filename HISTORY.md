@@ -1042,6 +1042,28 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+### Task 61: PMPro Profile Edit Post-Submission Redirect & Modal Popup Visibility Fix
+- **Objective**:
+  1. Redirect members to the PMPro Membership Account page immediately upon successful submission of the frontend profile edit form (`$_POST['action'] === 'update-profile'`).
+  2. Fix popup modal opening on the edit profile page by adding inline handlers, global helper functions (`window.mmOpenPendingVerifyModal`), document delegated click listeners, and DOM body relocation to bypass any CSS stacking context or overflow traps.
+- **Implemented**:
+  - `src/Frontend/AuthController.php`:
+    - Hooked `profile_update` action to `redirect_after_pmpro_profile_update()`.
+    - Detects frontend `$_POST['action'] === 'update-profile'` submissions and executes safe redirection to `ProfileService::get_membership_account_url()` with graceful fallback for sent headers.
+  - `src/Service/EmailVerificationService.php`:
+    - Redesigned popup modal trigger in `render_pending_email_notice()`:
+      - Added `window.mmOpenPendingVerifyModal` and `window.mmClosePendingVerifyModal`.
+      - Added dynamic DOM relocation (`document.body.appendChild(modal)`) upon opening to eliminate containment/stacking context issues from parent form or theme containers.
+      - Attached direct inline `onclick`, delegated `document.addEventListener('click')`, and overlay backdrop dismiss handlers.
+      - Increased modal overlay `z-index` to `999999`.
+  - `tests/bootstrap.php` & `tests/Unit/AuthAndRedirectsTest.php`:
+    - Added `wp_safe_redirect` and `wp_redirect` stubs in test harness.
+    - Added unit test `test_pmpro_profile_update_redirects_to_membership_account_page()`.
+  - **Verification**: Ran automated test suite (`tests/run_tests.php`) — all 93 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
 
 

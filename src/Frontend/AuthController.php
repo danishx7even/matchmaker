@@ -57,6 +57,7 @@ class AuthController
         add_filter('pmpro_confirmation_url',               [$this, 'custom_pmpro_level_based_registration_redirect'], 10, 3);
         add_filter('show_admin_bar',                       [$this, 'custom_hide_admin_bar_for_subscribers']);
         add_action('wp_footer',                            [$this, 'custom_pmpro_login_page_design']);
+        add_action('profile_update',                       [$this, 'redirect_after_pmpro_profile_update'], 99, 3);
     }
 
     /**
@@ -370,4 +371,36 @@ class AuthController
         </script>
         <?php
     }
+
+    /**
+     * Redirect member to the PMPro membership account page after submitting the frontend profile edit form.
+     *
+     * @param int   $user_id
+     * @param mixed $old_user_data
+     * @param mixed $userdata
+     * @return void
+     */
+    public function redirect_after_pmpro_profile_update(int $user_id, mixed $old_user_data = null, mixed $userdata = null): void
+    {
+        if (function_exists('is_admin') && is_admin()) {
+            return;
+        }
+
+        if (isset($_POST['action']) && $_POST['action'] === 'update-profile') {
+            $account_url = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
+            if (!empty($account_url)) {
+                wp_safe_redirect($account_url);
+                if (defined('MM_UNIT_TESTS')) {
+                    return;
+                }
+                if (!headers_sent()) {
+                    exit;
+                } else {
+                    echo '<script>window.location.href = ' . json_encode($account_url) . ';</script>';
+                    exit;
+                }
+            }
+        }
+    }
 }
+
