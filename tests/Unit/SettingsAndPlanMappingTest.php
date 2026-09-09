@@ -99,13 +99,16 @@ final class SettingsAndPlanMappingTest extends TestCase
         $sync->sync_all_membership_levels($pmpro_hook_data);
         $this->assertEquals('monthly', get_user_meta($user_id, 'user_type', true));
 
-        // 2. Direct int format
+        // 2. Direct int format with 1-on-1 VIP add-on
         $user_id_2 = 702;
         $GLOBALS['__mm_user_pmpro_levels'][$user_id_2] = [
             new \FakePMProLevel(4, 'VIP 1-on-1 Matchmaking'),
         ];
         $sync->sync_all_membership_levels($user_id_2);
-        $this->assertEquals('one_on_one', get_user_meta($user_id_2, 'user_type', true));
+        // Base tier is free, but 1-on-1 VIP flag is active
+        $this->assertEquals('free', get_user_meta($user_id_2, 'user_type', true));
+        $this->assertEquals(1, get_user_meta($user_id_2, 'mm_has_one_on_one', true));
+        $this->assertTrue($sync->has_active_one_on_one_service($user_id_2));
     }
 
     public function test_pmpro_membership_cancellation_downgrades_user_type_to_free(): void
@@ -132,14 +135,14 @@ final class SettingsAndPlanMappingTest extends TestCase
         $sync = PMProSync::instance();
         $user_id = 704;
 
-        // User starts as 1-on-1 VIP
-        pmpro_changeMembershipLevel(4, $user_id);
-        $sync->sync_pmpro_level_to_user_type(4, $user_id, 2);
-        $this->assertEquals('one_on_one', get_user_meta($user_id, 'user_type', true));
+        // User starts with Monthly membership (level 3)
+        pmpro_changeMembershipLevel(3, $user_id);
+        $sync->sync_pmpro_level_to_user_type(3, $user_id, 0);
+        $this->assertEquals('monthly', get_user_meta($user_id, 'user_type', true));
 
         // User changes plan to Event Single Pass (level 6)
         pmpro_changeMembershipLevel(6, $user_id);
-        $sync->sync_pmpro_level_to_user_type(6, $user_id, 4);
+        $sync->sync_pmpro_level_to_user_type(6, $user_id, 3);
         $this->assertEquals('event', get_user_meta($user_id, 'user_type', true));
         $this->assertEquals('event', ProfileService::instance()->get_user_type($user_id));
     }
@@ -160,6 +163,43 @@ final class SettingsAndPlanMappingTest extends TestCase
 
         $this->assertEquals('free', get_user_meta($user_id, 'user_type', true));
         $this->assertEquals('free', ProfileService::instance()->get_user_type($user_id));
+    }
+
+    public function test_one_on_one_coexists_with_free_and_monthly_tiers(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 706;
+
+        // 1. Free (Group 1) + 1-on-1 (Group 3)
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(2, 'Free Membership'),
+            new \FakePMProLevel(4, '1-on-1 VIP Matchmaking'),
+        ];
+        $sync->sync_all_membership_levels($user_id);
+
+        $this->assertEquals('free', $sync->get_current_user_type($user_id));
+        $this->assertTrue($sync->has_active_one_on_one_service($user_id));
+        $this->assertEquals('free', get_user_meta($user_id, 'user_type', true));
+        $this->assertEquals(1, get_user_meta($user_id, 'mm_has_one_on_one', true));
+
+        // 2. User buys Monthly (Group 2) -> cancels Free (Group 1), but retains 1-on-1 (Group 3)
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(2, 'Free Membership'),
+            new \FakePMProLevel(3, 'Monthly Membership'),
+            new \FakePMProLevel(4, '1-on-1 VIP Matchmaking'),
+        ];
+        $sync->sync_all_membership_levels($user_id);
+
+        $this->assertEquals('monthly', $sync->get_current_user_type($user_id));
+        $this->assertTrue($sync->has_active_one_on_one_service($user_id));
+        $this->assertEquals('monthly', get_user_meta($user_id, 'user_type', true));
+        $this->assertEquals(1, get_user_meta($user_id, 'mm_has_one_on_one', true));
+
+        // Free level (2) should have been cancelled
+        $active_level_ids = array_map(static fn($lvl) => (int) $lvl->id, $GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+        $this->assertNotContains(2, $active_level_ids);
+        $this->assertContains(3, $active_level_ids);
+        $this->assertContains(4, $active_level_ids);
     }
 }
 

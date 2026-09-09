@@ -141,9 +141,10 @@ class PortalController
                 . '</div></div>';
         }
 
-        // Determine user membership tier
-        $user_type = \Matchmaker\Service\ProfileService::instance()->get_user_type($user_id);
-        $is_premium = in_array($user_type, ['monthly', 'one_on_one'], true);
+        // Determine user membership tier and 1-on-1 add-on status
+        $user_type      = \Matchmaker\Service\ProfileService::instance()->get_user_type($user_id);
+        $has_one_on_one = $repo->has_one_on_one($user_id);
+        $is_premium     = in_array($user_type, ['monthly'], true);
 
         // Fetch meta, stats, and approved match records
         $meta          = $repo->get_meta_block($user_id);
@@ -154,18 +155,19 @@ class PortalController
         $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
 
         $data = [
-            'user_id'       => $user_id,
-            'user'          => $user_obj,
-            'user_type'     => $user_type,
-            'is_premium'    => $is_premium,
-            'pool'          => $pool,
-            'matches'       => $matches,
-            'stats'         => $stats,
-            'unread_count'  => $unread_count,
-            'photos'        => $photos,
-            'meta'          => $meta,
-            'dashboard_url' => $dashboard_url,
-            'repo'          => $repo,
+            'user_id'        => $user_id,
+            'user'           => $user_obj,
+            'user_type'      => $user_type,
+            'has_one_on_one' => $has_one_on_one,
+            'is_premium'     => $is_premium,
+            'pool'           => $pool,
+            'matches'        => $matches,
+            'stats'          => $stats,
+            'unread_count'   => $unread_count,
+            'photos'         => $photos,
+            'meta'           => $meta,
+            'dashboard_url'  => $dashboard_url,
+            'repo'           => $repo,
         ];
 
         ob_start();
@@ -280,7 +282,8 @@ class PortalController
     {
         $repo = \Matchmaker\Repository\MatchRepository::instance();
         $matches = $repo->find_approved_matches_for_user($user_id);
-        $is_premium = in_array($user_type, ['monthly', 'one_on_one'], true);
+        $has_one_on_one = $repo->has_one_on_one($user_id);
+        $is_premium = in_array($user_type, ['monthly'], true);
         
         ob_start();
         include __DIR__ . '/../View/frontend/portal/tab-matches.php';
@@ -297,7 +300,9 @@ class PortalController
      */
     private function render_events_html(int $user_id, string $user_type, int $paged = 1): string
     {
-        $is_premium = in_array($user_type, ['monthly', 'one_on_one'], true);
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $has_one_on_one = $repo->has_one_on_one($user_id);
+        $is_premium = in_array($user_type, ['monthly'], true);
 
         ob_start();
         include __DIR__ . '/../View/frontend/portal/tab-events.php';
@@ -315,11 +320,12 @@ class PortalController
         $repo = \Matchmaker\Repository\MatchRepository::instance();
         $user = wp_get_current_user();
         $user_type = \Matchmaker\Service\ProfileService::instance()->get_user_type($user_id);
+        $has_one_on_one = $repo->has_one_on_one($user_id);
         $pool = $repo->get_user_pool($user_id);
         $meta = $repo->get_meta_block($user_id);
         $stats = $repo->get_match_stats($user_id);
         $photos = $repo->get_user_photos($user_id);
-        $is_premium = in_array($user_type, ['monthly', 'one_on_one'], true);
+        $is_premium = in_array($user_type, ['monthly'], true);
         $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
         
         ob_start();

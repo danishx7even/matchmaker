@@ -132,16 +132,16 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                                 <td>
                                     <select name="mm_pmpro_levels[<?php echo $lid; ?>]" style="width:100%;">
                                         <option value="monthly" <?php selected($assigned, 'monthly'); ?>>
-                                            <?php esc_html_e('Monthly Member (Active Matching)', 'matchmaker'); ?>
-                                        </option>
-                                        <option value="one_on_one" <?php selected($assigned, 'one_on_one'); ?>>
-                                            <?php esc_html_e('1-on-1 VIP Member (VIP Matching)', 'matchmaker'); ?>
+                                            <?php esc_html_e('Monthly (Group 2 Subscription)', 'matchmaker'); ?>
                                         </option>
                                         <option value="event" <?php selected($assigned, 'event'); ?>>
-                                            <?php esc_html_e('Event Member (Event Only / Upsell)', 'matchmaker'); ?>
+                                            <?php esc_html_e('Event (Group 2 Subscription)', 'matchmaker'); ?>
                                         </option>
                                         <option value="free" <?php selected($assigned, 'free'); ?>>
-                                            <?php esc_html_e('Free Member (Upsell Banner)', 'matchmaker'); ?>
+                                            <?php esc_html_e('Free (Group 1 Subscription)', 'matchmaker'); ?>
+                                        </option>
+                                        <option value="one_on_one" <?php selected($assigned, 'one_on_one'); ?>>
+                                            <?php esc_html_e('1-on-1 VIP Service (Group 3 One-time Add-on)', 'matchmaker'); ?>
                                         </option>
                                     </select>
                                 </td>

@@ -1075,6 +1075,39 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Executed automated test suite (`tests/run_tests.php`) — all 93 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
+### Task 63: 3-Group Multi-Membership Architecture (Base Subscriptions + 1-on-1 VIP Add-on Service)
+- **Objective**:
+  - Restructure multiple membership levels into 3 distinct PMPro groups:
+    - **Group 1 (Free Base Tier)**: Free registration plan.
+    - **Group 2 (Paid Recurring Subscriptions)**: Monthly Matchmaking and Event Access.
+    - **Group 3 (One-Time VIP Add-on Service)**: 1-on-1 VIP Matchmaking service that coexists with any base tier.
+  - Upgrading to a Group 2 subscription cancels lingering Group 1 (Free) levels, while Group 3 (1-on-1) is never cancelled by subscription changes.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`: Added `has_one_on_one tinyint(1) NOT NULL DEFAULT 0` column and index `KEY idx_one_on_one` in `wp_matchmaking_pool` (DB version 2.6.0).
+  - `src/Repository/MatchRepository.php`:
+    - Added `mm_has_one_on_one` to `META_KEYS`.
+    - Added `update_pool_one_on_one(int $user_id, bool $has_one_on_one): void` and `has_one_on_one(int $user_id): bool`.
+    - Added `has_one_on_one` query filtering support in `search_pool()`.
+  - `src/Core/PMProSync.php`:
+    - Added `BASE_TIER_PRIORITY` (`monthly` => 3, `event` => 2, `free` => 1) for base subscription resolution.
+    - Added `has_active_one_on_one_service(int $user_id): bool` checking active Group 3 levels.
+    - Updated `get_current_user_type(int $user_id): string` to resolve base subscription tier independently.
+    - Updated `maybe_cancel_free_levels(int $user_id): void` to only cancel Group 1 Free levels, preserving Group 3 levels.
+    - Updated `sync_pmpro_level_to_user_type()` and `sync_all_membership_levels()` to persist both `user_type` and `has_one_on_one`.
+  - `src/Frontend/PortalController.php`, `src/View/frontend/portal/portal.php`, `src/View/frontend/portal/tab-profile.php`:
+    - Displayed sleek `★ 1-on-1 VIP` badge in Member Portal header.
+    - Displayed dedicated `1-on-1 VIP Matchmaking Active` info card in Member Profile tab.
+  - `src/Admin/AdminPortal.php`, `src/View/admin/pool/pool-list.php`, `src/View/admin/settings/settings.php`:
+    - Added 1-on-1 VIP Service filter toggle (All / Has 1-on-1 / No 1-on-1) in Admin Pool Browser.
+    - Displayed `★ 1-on-1 VIP` badge in Candidate Pool list rows.
+    - Updated PMPro plan connector dropdown labels to explicitly show Group 1, Group 2, and Group 3 designations.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`, `tests/Unit/AdminWorkflowTest.php`, `tests/Unit/PortalAndEventsTest.php`:
+    - Added unit test `test_one_on_one_coexists_with_free_and_monthly_tiers()`.
+    - Added unit test `test_pool_search_query_with_has_one_on_one_filter()`.
+    - Added unit test `test_portal_renders_one_on_one_vip_badge_and_profile_card()`.
+- **Verification**:
+  - Ran automated test runner (`tests/run_tests.php`) — all 95 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
 ---
 
 

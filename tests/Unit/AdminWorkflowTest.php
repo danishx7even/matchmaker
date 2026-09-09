@@ -39,6 +39,17 @@ class AdminWorkflowTest
         if (!str_contains($queries_str, 'wp_matchmaking_pool') || !str_contains($queries_str, 'gender =') || !str_contains($queries_str, 'user_type =')) {
             throw new \RuntimeException("Expected pool search query with gender and user_type, executed:\n{$queries_str}");
         }
+
+        // Test with has_one_on_one filter
+        $wpdb->queries = [];
+        $filters_vip = [
+            'has_one_on_one' => '1',
+        ];
+        $this->repo->search_pool($filters_vip);
+        $queries_str_vip = implode("\n", $wpdb->queries);
+        if (!str_contains($queries_str_vip, 'has_one_on_one = 1')) {
+            throw new \RuntimeException("Expected pool search query with has_one_on_one = 1, executed:\n{$queries_str_vip}");
+        }
     }
 
     public function test_admin_settings_options_save(): void

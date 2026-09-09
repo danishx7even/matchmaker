@@ -42,7 +42,7 @@ class MatchRepository
         'pref_additional_info',
         'user_photo1', 'user_photo2', 'user_photo3',
         'cycle_matches_count', 'mm_last_match_run',
-        'user_type',
+        'user_type', 'mm_has_one_on_one',
     ];
 
     /**
@@ -370,6 +370,10 @@ class MatchRepository
             $where[] = 'p.user_type = %s';
             $args[]  = $filters['user_type'];
         }
+        if (isset($filters['has_one_on_one']) && $filters['has_one_on_one'] !== '') {
+            $where[] = 'p.has_one_on_one = %d';
+            $args[]  = (int) $filters['has_one_on_one'];
+        }
         if (!empty($filters['gender'])) {
             $where[] = 'p.gender = %s';
             $args[]  = $filters['gender'];
@@ -663,6 +667,44 @@ class MatchRepository
         global $wpdb;
         $table = $wpdb->prefix . 'matchmaking_pool';
         $wpdb->update($table, ['user_type' => $user_type], ['user_id' => $user_id], ['%s'], ['%d']);
+    }
+
+    /**
+     * Update the has_one_on_one column in the pool.
+     *
+     * @param int  $user_id        WordPress user ID.
+     * @param bool $has_one_on_one Whether user holds 1-on-1 VIP service.
+     * @return void
+     */
+    public function update_pool_one_on_one(int $user_id, bool $has_one_on_one): void
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaking_pool';
+        $wpdb->update($table, ['has_one_on_one' => $has_one_on_one ? 1 : 0], ['user_id' => $user_id], ['%d'], ['%d']);
+    }
+
+    /**
+     * Check if a user has 1-on-1 VIP service active.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return bool
+     */
+    public function has_one_on_one(int $user_id): bool
+    {
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaking_pool';
+        $val = $wpdb->get_var(
+            $wpdb->prepare("SELECT has_one_on_one FROM {$table} WHERE user_id = %d", $user_id)
+        );
+        if ($val !== null) {
+            return (int) $val === 1;
+        }
+
+        return (bool) get_user_meta($user_id, 'mm_has_one_on_one', true);
     }
 
     /**

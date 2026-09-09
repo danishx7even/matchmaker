@@ -27,10 +27,18 @@ class PMProSync {
     ];
 
     /**
-     * @return self
+     * Base subscription tier priority rank (higher integer = higher priority).
+     * Group 1: free
+     * Group 2: event, monthly
      */
+    public const BASE_TIER_PRIORITY = [
+        'monthly' => 3,
+        'event'   => 2,
+        'free'    => 1,
+    ];
+
     /**
-     * Tier priority rank (higher integer = higher priority).
+     * Combined tier priority fallback rank (for backwards compatibility).
      */
     public const TIER_PRIORITY = [
         'one_on_one' => 4,
@@ -138,6 +146,47 @@ class PMProSync {
     }
 
     /**
+     * Checks whether the user holds an active 1-on-1 VIP service level (Group 3).
+     *
+     * @param int $user_id
+     * @return bool
+     */
+    public function has_active_one_on_one_service(int $user_id): bool
+    {
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        $one_on_one_levels = $this->get_levels_for_tier('one_on_one');
+        if (empty($one_on_one_levels)) {
+            $one_on_one_levels = [4, 5];
+        }
+
+        if (function_exists('pmpro_getMembershipLevelsForUser')) {
+            $active_levels = pmpro_getMembershipLevelsForUser($user_id);
+            if (is_array($active_levels) && !empty($active_levels)) {
+                foreach ($active_levels as $lvl) {
+                    $lid = is_object($lvl) ? (int) ($lvl->id ?? 0) : (int) $lvl;
+                    if ($lid > 0 && in_array($lid, $one_on_one_levels, true)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        if (function_exists('pmpro_getMembershipLevelForUser')) {
+            $membership = pmpro_getMembershipLevelForUser($user_id);
+            if (is_object($membership) && !empty($membership->id)) {
+                return in_array((int) $membership->id, $one_on_one_levels, true);
+            }
+        }
+
+        // Fallback to usermeta if PMPro functions are not available
+        return (bool) get_user_meta($user_id, 'mm_has_one_on_one', true);
+    }
+
+    /**
      * Syncs PMPro level changes to our system.
      *
      * @param mixed $level_id
@@ -152,28 +201,40 @@ class PMProSync {
 
         $int_level_id = is_numeric($level_id) ? (int) $level_id : 0;
 
-        // If user changed/upgraded to a paid tier, cancel any lingering Free tier level from separate PMPro level groups
+        // If user changed/upgraded to a paid base tier (Monthly or Event), cancel lingering Free tier (Group 1)
         if ($int_level_id > 0) {
             $new_tier = $this->get_user_type_by_level_id($int_level_id);
-            if (in_array($new_tier, ['monthly', 'one_on_one', 'event'], true)) {
+            if (in_array($new_tier, ['monthly', 'event'], true)) {
                 $this->maybe_cancel_free_levels($user_id);
             }
         }
 
         $resolved_user_type = $this->get_current_user_type($user_id);
+        $has_one_on_one     = $this->has_active_one_on_one_service($user_id);
 
         // If a specific level > 0 was passed and PMPro internal cache hasn't flushed yet
         if ($int_level_id > 0) {
             $direct_tier = $this->get_user_type_by_level_id($int_level_id);
-            $direct_rank = self::TIER_PRIORITY[$direct_tier] ?? 1;
-            $resolved_rank = self::TIER_PRIORITY[$resolved_user_type] ?? 1;
-            if ($direct_rank > $resolved_rank) {
-                $resolved_user_type = $direct_tier;
+            if ($direct_tier === 'one_on_one') {
+                $has_one_on_one = true;
+            } elseif (isset(self::BASE_TIER_PRIORITY[$direct_tier])) {
+                $direct_rank   = self::BASE_TIER_PRIORITY[$direct_tier];
+                $resolved_rank = self::BASE_TIER_PRIORITY[$resolved_user_type] ?? 1;
+                if ($direct_rank > $resolved_rank) {
+                    $resolved_user_type = $direct_tier;
+                }
             }
+        }
+
+        if (in_array($resolved_user_type, ['monthly', 'event'], true)) {
+            $this->maybe_cancel_free_levels($user_id);
         }
         
         \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
+        update_user_meta($user_id, 'mm_has_one_on_one', $has_one_on_one ? 1 : 0);
+
         \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
+        \Matchmaker\Repository\MatchRepository::instance()->update_pool_one_on_one($user_id, $has_one_on_one);
 
         if ($resolved_user_type === 'monthly') {
             $pool_user = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
@@ -213,13 +274,17 @@ class PMProSync {
 
         foreach ($user_ids as $user_id) {
             $resolved_user_type = $this->get_current_user_type($user_id);
+            $has_one_on_one     = $this->has_active_one_on_one_service($user_id);
 
-            if (in_array($resolved_user_type, ['monthly', 'one_on_one', 'event'], true)) {
+            if (in_array($resolved_user_type, ['monthly', 'event'], true)) {
                 $this->maybe_cancel_free_levels($user_id);
             }
 
             \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
+            update_user_meta($user_id, 'mm_has_one_on_one', $has_one_on_one ? 1 : 0);
+
             \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
+            \Matchmaker\Repository\MatchRepository::instance()->update_pool_one_on_one($user_id, $has_one_on_one);
 
             if ($resolved_user_type === 'monthly') {
                 $pool_user = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
@@ -265,7 +330,8 @@ class PMProSync {
     }
 
     /**
-     * Cancels any active Free tier levels for a user if they hold a paid tier.
+     * Cancels any active Free tier levels for a user if they hold a paid base tier.
+     * Group 3 (1-on-1) levels are NEVER cancelled.
      *
      * @param int $user_id
      * @return void
@@ -295,10 +361,11 @@ class PMProSync {
     }
 
     /**
-     * Retrieves the current user_type with multi-group priority resolution.
+     * Retrieves the current base subscription user_type (Group 1: free, Group 2: monthly / event).
+     * 1-on-1 (Group 3) is treated as an independent add-on service.
      *
      * @param int $user_id
-     * @return string
+     * @return string 'monthly' | 'event' | 'free'
      */
     public function get_current_user_type(int $user_id): string
     {
@@ -312,23 +379,25 @@ class PMProSync {
         if (function_exists('pmpro_getMembershipLevelsForUser')) {
             $levels = pmpro_getMembershipLevelsForUser($user_id);
             if (is_array($levels) && !empty($levels)) {
-                $best_tier     = 'free';
-                $highest_rank  = 0;
+                $best_base_tier = 'free';
+                $highest_rank   = 0;
 
                 foreach ($levels as $level_obj) {
                     $lvl_id = is_object($level_obj) ? (int) ($level_obj->id ?? 0) : (int) $level_obj;
                     if ($lvl_id > 0) {
                         $tier = $this->get_user_type_by_level_id($lvl_id);
-                        $rank = self::TIER_PRIORITY[$tier] ?? 0;
-                        if ($rank > $highest_rank) {
-                            $highest_rank = $rank;
-                            $best_tier    = $tier;
+                        if (isset(self::BASE_TIER_PRIORITY[$tier])) {
+                            $rank = self::BASE_TIER_PRIORITY[$tier];
+                            if ($rank > $highest_rank) {
+                                $highest_rank   = $rank;
+                                $best_base_tier = $tier;
+                            }
                         }
                     }
                 }
 
                 if ($highest_rank > 0) {
-                    return $best_tier;
+                    return $best_base_tier;
                 }
             }
         }
@@ -337,18 +406,25 @@ class PMProSync {
         if (function_exists('pmpro_getMembershipLevelForUser')) {
             $membership = pmpro_getMembershipLevelForUser($user_id);
             if (is_object($membership) && !empty($membership->id)) {
-                return $this->get_user_type_by_level_id((int) $membership->id);
+                $tier = $this->get_user_type_by_level_id((int) $membership->id);
+                if (in_array($tier, ['monthly', 'event'], true)) {
+                    return $tier;
+                }
             }
         }
 
-        // If PMPro functions are present and reported no active levels, the user has no active tier -> 'free'
+        // If PMPro functions are present and reported no active base levels, user is 'free'
         if ($pmpro_available) {
             return 'free';
         }
 
         // 3. Fallback to usermeta ONLY if PMPro functions are not loaded in the runtime
         $meta_type = (string) get_user_meta($user_id, 'user_type', true);
-        return !empty($meta_type) ? $meta_type : 'free';
+        if (in_array($meta_type, ['monthly', 'event', 'free'], true)) {
+            return $meta_type;
+        }
+
+        return 'free';
     }
 
     /**

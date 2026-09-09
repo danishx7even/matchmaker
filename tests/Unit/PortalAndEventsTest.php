@@ -175,6 +175,56 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Back to Profile Dashboard', $html);
         $this->assertStringContainsString('Direct Contact Information', $html);
     }
+
+    public function test_portal_renders_one_on_one_vip_badge_and_profile_card(): void
+    {
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $user_id = 906;
+        $user = new \FakeWP_User($user_id, 'VIP Member', 'vip@example.com');
+        $GLOBALS['__mm_users'][$user_id] = $user;
+        $GLOBALS['__mm_current_user_id'] = $user_id;
+
+        $user_type = 'monthly';
+        $has_one_on_one = true;
+        $is_premium = true;
+        $pool = [
+            'user_id' => $user_id,
+            'birth_date' => '1995-05-15',
+            'height_cm' => 180,
+            'country' => 'United Arab Emirates',
+            'city' => 'Dubai',
+            'state' => 'Dubai',
+            'origin' => 'Emirati',
+            'languages' => 'Arabic, English',
+            'religion' => 'Muslim',
+            'smoking' => 'No',
+            'drinking' => 'No',
+            'job' => 'Engineer',
+            'has_one_on_one' => 1,
+        ];
+        $stats = $repo->get_match_stats($user_id);
+        $unread_count = 0;
+        $photos = [];
+        $meta = [];
+        $dashboard_url = 'https://example.com/dashboard/';
+        $matches = [];
+
+        // 1. Test portal header badge
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/portal.php';
+        $portal_html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('mm-vip-header-badge', $portal_html);
+        $this->assertStringContainsString('1-on-1 VIP', $portal_html);
+
+        // 2. Test profile tab VIP card
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-profile.php';
+        $profile_html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('mm-vip-service-card', $profile_html);
+        $this->assertStringContainsString('1-on-1 VIP Matchmaking Active', $profile_html);
+    }
 }
 
 

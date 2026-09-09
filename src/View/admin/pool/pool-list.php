@@ -31,11 +31,16 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     </select>
 
     <select name="filter_tier">
-        <option value=""><?php esc_html_e('All Tiers', 'matchmaker'); ?></option>
+        <option value=""><?php esc_html_e('All Base Tiers', 'matchmaker'); ?></option>
         <option value="monthly" <?php selected($tier, 'monthly'); ?>><?php esc_html_e('Monthly', 'matchmaker'); ?></option>
-        <option value="one_on_one" <?php selected($tier, 'one_on_one'); ?>><?php esc_html_e('1-on-1 VIP', 'matchmaker'); ?></option>
-        <option value="free" <?php selected($tier, 'free'); ?>><?php esc_html_e('Free', 'matchmaker'); ?></option>
         <option value="event" <?php selected($tier, 'event'); ?>><?php esc_html_e('Event', 'matchmaker'); ?></option>
+        <option value="free" <?php selected($tier, 'free'); ?>><?php esc_html_e('Free', 'matchmaker'); ?></option>
+    </select>
+
+    <select name="filter_one_on_one">
+        <option value=""><?php esc_html_e('All VIP Services', 'matchmaker'); ?></option>
+        <option value="1" <?php selected($one_on_one ?? '', '1'); ?>><?php esc_html_e('⭐ Has 1-on-1 VIP', 'matchmaker'); ?></option>
+        <option value="0" <?php selected($one_on_one ?? '', '0'); ?>><?php esc_html_e('No 1-on-1 VIP', 'matchmaker'); ?></option>
     </select>
 
     <input type="submit" class="button" value="<?php esc_attr_e('Filter', 'matchmaker'); ?>">
@@ -49,7 +54,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <th><?php esc_html_e('Gender', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Age', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Location', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Tier', 'matchmaker'); ?></th>
+            <th><?php esc_html_e('Tier & VIP', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Active Matches', 'matchmaker'); ?></th>
             <th style="width:100px; text-align:center;"><?php esc_html_e('Actions', 'matchmaker'); ?></th>
         </tr>
@@ -67,6 +72,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                 $approved_cnt = (int) ($c['approved_matches'] ?? 0);
                 $pending_cnt  = (int) ($c['pending_matches'] ?? 0);
                 $has_mutual   = $repo->has_mutual_match_this_month($uid);
+                $c_has_vip    = !empty($c['has_one_on_one']);
             ?>
                 <tr>
                     <td>
@@ -93,6 +99,13 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                         <span class="mm-badge mm-badge-<?php echo esc_attr($c['user_type'] ?? 'free'); ?>">
                             <?php echo esc_html($repo->format_tier_label($c['user_type'] ?? 'free')); ?>
                         </span>
+                        <?php if ($c_has_vip) : ?>
+                            <div style="margin-top:4px;">
+                                <span class="mm-badge" style="background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); font-weight:700; font-size:10px; letter-spacing:0.03em;">
+                                    ★ 1-on-1 VIP
+                                </span>
+                            </div>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <span class="mm-count-approved"><?php echo $approved_cnt; ?> <?php esc_html_e('approved', 'matchmaker'); ?></span> / 
