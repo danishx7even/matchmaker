@@ -59,7 +59,10 @@
        Dynamic Custom Select Updater Helper
     ------------------------------------------------------- */
     function updateCustomSelect(fieldName, items, selectedValue, defaultPlaceholder) {
-        var select = form.querySelector('select[name="form_fields[' + fieldName + ']"]');
+        var select = (form ? form.querySelector('select[name="form_fields[' + fieldName + ']"]') : null)
+            || document.getElementById('form-field-' + fieldName)
+            || document.querySelector('select[name="form_fields[' + fieldName + ']"]')
+            || document.querySelector('select[name="' + fieldName + '"]');
         if (!select) return;
         var wrapper = select.closest('.custom-select-wrapper');
         if (!wrapper) return;
@@ -217,52 +220,143 @@
         }
     };
 
+    function getUserGender() {
+        var checked = (form ? form.querySelector('input[type="radio"][name="form_fields[user_gender]"]:checked') : null)
+            || document.querySelector('input[type="radio"][name="form_fields[user_gender]"]:checked')
+            || document.querySelector('input[type="radio"][name="user_gender"]:checked');
+        if (checked && checked.value) {
+            return checked.value.trim().toLowerCase();
+        }
+        return 'female';
+    }
+
+    function getPrefGender() {
+        var checked = (form ? form.querySelector('input[type="radio"][name="form_fields[pref_gender]"]:checked') : null)
+            || document.querySelector('input[type="radio"][name="form_fields[pref_gender]"]:checked')
+            || document.querySelector('input[type="radio"][name="pref_gender"]:checked');
+        if (checked && checked.value) {
+            return checked.value.trim().toLowerCase();
+        }
+        var uG = getUserGender();
+        return (uG === 'male') ? 'female' : 'male';
+    }
+
     function syncModestyOptionsForUserGender(userGender) {
         var gKey = (userGender && userGender.toLowerCase() === 'male') ? 'male' : 'female';
-        var userModestySel = form.querySelector('select[name="form_fields[user_modesty]"]');
-        var currentVal = userModestySel ? userModestySel.value : '';
-        updateCustomSelect('user_modesty', modestyConfig[gKey].self, currentVal, 'Select preference');
+        var select = document.getElementById('form-field-user_modesty') || (form ? form.querySelector('select[name="form_fields[user_modesty]"]') : null);
+        var currentVal = select ? select.value : '';
+        var validOptions = modestyConfig[gKey].self;
+        var isValid = validOptions.some(function (opt) {
+            return opt.toLowerCase() === currentVal.toLowerCase() && !/^select\b/i.test(opt);
+        });
+        if (!isValid) {
+            currentVal = '';
+        }
+        updateCustomSelect('user_modesty', validOptions, currentVal, 'Select preference');
     }
 
     function syncModestyOptionsForPrefGender(prefGender) {
         var gKey = (prefGender && prefGender.toLowerCase() === 'male') ? 'male' : 'female';
-        var prefModestySel = form.querySelector('select[name="form_fields[pref_modesty]"]');
-        var currentVal = prefModestySel ? prefModestySel.value : '';
-        updateCustomSelect('pref_modesty', modestyConfig[gKey].pref, currentVal, 'Select preference');
+        var select = document.getElementById('form-field-pref_modesty') || (form ? form.querySelector('select[name="form_fields[pref_modesty]"]') : null);
+        var currentVal = select ? select.value : '';
+        var validOptions = modestyConfig[gKey].pref;
+        var isValid = validOptions.some(function (opt) {
+            return opt.toLowerCase() === currentVal.toLowerCase() && !/^select\b/i.test(opt);
+        });
+        if (!isValid) {
+            currentVal = '';
+        }
+        updateCustomSelect('pref_modesty', validOptions, currentVal, 'Select preference');
     }
 
-    // Listen to user_gender radio changes
-    var userGenderRadios = form.querySelectorAll('input[type="radio"][name="form_fields[user_gender]"]');
-    userGenderRadios.forEach(function (radio) {
-        radio.addEventListener('change', function () {
-            if (radio.checked) {
-                var uGender = radio.value;
-                syncModestyOptionsForUserGender(uGender);
+    function handleUserGenderChange(newGender) {
+        var g = (newGender || '').trim().toLowerCase();
+        if (!g) return;
+        syncModestyOptionsForUserGender(g);
 
-                // Auto-suggest opposite gender for pref_gender if not yet chosen
-                var targetPrefGender = (uGender.toLowerCase() === 'male') ? 'Female' : 'Male';
-                var currentPrefRadioChecked = form.querySelector('input[type="radio"][name="form_fields[pref_gender]"]:checked');
-                var prefRadio = form.querySelector('input[type="radio"][name="form_fields[pref_gender]"][value="' + targetPrefGender + '"]');
-                
-                if (!currentPrefRadioChecked && prefRadio) {
-                    prefRadio.checked = true;
-                    syncModestyOptionsForPrefGender(targetPrefGender);
-                } else if (currentPrefRadioChecked) {
-                    syncModestyOptionsForPrefGender(currentPrefRadioChecked.value);
-                }
+        // Auto-switch preferred partner gender to the opposite
+        var oppositeGender = (g === 'male') ? 'female' : 'male';
+        var prefRadios = form ? form.querySelectorAll('input[type="radio"][name="form_fields[pref_gender]"], input[type="radio"][name="pref_gender"]') : [];
+        prefRadios.forEach(function (r) {
+            if (r.value.toLowerCase() === oppositeGender) {
+                r.checked = true;
+            } else {
+                r.checked = false;
             }
+        });
+        syncModestyOptionsForPrefGender(oppositeGender);
+    }
+
+    function handlePrefGenderChange(newPrefGender) {
+        var g = (newPrefGender || '').trim().toLowerCase();
+        if (!g) return;
+        syncModestyOptionsForPrefGender(g);
+    }
+
+    // Direct event listeners on radio buttons & option items
+    form.querySelectorAll('input[type="radio"][name="form_fields[user_gender]"], input[type="radio"][name="user_gender"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            if (this.checked) handleUserGenderChange(this.value);
+        });
+        radio.addEventListener('click', function () {
+            if (this.checked) handleUserGenderChange(this.value);
         });
     });
 
-    // Listen to pref_gender radio changes
-    var prefGenderRadios = form.querySelectorAll('input[type="radio"][name="form_fields[pref_gender]"]');
-    prefGenderRadios.forEach(function (radio) {
+    form.querySelectorAll('input[type="radio"][name="form_fields[pref_gender]"], input[type="radio"][name="pref_gender"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
-            if (radio.checked) {
-                syncModestyOptionsForPrefGender(radio.value);
-            }
+            if (this.checked) handlePrefGenderChange(this.value);
+        });
+        radio.addEventListener('click', function () {
+            if (this.checked) handlePrefGenderChange(this.value);
         });
     });
+
+    // Form-level delegated listener for dynamic changes or custom radio clicks
+    form.addEventListener('change', function (e) {
+        var target = e.target;
+        if (!target) return;
+        var name = target.getAttribute('name') || '';
+        if (name === 'form_fields[user_gender]' || name === 'user_gender') {
+            if (target.checked) handleUserGenderChange(target.value);
+        } else if (name === 'form_fields[pref_gender]' || name === 'pref_gender') {
+            if (target.checked) handlePrefGenderChange(target.value);
+        }
+    });
+
+    // Option wrapper click fallback (e.g. clicking Elementor span/label)
+    form.addEventListener('click', function (e) {
+        var opt = e.target.closest('.elementor-field-option');
+        if (opt) {
+            var radio = opt.querySelector('input[type="radio"]');
+            if (radio) {
+                setTimeout(function () {
+                    if (radio.checked) {
+                        var name = radio.getAttribute('name') || '';
+                        if (name === 'form_fields[user_gender]' || name === 'user_gender') {
+                            handleUserGenderChange(radio.value);
+                        } else if (name === 'form_fields[pref_gender]' || name === 'pref_gender') {
+                            handlePrefGenderChange(radio.value);
+                        }
+                    }
+                }, 10);
+            }
+        }
+    });
+
+    // jQuery event binding if jQuery is active
+    if (window.jQuery) {
+        window.jQuery(form).on('change click', 'input[name="form_fields[user_gender]"], input[name="user_gender"]', function () {
+            if (this.checked) handleUserGenderChange(this.value);
+        });
+        window.jQuery(form).on('change click', 'input[name="form_fields[pref_gender]"], input[name="pref_gender"]', function () {
+            if (this.checked) handlePrefGenderChange(this.value);
+        });
+    }
+
+    // Run initial sync on script load
+    handleUserGenderChange(getUserGender());
+    handlePrefGenderChange(getPrefGender());
 
     /* -------------------------------------------------------
        Multi-select custom dropdowns

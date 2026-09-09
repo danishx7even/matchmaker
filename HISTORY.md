@@ -935,10 +935,23 @@ This document maintains a chronological, step-by-step history of all features, a
     - Replaced `f_modesty` text input with gender-aware `<select>` dropdown populated via `$fg->options_pref_modesty($cand_gender)`.
     - Added client-side JavaScript syncing `#mm_f_modesty` when candidate gender `#mm_f_gender` changes.
   - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
-    - Added comprehensive unit tests for female/male modesty options and field rendering.
+### Task 57: Robust Real-Time Modesty and Preferred Modesty Option Synchronization
+- **Objective**:
+  - Fix real-time updating of `user_modesty` and `pref_modesty` select options when changing `user_gender` and `pref_gender` radio selections.
+  - Eliminate browser script caching issues by adding dynamic filemtime versioning to frontend assets.
+- **Implemented**:
+  - `assets/js/matchmaking-form.js`:
+    - Upgraded `updateCustomSelect()` to support multi-layer selector fallbacks (by form query, document ID `form-field-{name}`, and name attribute).
+    - Added helper functions `getUserGender()` and `getPrefGender()` to robustly extract active gender states.
+    - Added comprehensive multi-level event listeners across `'change'`, `'click'`, Elementor option wrapper clicks, and jQuery event hooks.
+    - Implemented immediate initial synchronization on script load so options match pre-selected gender values instantly.
+    - Added automatic mutual gender suggestion (switching `user_gender` to Male auto-checks Female for `pref_gender` and vice-versa).
+  - `src/Frontend/FormController.php`:
+    - Updated asset enqueueing to use dynamic `filemtime()` for `matchmaking-form.js` and `matchmaking-form.css`, ensuring fresh scripts are loaded across all user browsers without caching delays.
   - **Verification**: Ran full automated test suite (`tests/run_tests.php`) — all 78 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
 ---
+
 
 
 

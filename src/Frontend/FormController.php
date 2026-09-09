@@ -79,20 +79,23 @@ class FormController {
         }
 
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
-        $version    = defined('MM_VERSION') ? MM_VERSION : '2.0.0';
+        $js_file    = dirname(__DIR__, 2) . '/assets/js/matchmaking-form.js';
+        $css_file   = dirname(__DIR__, 2) . '/assets/css/matchmaking-form.css';
+        $js_ver     = file_exists($js_file) ? (string) filemtime($js_file) : (defined('MM_VERSION') ? MM_VERSION : '2.0.0');
+        $css_ver    = file_exists($css_file) ? (string) filemtime($css_file) : (defined('MM_VERSION') ? MM_VERSION : '2.0.0');
 
         wp_enqueue_style(
             'mm-form-styles',
             $plugin_url . 'assets/css/matchmaking-form.css',
             [],
-            $version
+            $css_ver
         );
 
         wp_enqueue_script(
             'mm-form-script',
             $plugin_url . 'assets/js/matchmaking-form.js',
             [],
-            $version,
+            $js_ver,
             true // load in footer
         );
 
