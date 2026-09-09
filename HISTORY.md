@@ -1063,6 +1063,20 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+### Task 62: Fix wpautop & wptexturize Filter Priority and HTML/JS Syntax Corruption
+- **Objective**:
+  - Resolve HTML and JavaScript corruption on PMPro edit profile pages where WordPress core `wpautop` and `wptexturize` filters were injecting unexpected `<p>`, `</p>`, and converting `&&` into `&#038;&#038;` inside JavaScript event handlers.
+- **Implemented**:
+  - `src/Service/EmailVerificationService.php`:
+    - Updated hook priorities for `the_content`, `pmpro_shortcode_account`, and `pmpro_shortcode_member_profile_edit` from priority `5` to priority `99` so they run AFTER WordPress core `wpautop` (priority 10) and `wptexturize` (priority 10).
+    - Removed HTML comment tags (`<!-- ... -->`) from `render_pending_email_notice()` that triggered core `wpautop` paragraph insertions.
+    - Replaced all inline logical `&&` expressions in HTML `onclick` attributes with safe standard condition syntax (`if (window.mmOpenPendingVerifyModal) { ... }`).
+    - Added dedicated backdrop click dismissal via JavaScript event listener (`modal.addEventListener('click')`).
+- **Verification**:
+  - Executed automated test suite (`tests/run_tests.php`) — all 93 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
 
 
 

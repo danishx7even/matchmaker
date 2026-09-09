@@ -63,9 +63,9 @@ class EmailVerificationService
         add_action('personal_options_update',          [$this, 'intercept_personal_options_update'], 5, 1);
 
         // PMPro Account Page & Content Notice Hooks
-        add_filter('the_content',                             [$this, 'filter_the_content_for_pending_email_notice'], 5, 1);
-        add_filter('pmpro_shortcode_account',                 [$this, 'filter_pmpro_shortcode_notice'], 5, 1);
-        add_filter('pmpro_shortcode_member_profile_edit',     [$this, 'filter_pmpro_shortcode_notice'], 5, 1);
+        add_filter('the_content',                             [$this, 'filter_the_content_for_pending_email_notice'], 99, 1);
+        add_filter('pmpro_shortcode_account',                 [$this, 'filter_pmpro_shortcode_notice'], 99, 1);
+        add_filter('pmpro_shortcode_member_profile_edit',     [$this, 'filter_pmpro_shortcode_notice'], 99, 1);
         add_action('pmpro_account_bullets_top',               [$this, 'render_pending_email_notice_on_pmpro_account']);
         add_action('pmpro_account_preheader',                 [$this, 'render_pending_email_notice_on_pmpro_account']);
         add_action('pmpro_member_profile_edit_after_panel',   [$this, 'render_pending_email_notice_on_pmpro_account']);
@@ -1759,7 +1759,6 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
         ob_start();
         ?>
         <div class="mm-pending-email-notice-wrap" id="mm-pending-email-notice-wrap" style="margin: 0 0 24px;">
-            <!-- Notice Banner -->
             <div class="mm-pending-email-notice" style="background: linear-gradient(135deg, #FFFDFB 0%, #FAF5F0 100%); border: 1px solid rgba(204,114,63,0.3); border-left: 4px solid #CC723F; padding: 16px 20px; border-radius: 12px; box-shadow: 0 4px 14px rgba(204,114,63,0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 260px;">
                     <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(204,114,63,0.12); color: #CC723F; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -1773,17 +1772,16 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                     </div>
                 </div>
                 <div>
-                    <button type="button" id="mm-open-pending-verify-modal-btn" class="mm-open-pending-verify-btn" onclick="window.mmOpenPendingVerifyModal && window.mmOpenPendingVerifyModal(event)" style="background: #CC723F; color: #ffffff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(204,114,63,0.25); display: inline-flex; align-items: center; gap: 6px;">
+                    <button type="button" id="mm-open-pending-verify-modal-btn" class="mm-open-pending-verify-btn" onclick="if(window.mmOpenPendingVerifyModal){window.mmOpenPendingVerifyModal(event);}" style="background: #CC723F; color: #ffffff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(204,114,63,0.25); display: inline-flex; align-items: center; gap: 6px;">
                         <span><?php esc_html_e('Verify Email', 'matchmaker'); ?></span>
                         <span style="font-size: 14px;">&rarr;</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Pending Email OTP Verification Modal -->
-            <div id="mm-pending-verify-modal" class="mm-modal-overlay" onclick="if(event.target === this) { window.mmClosePendingVerifyModal && window.mmClosePendingVerifyModal(event); }" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(29,30,32,0.65); backdrop-filter:blur(4px); z-index:999999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
+            <div id="mm-pending-verify-modal" class="mm-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(29,30,32,0.65); backdrop-filter:blur(4px); z-index:999999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
                 <div class="mm-modal-card" style="background:#ffffff; max-width:440px; width:100%; border-radius:18px; padding:32px 26px; box-shadow:0 24px 48px rgba(29,30,32,0.22); border:1px solid rgba(204,114,63,0.18); position:relative; text-align:center; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    <button type="button" id="mm-close-pending-modal-btn" class="mm-close-pending-modal-btn" onclick="window.mmClosePendingVerifyModal && window.mmClosePendingVerifyModal(event)" style="position:absolute; top:16px; right:18px; background:none; border:none; font-size:24px; color:#9ca3af; cursor:pointer; line-height:1; transition:color 0.15s ease;" title="<?php esc_attr_e('Close', 'matchmaker'); ?>">&times;</button>
+                    <button type="button" id="mm-close-pending-modal-btn" class="mm-close-pending-modal-btn" onclick="if(window.mmClosePendingVerifyModal){window.mmClosePendingVerifyModal(event);}" style="position:absolute; top:16px; right:18px; background:none; border:none; font-size:24px; color:#9ca3af; cursor:pointer; line-height:1; transition:color 0.15s ease;" title="<?php esc_attr_e('Close', 'matchmaker'); ?>">&times;</button>
                     
                     <div style="width:52px; height:52px; background:#FAF5F0; border:1px solid rgba(204,114,63,0.25); border-radius:50%; color:#CC723F; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CC723F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
@@ -1853,6 +1851,14 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                 var alertBox = document.getElementById('mm-pending-verify-alert');
                 var cooldown = <?php echo (int) $cooldown_remaining; ?>;
                 var timerInterval = null;
+
+                if (modal) {
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === modal) {
+                            window.mmClosePendingVerifyModal(e);
+                        }
+                    });
+                }
 
                 function showAlert(msg, isSuccess) {
                     if (!alertBox) return;
