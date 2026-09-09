@@ -897,8 +897,27 @@ This document maintains a chronological, step-by-step history of all features, a
   - `tests/Unit/AdminWorkflowTest.php` & `tests/Unit/AuthAndRedirectsTest.php`:
     - Added automated unit tests verifying role registration, capability inheritance, menu stripping, and login redirects.
   - `context/admin_portal.md`:
-    - Documented Matchmaker Admin role, capabilities, and screen gating architecture.
-  - Verified test suite: all 76 automated unit and integration tests pass with 100% success rate (0 errors, 0 failures).
+### Task 55: Populate Origin / Ethnicity and Preferred Origin from ethinicity.json
+- **Objective**:
+  - Ingest the full nationalities dataset from `assets/file/ethinicity.json` to populate options for `user_origin` (Origin / Ethnicity) and `pref_origin` (Preferred Origin).
+  - Ensure that changes to Origin / Ethnicity have **no impact** on the Country, State, and City cascading selections.
+  - Ensure `pref_origin` has a first option of **"Any Origin"** followed by all nationalities, and that selecting "Any Origin" matches candidates seamlessly in the matching engine and manual matchmaker.
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Added `get_ethnicity_data(): array` to read and decode `assets/file/ethinicity.json` with fallback defaults.
+    - Updated `options_origin(): array` to return sorted nationalities with `'Select origin'` placeholder.
+    - Updated `options_pref_origin(): array` to return `'Any Origin'` as the first option followed by all nationalities.
+  - `src/Core/MatchingEngine.php`:
+    - Updated `compute_flexible_score()` origin matching closure `$in_list` to support `'Any Origin'`, `'No Preference'`, and `'Any'` alongside comma-separated list matching.
+  - `src/Repository/MatchRepository.php`:
+    - Updated `get_manual_match_candidates()` so passing `'Any Origin'` or `'Any'` does not incorrectly filter out candidates via strict WHERE clauses, while still scoring specific origin preferences accurately.
+  - `src/View/admin/pool/manual-match.php`:
+    - Replaced the `f_origin` text input with a `<select>` dropdown populated dynamically with `$origin_options` from `$fg->options_pref_origin()`.
+  - `context/matching_engine.md`:
+    - Updated flexible scoring documentation for Dimension 1 (Origin / Ethnicity) referencing `ethinicity.json` and `'Any Origin'`.
+  - `tests/Unit/LocationCascadeTest.php` & `tests/Unit/MatchingEngineTest.php`:
+    - Added comprehensive unit tests validating `options_origin()`, `options_pref_origin()`, and flexible score calculation for `'Any Origin'`.
+  - **Verification**: Ran full automated test suite (`tests/run_tests.php`) — all 77 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
 ---
 

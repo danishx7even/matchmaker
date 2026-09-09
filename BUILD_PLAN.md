@@ -2,7 +2,8 @@
 
 **Status**: `IDLE`
 
-There are currently no active tasks in progress.
+There is currently no active task in progress.
+
 
 
 

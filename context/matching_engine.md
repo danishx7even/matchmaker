@@ -104,7 +104,7 @@ For all candidates passing Phase 1 hard gates, `MatchingEngine::compute_flexible
 
 | Dimension | Points | Evaluation Rule |
 | :--- | :---: | :--- |
-| **1. Origin / Ethnicity** | **+1 pt** | Mutual match: User A's `origin` is in Candidate B's `pref_origin` **AND** Candidate B's `origin` is in User A's `pref_origin`. |
+| **1. Origin / Ethnicity** | **+1 pt** | Mutual match: User A's `origin` is in Candidate B's `pref_origin` (or `'Any Origin'` / `'Any'`) **AND** Candidate B's `origin` is in User A's `pref_origin` (or `'Any Origin'` / `'Any'`). Sourced from `assets/file/ethinicity.json`. |
 | **2. Languages Spoken** | **+1 pt** | At least one shared spoken language in comma-delimited `languages` lists. |
 | **3. Height Compatibility** | **+1 pt** | Candidate height $\in [\text{User preferred\_height\_min}, \text{User preferred\_height\_max}]$ **AND** User height $\in [\text{Cand preferred\_height\_min}, \text{Cand preferred\_height\_max}]$. |
 | **4. Profession / Employment** | **+1 pt** | Candidate has a non-empty `job` field provided. |

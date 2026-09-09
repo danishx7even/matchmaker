@@ -99,5 +99,28 @@ final class LocationCascadeTest extends TestCase
         $this->assertContains('Pakistan', $pref_citizenships);
         $this->assertGreaterThan(200, count($pref_citizenships));
     }
+
+    public function test_origin_and_pref_origin_contain_ethnicity_data(): void
+    {
+        $fg = FieldGenerator::instance();
+
+        $origins = $fg->options_origin();
+        $this->assertEquals('Select origin', $origins[0]);
+        $this->assertContains('Algerian', $origins);
+        $this->assertContains('Egyptian', $origins);
+        $this->assertContains('Pakistani', $origins);
+        $this->assertContains('Saudi, Saudi Arabian', $origins);
+        $this->assertContains('Moroccan', $origins);
+        $this->assertGreaterThan(50, count($origins));
+
+        $pref_origins = $fg->options_pref_origin();
+        $this->assertEquals('Any Origin', $pref_origins[0]);
+        $this->assertContains('Algerian', $pref_origins);
+        $this->assertContains('Egyptian', $pref_origins);
+        $this->assertContains('Pakistani', $pref_origins);
+        $this->assertContains('Saudi, Saudi Arabian', $pref_origins);
+        $this->assertContains('Moroccan', $pref_origins);
+        $this->assertGreaterThan(50, count($pref_origins));
+    }
 }
 

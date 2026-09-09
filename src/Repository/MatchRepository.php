@@ -529,7 +529,7 @@ class MatchRepository
 
         // 3d. Pool Profile Text Criteria (Religion, Modesty, Origin)
         foreach (['f_religion' => 'religion', 'f_modesty' => 'modesty', 'f_origin' => 'origin'] as $filter_key => $col) {
-            if (!empty($filters[$filter_key]) && strtolower($filters[$filter_key]) !== 'any') {
+            if (!empty($filters[$filter_key]) && !in_array(strtolower(trim((string)$filters[$filter_key])), ['any', 'any origin', 'any religion', 'any modesty', 'select origin', 'select religion', 'no preference', ''], true)) {
                 $val = trim((string)$filters[$filter_key]);
                 $like = '%' . $wpdb->esc_like(strtolower($val)) . '%';
                 $where[] = "(c.{$col} IS NOT NULL AND c.{$col} != '' AND (LOWER(c.{$col}) LIKE %s OR %s LIKE CONCAT('%%', LOWER(c.{$col}), '%%') OR FIND_IN_SET(LOWER(c.{$col}), REPLACE(LOWER(%s), ', ', ',')) > 0))";
@@ -578,7 +578,7 @@ class MatchRepository
         if (!empty($filters['f_location']) && strtolower($filters['f_location']) !== 'any') {
             $scoring_profile['pref_location'] = $filters['f_location'];
         }
-        if (!empty($filters['f_origin']) && strtolower($filters['f_origin']) !== 'any') {
+        if (!empty($filters['f_origin']) && !in_array(strtolower(trim((string)$filters['f_origin'])), ['any', 'any origin', 'select origin', 'no preference', ''], true)) {
             $scoring_profile['pref_origin'] = $filters['f_origin'];
         }
         if (!empty($filters['f_religion']) && strtolower($filters['f_religion']) !== 'any') {

@@ -84,6 +84,15 @@ final class MatchingEngineTest extends TestCase
         $scoreC = $engine->compute_flexible_score($userA, $candC);
         // Only height (1pt) + drinking (1pt) match = 2 pts
         $this->assertEquals(2, $scoreC);
+
+        // Candidate D with 'Any Origin' in pref_origin matches userA's origin
+        $candD = $candC;
+        $candD['pref_origin'] = 'Any Origin';
+        $userA_any = $userA;
+        $userA_any['pref_origin'] = 'Any Origin';
+        $scoreD = $engine->compute_flexible_score($userA_any, $candD);
+        // Height (1pt) + drinking (1pt) + origin (1pt) = 3 pts
+        $this->assertEquals(3, $scoreD);
     }
 
     public function test_field_generator_options_usd_and_no_preference_and_citizenship(): void
@@ -133,7 +142,18 @@ final class MatchingEngineTest extends TestCase
         $this->assertContains('Saudi Arabia', $pref_citizenship);
         $this->assertContains('United States', $pref_citizenship);
 
-        // 4. Verify specific country list
+        // 4. Verify "Any Origin" as first preferred origin option and origin list
+        $pref_origin = $gen->options_pref_origin();
+        $this->assertEquals('Any Origin', $pref_origin[0]);
+        $this->assertContains('Algerian', $pref_origin);
+        $this->assertContains('Pakistani', $pref_origin);
+
+        $origin = $gen->options_origin();
+        $this->assertEquals('Select origin', $origin[0]);
+        $this->assertContains('Algerian', $origin);
+        $this->assertContains('Pakistani', $origin);
+
+        // 5. Verify specific country list
         $countries = $gen->options_country();
         $this->assertContains('United States', $countries);
         $this->assertContains('United Kingdom', $countries);

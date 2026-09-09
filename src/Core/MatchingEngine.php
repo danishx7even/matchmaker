@@ -573,12 +573,21 @@ class MatchingEngine {
             return array_filter(array_map('trim', explode(',', $val)));
         };
 
-        // Helper: check if $needle appears in a comma-delimited $haystack.
+        // Helper: check if $needle appears in a comma-delimited $haystack or if $haystack specifies Any/No Preference.
         $in_list = static function (?string $needle, ?string $haystack) use ($split): bool {
-            if (empty($needle) || empty($haystack)) {
-                return false;
+            if (empty($haystack)) {
+                return true;
             }
-            return in_array(trim($needle), $split($haystack), true);
+            $items = $split($haystack);
+            foreach ($items as $item) {
+                if (in_array(strtolower(trim($item)), ['any', 'any origin', 'no preference', 'any country', 'any citizenship'], true)) {
+                    return true;
+                }
+                if (!empty($needle) && strcasecmp(trim($needle), $item) === 0) {
+                    return true;
+                }
+            }
+            return false;
         };
 
         // 1. Origin — mutual match.

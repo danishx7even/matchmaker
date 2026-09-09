@@ -215,18 +215,69 @@ class FieldGenerator {
     }
 
     /**
-     * Get origin options
+     * Get ethnicity/nationality data from JSON file (assets/file/ethinicity.json).
+     *
+     * @return list<string>
+     */
+    public function get_ethnicity_data(): array
+    {
+        static $data = null;
+        if ($data === null) {
+            $json_path = (defined('MM_PATH') ? MM_PATH : dirname(__DIR__, 2) . '/') . 'assets/file/ethinicity.json';
+            if (file_exists($json_path)) {
+                $content = @file_get_contents($json_path);
+                if ($content) {
+                    $decoded = json_decode($content, true);
+                    if (is_array($decoded)) {
+                        $data = array_values(array_filter(array_map('trim', $decoded)));
+                    }
+                }
+            }
+            if ($data === null || empty($data)) {
+                $data = [
+                    'Afghan', 'Albanian', 'Algerian', 'American', 'Andorran', 'Angolan',
+                    'Arab', 'Argentine', 'Armenian', 'Australian', 'Austrian', 'Azerbaijani',
+                    'Bahraini', 'Bangladeshi', 'Belgian', 'Bosnian', 'Brazilian', 'British',
+                    'Bulgarian', 'Canadian', 'Chinese', 'Colombian', 'Croatian', 'Czech',
+                    'Danish', 'Egyptian', 'Emirati', 'Ethiopian', 'Filipino', 'Finnish',
+                    'French', 'German', 'Greek', 'Indian', 'Indonesian', 'Iranian', 'Iraqi',
+                    'Irish', 'Italian', 'Japanese', 'Jordanian', 'Kazakh', 'Kenyan', 'Kuwaiti',
+                    'Lebanese', 'Libyan', 'Malaysian', 'Moroccan', 'Nigerian', 'Norwegian',
+                    'Omani', 'Pakistani', 'Palestinian', 'Polish', 'Qatari', 'Russian',
+                    'Saudi', 'Somali', 'Spanish', 'Sudanese', 'Swedish', 'Swiss', 'Syrian',
+                    'Tunisian', 'Turkish', 'Ukrainian', 'Yemeni', 'Other'
+                ];
+            }
+        }
+        return $data;
+    }
+
+    /**
+     * Get origin / ethnicity options (full nationality list from ethinicity.json)
      *
      * @return array
      */
-    public function options_origin(): array { return ['Arab', 'South Asian', 'Middle Eastern', 'North African', 'African', 'European', 'North American', 'South American', 'Central American', 'Caribbean', 'Central Asian', 'Southeast Asian', 'East Asian', 'Australian / Oceanian', 'Other']; }
+    public function options_origin(): array
+    {
+        $ethnicities = $this->get_ethnicity_data();
+        sort($ethnicities, SORT_STRING | SORT_FLAG_CASE);
+        return array_merge(['Select origin'], $ethnicities);
+    }
     
     /**
-     * Get preferred origin options (with No Preference)
+     * Get preferred origin / ethnicity options (with Any Origin as first option)
      *
      * @return array
      */
-    public function options_pref_origin(): array { return array_merge($this->options_origin(), ['No Preference']); }
+    public function options_pref_origin(): array
+    {
+        $origins = $this->options_origin();
+        if (!empty($origins) && preg_match('/^select\b/i', (string) $origins[0])) {
+            array_shift($origins); // Remove "Select origin"
+        }
+        array_unshift($origins, 'Any Origin');
+        return $origins;
+    }
 
     /**
      * Get religion options

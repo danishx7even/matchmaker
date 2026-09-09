@@ -38,6 +38,7 @@ $country_options     = $fg->options_pref_country();
 $state_options       = $fg->options_pref_state($f_country ?? '');
 $city_options        = $fg->options_pref_city($f_country ?? '', $f_state ?? '');
 $citizenship_options = $fg->options_pref_citizenship();
+$origin_options      = $fg->options_pref_origin();
 $hierarchy_json      = json_encode($fg->get_hierarchy_data(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['country'] ?: ($pool['location'] ?: '—')));
@@ -142,7 +143,13 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
 
             <div style="flex:1 1 180px;">
                 <label><strong><?php esc_html_e('Origin / Ethnicity', 'matchmaker'); ?></strong></label><br>
-                <input type="text" name="f_origin" value="<?php echo esc_attr($f_origin ?? ''); ?>" placeholder="<?php esc_attr_e('e.g. Arab or Any', 'matchmaker'); ?>" style="width:100%;">
+                <select name="f_origin" id="mm_f_origin" style="width:100%;">
+                    <?php foreach ($origin_options as $orig_opt) : ?>
+                        <option value="<?php echo esc_attr($orig_opt); ?>" <?php selected(strcasecmp($f_origin ?? '', $orig_opt) === 0); ?>>
+                            <?php echo esc_html($orig_opt); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <div style="flex:1 1 180px;">
