@@ -104,6 +104,7 @@ class FakeWP_User {
     public int $ID = 0;
     public string $display_name = '';
     public string $user_email = '';
+    public string $user_registered = '';
     public array $roles = ['subscriber'];
 
     public function __construct(int $id = 0, string $name = 'Test User', string $email = 'test@example.com') {
@@ -199,8 +200,19 @@ function wp_update_user($args) {
         if (!empty($args['display_name'])) {
             $GLOBALS['__mm_users'][$uid]->display_name = $args['display_name'];
         }
+        if (!empty($args['user_email'])) {
+            $GLOBALS['__mm_users'][$uid]->user_email = $args['user_email'];
+        }
     }
     return $uid;
+}
+
+function wp_delete_user(int $id, ?int $reassign = null): bool {
+    unset($GLOBALS['__mm_users'][$id]);
+    unset($GLOBALS['__mm_usermeta'][$id]);
+    unset($GLOBALS['__mm_user_pmpro_level'][$id]);
+    unset($GLOBALS['__mm_user_pmpro_levels'][$id]);
+    return true;
 }
 
 function email_exists($email) {
@@ -822,10 +834,48 @@ class Fakewpdb {
         return 1;
     }
 
+    public function delete($table, $where, $where_format = null): int {
+        $this->queries[] = "DELETE FROM {$table}";
+        return 1;
+    }
+
     public function replace($table, $data, $format = null): int {
         $this->queries[] = "REPLACE INTO {$table}";
         return 1;
     }
+}
+
+class WP_Error {
+    public array $errors = [];
+    public array $error_data = [];
+
+    public function __construct(string|int $code = '', string $message = '', mixed $data = '') {
+        if ($code) {
+            $this->add($code, $message, $data);
+        }
+    }
+
+    public function add(string|int $code, string $message, mixed $data = ''): void {
+        $this->errors[$code][] = $message;
+        if ($data) {
+            $this->error_data[$code] = $data;
+        }
+    }
+
+    public function get_error_message(string|int $code = ''): string {
+        if (empty($code)) {
+            $code = key($this->errors);
+        }
+        return isset($this->errors[$code][0]) ? (string) $this->errors[$code][0] : '';
+    }
+
+    public function has_errors(): bool {
+        return !empty($this->errors);
+    }
+}
+
+function is_wp_error(mixed $thing): bool {
+    return $thing instanceof WP_Error;
 }
 
 $GLOBALS['wpdb'] = new Fakewpdb();

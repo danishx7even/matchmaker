@@ -666,6 +666,26 @@ class MatchRepository
     }
 
     /**
+     * Delete a candidate from wp_matchmaking_pool and cleanup any associated match pairs.
+     *
+     * @param int $user_id
+     * @return void
+     */
+    public function delete_pool_user(int $user_id): void
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaking_pool';
+        $wpdb->delete($table, ['user_id' => $user_id], ['%d']);
+
+        $matches_table = $wpdb->prefix . 'matches';
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$matches_table} WHERE user_one_id = %d OR user_two_id = %d",
+            $user_id,
+            $user_id
+        ));
+    }
+
+    /**
      * Get all active pool records (used for idle-user cron sweeps).
      *
      * @param string $user_type Membership tier slug to filter by.

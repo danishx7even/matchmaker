@@ -557,7 +557,10 @@ class FieldGenerator {
     private function upload(string $name, $preview_url = ''): string {
         $has_preview = !empty($preview_url);
         $extra_class = $has_preview ? ' has-preview' : '';
+        $photo_num   = preg_replace('/\D/', '', $name);
+        $label_text  = $photo_num ? sprintf(__('Photo %s', 'matchmaker'), $photo_num) : __('Profile Photo', 'matchmaker');
         $html = '<div class="elementor-field-type-upload elementor-field-group elementor-column elementor-field-group-' . esc_attr($name) . $extra_class . '">';
+        $html .= '<label class="elementor-field-label" for="form-field-' . esc_attr($name) . '">' . esc_html($label_text) . ' <span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span></label>';
         $html .= '<input type="file" accept="image/*" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field"' . ($has_preview ? '' : ' required') . '>';
         if ($has_preview) { $html .= '<img src="' . esc_url($preview_url) . '" class="upload-preview-img" alt="Photo Preview">'; }
         $html .= '</div>';
@@ -623,13 +626,18 @@ class FieldGenerator {
      * @param string $title Section title
      * @param string $subtitle Optional subtitle
      * @param string $extra_class Optional extra class
+     * @param bool $required Optional required indicator
      * @return string
      */
-    public function section_open(string $icon, string $title, string $subtitle = '', string $extra_class = ''): string {
+    public function section_open(string $icon, string $title, string $subtitle = '', string $extra_class = '', bool $required = false): string {
         $html = '<div class="form-section' . ($extra_class ? ' ' . esc_attr($extra_class) : '') . '">';
         $html .= '<div class="form-section-title">';
         if ($icon) $html .= '<span class="section-icon">' . $this->icon($icon) . '</span>';
-        $html .= esc_html($title) . '</div>';
+        $html .= esc_html($title);
+        if ($required) {
+            $html .= ' <span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span>';
+        }
+        $html .= '</div>';
         if ($subtitle) $html .= '<p class="form-section-subtitle">' . esc_html($subtitle) . '</p>';
         $html .= '<div class="form-section-fields">';
         return $html;
@@ -758,16 +766,16 @@ class FieldGenerator {
             'user_smoking'        => ['Smoking Habits', $this->options_smoking()],
             'user_prayer'         => ['Prayer Habits', $this->options_prayer()],
             'user_education'      => ['Highest Education Level', $this->options_education()],
-            'user_income'         => ['Income Range', $this->options_income()],
+            'user_income'         => ['Yearly Income Range', $this->options_income()],
             'pref_origin'         => ['Preferred Origin / Ethnicity', $this->options_pref_origin()],
             'pref_religion'       => ['Preferred Religion', $this->options_pref_religion()],
             'pref_marital_status' => ['Preferred Marital Status', $this->options_pref_marital()],
             'pref_children'       => ['Children Preference', $this->options_pref_children()],
             'pref_drinking'       => ['Drinking Preference', $this->options_pref_drinking()],
             'pref_smoking'        => ['Smoking Preference', $this->options_pref_smoking()],
-            'pref_prayer'         => ['Prayer Habits Preference', $this->options_pref_prayer()],
+            'pref_prayer'         => ['Prayer Habits Preference', $this->options_prayer()],
             'pref_education'      => ['Preferred Education Level', $this->options_pref_education()],
-            'pref_income'         => ['Preferred Income Range', $this->options_pref_income()],
+            'pref_income'         => ['Preferred Yearly Income Range', $this->options_pref_income()],
         ];
 
         $multi_configs = [

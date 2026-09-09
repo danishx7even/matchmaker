@@ -298,7 +298,7 @@ class FormController {
                         <?php echo $this->fg->render_single_field('user_income', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
-                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. All 3 photos are mandatory.', 'upload-section'); ?>
+                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. All 3 photos are mandatory.', 'upload-section', true); ?>
                         <?php echo $this->fg->render_single_field('user_photo1', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo2', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo3', $v); ?>

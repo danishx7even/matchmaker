@@ -952,6 +952,44 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+### Task 58: Photo Required Mark, Yearly Income Range Labels, 48h Unverified User Purge, PMPro Email Change Verification & 60min Expiry
+- **Objective**:
+  1. Add required red asterisk (`*`) to the Profile Photos section header and individual upload field labels.
+  2. Rename `"Income Range"` $\rightarrow$ `"Yearly Income Range"` and `"Preferred Income Range"` $\rightarrow$ `"Preferred Yearly Income Range"` across frontend forms and admin single user view.
+  3. Implement automatic 48-hour unverified account purging with Action Scheduler daily recurring job `mm_purge_unverified_users_job` (canceling PMPro memberships, deleting from pool, and removing user accounts while preserving admins).
+  4. Intercept email changes on PMPro account / edit profile pages: preserve existing `user_email`, store new email in `mm_pending_new_email`, dispatch 6-digit OTP to the new email address, and render non-intrusive warning notice banner and modal popup on PMPro Account and Member Dashboard pages without locking access.
+  5. Update verification code expiration default to 60 minutes (3600 seconds) and display "60 minutes" in email templates.
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `upload()` to include label with `<span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span>`.
+    - Updated `section_open()` to accept `$required = false` parameter and render `<span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span>` on section headers.
+    - Updated `$select_configs` for `'user_income'` $\rightarrow$ `'Yearly Income Range'` and `'pref_income'` $\rightarrow$ `'Preferred Yearly Income Range'`.
+  - `src/Frontend/FormController.php`:
+    - Passed `$required = true` to `section_open('camera', 'Profile Photos', ..., 'upload-section', true)`.
+  - `src/View/admin/pool/user-single.php`:
+    - Updated table header labels to `"Yearly Income Range"` and `"Preferred Yearly Income Range"`.
+  - `src/Repository/MatchRepository.php`:
+    - Added `delete_pool_user(int $user_id): void` to encapsulate candidate deletion and match pair cleanup in compliance with the Single Database Authority rule.
+  - `src/Service/EmailVerificationService.php`:
+    - Updated `CODE_EXPIRY_SECONDS` constant and `get_expiry_seconds()` default to `3600` (60 minutes).
+    - Updated `get_email_html()` to display `"60 minutes"` when 1 hour is configured.
+    - Implemented `purge_unverified_users()` and daily Action Scheduler recurring worker `mm_purge_unverified_users_job`.
+    - Hooked into `user_profile_update_errors` and `personal_options_update` via `intercept_profile_email_update()` and `intercept_personal_options_update()` to intercept PMPro / WordPress profile email updates.
+    - Implemented `generate_and_send_pending_code()`, `send_pending_email_verification()`, and `verify_pending_email_code()` to handle OTP lifecycle for pending email changes.
+    - Registered AJAX actions `wp_ajax_mm_verify_pending_email_code` and `wp_ajax_mm_resend_pending_email_code`.
+    - Implemented `render_pending_email_notice()` and `render_pending_email_notice_on_pmpro_account()` hooked to `pmpro_account_preheader` and `pmpro_member_profile_edit_after_panel`.
+  - `src/View/frontend/portal/portal.php`:
+    - Added `render_pending_email_notice()` above tab panels for seamless notice banner rendering on the Member Dashboard.
+  - `tests/bootstrap.php`:
+    - Added `wp_delete_user`, `WP_Error`, `is_wp_error`, and `Fakewpdb::delete` test doubles.
+    - Updated `wp_update_user` mock to support updating `user_email`.
+  - `tests/Unit/EmailVerificationTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Added unit tests for 60-minute expiry, 48-hour purge worker, profile email update interception, pending email verification, notice banner rendering, required photo mark, and yearly income labels.
+  - **Verification**: Ran full automated test suite (`tests/run_tests.php`) — all 85 tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
 
 

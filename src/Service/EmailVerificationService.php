@@ -28,8 +28,8 @@ class EmailVerificationService
      */
     private static array $sent_in_request = [];
 
-    public const CODE_EXPIRY_SECONDS     = 86400; // 24 hours (default fallback)
-    public const RESEND_COOLDOWN_SECONDS = 60;    // 60 seconds (default fallback)
+    public const CODE_EXPIRY_SECONDS     = 3600; // 60 minutes (default fallback)
+    public const RESEND_COOLDOWN_SECONDS = 60;   // 60 seconds (default fallback)
 
     public static function instance(): self
     {
@@ -47,12 +47,43 @@ class EmailVerificationService
         add_action('wp_ajax_mm_resend_verification_code',        [$this, 'handle_ajax_resend']);
         add_action('wp_ajax_nopriv_mm_resend_verification_code', [$this, 'handle_ajax_resend']);
 
+        // Pending email update AJAX endpoints
+        add_action('wp_ajax_mm_verify_pending_email_code', [$this, 'handle_ajax_verify_pending_email']);
+        add_action('wp_ajax_mm_resend_pending_email_code', [$this, 'handle_ajax_resend_pending_email']);
+
         // Auto-send verification code on user registration
         add_action('user_register', [$this, 'on_user_register'], 20, 1);
         add_action('pmpro_after_checkout', [$this, 'on_pmpro_checkout'], 20, 2);
 
+        // Intercept profile email updates on PMPro / WordPress edit profile
+        add_action('user_profile_update_errors', [$this, 'intercept_profile_email_update'], 10, 3);
+        add_action('personal_options_update',    [$this, 'intercept_personal_options_update'], 5, 1);
+
+        // PMPro Account Page Notice Hooks
+        add_action('pmpro_account_preheader',                 [$this, 'render_pending_email_notice_on_pmpro_account']);
+        add_action('pmpro_member_profile_edit_after_panel',   [$this, 'render_pending_email_notice_on_pmpro_account']);
+
+        // 48-Hour Unverified Users Purge Cron Worker
+        add_action('mm_purge_unverified_users_job', [$this, 'purge_unverified_users']);
+        $this->schedule_purge_job();
+
         // One-time grandfathering migration for existing users
         $this->maybe_grandfather_existing_users();
+    }
+
+    /**
+     * Schedule daily recurring Action Scheduler action for unverified user purge.
+     *
+     * @return void
+     */
+    public function schedule_purge_job(): void
+    {
+        if (function_exists('as_has_scheduled_action') && function_exists('as_schedule_recurring_action')) {
+            if (!as_has_scheduled_action('mm_purge_unverified_users_job')) {
+                $interval = defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400;
+                as_schedule_recurring_action(time() + 3600, $interval, 'mm_purge_unverified_users_job', [], 'matchmaker');
+            }
+        }
     }
 
     /**
@@ -62,7 +93,10 @@ class EmailVerificationService
      */
     public function get_expiry_seconds(): int
     {
-        $hours = max(1, (int) get_option('mm_email_verify_expiry_hours', 24));
+        $hours = (int) get_option('mm_email_verify_expiry_hours', 1);
+        if ($hours <= 0) {
+            $hours = 1;
+        }
         return $hours * 3600;
     }
 
@@ -618,7 +652,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
     public function get_email_html(string $display_name, string $code, string $user_email = ''): string
     {
         $custom_template = (string) get_option('mm_email_verify_template', '');
-        $expiry_hours    = (string) max(1, (int) get_option('mm_email_verify_expiry_hours', 24));
+        $expiry_hours    = (string) max(1, (int) get_option('mm_email_verify_expiry_hours', 1));
         $sitename        = $this->get_sender_name();
 
         if (!empty(trim($custom_template))) {
@@ -645,7 +679,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                     <td align="center" bgcolor="#FAF5F0" style="background-color: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; padding: 24px 16px; text-align: center;">
                         <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #8C532B; margin-bottom: 8px;">YOUR VERIFICATION CODE</div>
                         <div class="email-otp-box" style="font-family: \'Courier New\', Courier, monospace; font-size: 38px; font-weight: 800; letter-spacing: 12px; color: #1D1E20; text-indent: 12px; margin: 4px 0 8px; line-height: 1;">' . esc_html($code) . '</div>
-                        <div style="font-size: 12px; color: #78716C; font-weight: 500;">⏱ Valid for <strong>' . $expiry_hours . ' hours</strong></div>
+                        <div style="font-size: 12px; color: #78716C; font-weight: 500;">⏱ Valid for <strong>' . (((int) $expiry_hours === 1) ? '60 minutes' : ($expiry_hours . ' hours')) . '</strong></div>
                     </td>
                 </tr>
             </table>
@@ -846,4 +880,824 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
         }
         $this->generate_and_send_code($user_id, true);
     }
+
+    /**
+     * Purge unverified user accounts older than 48 hours and cancel any associated PMPro membership.
+     * Triggered daily by Action Scheduler recurring action `mm_purge_unverified_users_job`.
+     *
+     * @return int Number of purged unverified accounts.
+     */
+    public function purge_unverified_users(): int
+    {
+        global $wpdb;
+        $cutoff_time = time() - (48 * 3600);
+        $cutoff_date = gmdate('Y-m-d H:i:s', $cutoff_time);
+
+        if (!isset($wpdb->users)) {
+            return 0;
+        }
+
+        // Find users registered <= 48 hours ago who are not verified
+        $sql = "
+            SELECT u.ID, u.user_email, u.user_registered 
+            FROM {$wpdb->users} u
+            LEFT JOIN {$wpdb->usermeta} um ON (u.ID = um.user_id AND um.meta_key = 'mm_email_verified')
+            WHERE u.user_registered <= %s
+              AND (um.meta_value IS NULL OR um.meta_value = '' OR um.meta_value = '0')
+        ";
+
+        $users_to_purge = $wpdb->get_results($wpdb->prepare($sql, $cutoff_date));
+        if (empty($users_to_purge) || !is_array($users_to_purge)) {
+            return 0;
+        }
+
+        if (!function_exists('wp_delete_user')) {
+            $user_admin_file = (defined('ABSPATH') ? ABSPATH : '') . 'wp-admin/includes/user.php';
+            if (file_exists($user_admin_file)) {
+                require_once $user_admin_file;
+            }
+        }
+
+        $purged_count = 0;
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+
+        foreach ($users_to_purge as $u) {
+            $uid = (int) $u->ID;
+            if ($uid <= 0) {
+                continue;
+            }
+
+            // Safety check: Never delete administrators or matchmaker admins
+            if (function_exists('user_can') && (user_can($uid, 'manage_options') || user_can($uid, 'manage_matchmaker'))) {
+                continue;
+            }
+
+            // Cancel PMPro membership if active
+            if (function_exists('pmpro_changeMembershipLevel')) {
+                pmpro_changeMembershipLevel(0, $uid);
+            }
+
+            // Remove from matchmaking pool
+            $repo->delete_pool_user($uid);
+
+            // Log purge event
+            $repo->log_event(
+                'system',
+                'user_purged_unverified_48h',
+                sprintf(__('Unverified User Auto-Purged (48h): %s', 'matchmaker'), $u->user_email),
+                sprintf(__('User #%d (%s) registered at %s was automatically deleted after 48 hours without email verification.', 'matchmaker'), $uid, $u->user_email, (string) $u->user_registered),
+                ['user_id' => $uid, 'user_registered' => (string) $u->user_registered],
+                null,
+                $uid,
+                $u->user_email,
+                'warning'
+            );
+
+            // Delete user account
+            if (function_exists('wp_delete_user')) {
+                wp_delete_user($uid);
+                $purged_count++;
+            }
+        }
+
+        return $purged_count;
+    }
+
+    /**
+     * Intercept profile email updates on WordPress / PMPro edit profile.
+     * Prevents immediate overwrite in wp_users, storing pending new email in usermeta and sending OTP.
+     *
+     * @param \WP_Error $errors
+     * @param bool      $update
+     * @param \stdClass $user
+     * @return void
+     */
+    public function intercept_profile_email_update(\WP_Error &$errors, bool $update, \stdClass $user): void
+    {
+        if (!$update || empty($user->ID)) {
+            return;
+        }
+
+        $user_id = (int) $user->ID;
+        $current_user = get_userdata($user_id);
+        if (!$current_user || empty($current_user->user_email)) {
+            return;
+        }
+
+        // Allow administrators editing other users in wp-admin to update directly
+        if (function_exists('is_admin') && is_admin() && function_exists('current_user_can') && current_user_can('manage_options') && get_current_user_id() !== $user_id) {
+            return;
+        }
+
+        $submitted_email = '';
+        if (isset($_POST['email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['email']));
+        } elseif (isset($_POST['user_email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['user_email']));
+        } elseif (isset($user->user_email)) {
+            $submitted_email = sanitize_email((string) $user->user_email);
+        }
+
+        if (empty($submitted_email) || !is_email($submitted_email)) {
+            return;
+        }
+
+        $current_email = (string) $current_user->user_email;
+
+        // If email hasn't changed, do nothing
+        if (strtolower(trim($submitted_email)) === strtolower(trim($current_email))) {
+            return;
+        }
+
+        // Check if email already belongs to another user
+        $existing_user_id = email_exists($submitted_email);
+        if ($existing_user_id && (int) $existing_user_id !== $user_id) {
+            $errors->add('email_exists', __('That email address is already registered. Please enter a different one.', 'matchmaker'));
+            return;
+        }
+
+        // Save new email as unverified in usermeta
+        update_user_meta($user_id, 'mm_pending_new_email', $submitted_email);
+
+        // Send 6-digit verification code to the NEW email address
+        $this->generate_and_send_pending_code($user_id, $submitted_email, true);
+
+        // Keep current email intact in $user object and $_POST so WordPress doesn't overwrite wp_users.user_email
+        $user->user_email = $current_email;
+        if (isset($_POST['email'])) {
+            $_POST['email'] = $current_email;
+        }
+        if (isset($_POST['user_email'])) {
+            $_POST['user_email'] = $current_email;
+        }
+    }
+
+    /**
+     * Intercept personal_options_update as a secondary guard for profile saves.
+     *
+     * @param int $user_id
+     * @return void
+     */
+    public function intercept_personal_options_update(int $user_id): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        if (function_exists('is_admin') && is_admin() && function_exists('current_user_can') && current_user_can('manage_options') && get_current_user_id() !== $user_id) {
+            return;
+        }
+
+        $current_user = get_userdata($user_id);
+        if (!$current_user || empty($current_user->user_email)) {
+            return;
+        }
+
+        $submitted_email = '';
+        if (isset($_POST['email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['email']));
+        } elseif (isset($_POST['user_email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['user_email']));
+        }
+
+        if (empty($submitted_email) || !is_email($submitted_email)) {
+            return;
+        }
+
+        $current_email = (string) $current_user->user_email;
+        if (strtolower(trim($submitted_email)) !== strtolower(trim($current_email))) {
+            update_user_meta($user_id, 'mm_pending_new_email', $submitted_email);
+            $this->generate_and_send_pending_code($user_id, $submitted_email, true);
+            $_POST['email'] = $current_email;
+            $_POST['user_email'] = $current_email;
+        }
+    }
+
+    /**
+     * Generate and dispatch a 6-digit verification code to the pending new email address.
+     *
+     * @param int    $user_id
+     * @param string $new_email
+     * @param bool   $force Bypass cooldown if true.
+     * @return array{success: bool, message: string, cooldown_remaining: int}
+     */
+    public function generate_and_send_pending_code(int $user_id, string $new_email, bool $force = false): array
+    {
+        if ($user_id <= 0 || empty($new_email) || !is_email($new_email)) {
+            return [
+                'success'            => false,
+                'message'            => __('Invalid email address.', 'matchmaker'),
+                'cooldown_remaining' => 0,
+            ];
+        }
+
+        $now            = time();
+        $cooldown_limit = $this->get_cooldown_seconds();
+        $expiry_limit   = $this->get_expiry_seconds();
+
+        $last_sent = (int) get_user_meta($user_id, 'mm_pending_verification_last_sent_at', true);
+        $time_diff = $now - $last_sent;
+
+        if (!$force && $last_sent > 0 && $time_diff < $cooldown_limit) {
+            $remaining = $cooldown_limit - $time_diff;
+            return [
+                'success'            => false,
+                'message'            => sprintf(__('Please wait %d seconds before requesting another code.', 'matchmaker'), $remaining),
+                'cooldown_remaining' => $remaining,
+            ];
+        }
+
+        // Generate 6-digit cryptographically secure random number
+        $code = sprintf('%06d', random_int(100000, 999999));
+
+        update_user_meta($user_id, 'mm_pending_new_email', $new_email);
+        update_user_meta($user_id, 'mm_pending_verification_code', $code);
+        update_user_meta($user_id, 'mm_pending_verification_expires_at', $now + $expiry_limit);
+        update_user_meta($user_id, 'mm_pending_verification_last_sent_at', $now);
+
+        $user = get_userdata($user_id);
+        $display_name = $user ? ($user->display_name ?: 'Member') : 'Member';
+
+        // Send HTML email to new email address
+        $mail_error = null;
+        $sent = $this->send_pending_email_verification($new_email, $display_name, $code, $mail_error);
+
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+
+        if (!$sent) {
+            $is_test_mode = $repo->is_test_mode();
+            $error_detail = $mail_error ?: __('Mail server rejected dispatch.', 'matchmaker');
+
+            if ($is_test_mode) {
+                $repo->log_event(
+                    'email',
+                    'pending_email_code_sent',
+                    sprintf(__('Pending Email Verification Code (Test Mode): %s', 'matchmaker'), $new_email),
+                    sprintf(__('Test Mode: Verification code %s generated for pending email change to %s.', 'matchmaker'), $code, $new_email),
+                    [
+                        'user_id'       => $user_id,
+                        'new_email'     => $new_email,
+                        'code'          => $code,
+                        'delivery_stat' => 'simulated',
+                        'expires_at'    => gmdate('Y-m-d H:i:s', $now + $expiry_limit),
+                    ],
+                    null,
+                    $user_id,
+                    $new_email,
+                    'warning'
+                );
+
+                return [
+                    'success'            => true,
+                    'message'            => sprintf(__('Test Mode: Verification code is %s.', 'matchmaker'), $code),
+                    'cooldown_remaining' => $cooldown_limit,
+                ];
+            }
+
+            $repo->log_event(
+                'email',
+                'pending_email_code_failed',
+                sprintf(__('Pending Email Verification Code Failed: %s', 'matchmaker'), $new_email),
+                sprintf(__('Failed to dispatch verification email to %s: %s', 'matchmaker'), $new_email, $error_detail),
+                ['user_id' => $user_id, 'new_email' => $new_email, 'error_detail' => $error_detail],
+                null,
+                $user_id,
+                $new_email,
+                'error'
+            );
+
+            return [
+                'success'            => false,
+                'message'            => sprintf(__('Failed to send verification email: %s', 'matchmaker'), esc_html($error_detail)),
+                'cooldown_remaining' => 0,
+            ];
+        }
+
+        $repo->log_event(
+            'email',
+            'pending_email_code_sent',
+            sprintf(__('Pending Email Verification Code Sent: %s', 'matchmaker'), $new_email),
+            sprintf(__('Verification code dispatched successfully to new email %s.', 'matchmaker'), $new_email),
+            [
+                'user_id'       => $user_id,
+                'new_email'     => $new_email,
+                'code'          => $code,
+                'delivery_stat' => 'delivered',
+                'expires_at'    => gmdate('Y-m-d H:i:s', $now + $expiry_limit),
+            ],
+            null,
+            $user_id,
+            $new_email,
+            'success'
+        );
+
+        return [
+            'success'            => true,
+            'message'            => sprintf(__('Verification code sent to %s.', 'matchmaker'), esc_html($new_email)),
+            'cooldown_remaining' => $cooldown_limit,
+        ];
+    }
+
+    /**
+     * Send branded verification email for pending email update.
+     *
+     * @param string      $to_email
+     * @param string      $display_name
+     * @param string      $code
+     * @param string|null $mail_error
+     * @return bool
+     */
+    public function send_pending_email_verification(string $to_email, string $display_name, string $code, ?string &$mail_error = null): bool
+    {
+        $subject = sprintf(__('Verify Your New Arab Zawaj Email: %s', 'matchmaker'), $code);
+        
+        $inner = '
+            <div style="margin-bottom: 22px;">
+                <h2 style="font-family: \'Marcellus\', Georgia, serif; font-size: 21px; font-weight: 700; color: #1D1E20; margin: 0 0 10px; line-height: 1.3;">Assalamu Alaikum, ' . esc_html($display_name ?: 'Member') . '!</h2>
+                <p style="margin: 0; font-size: 15px; color: #4B5563; line-height: 1.6;">You recently requested to update your account email address on Arab Zawaj to <strong>' . esc_html($to_email) . '</strong>. Please enter the verification code below to confirm this change:</p>
+            </div>
+
+            <!-- OTP Code Card -->
+            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0 24px;">
+                <tr>
+                    <td align="center" bgcolor="#FAF5F0" style="background-color: #FAF5F0; border: 2px dashed #CC723F; border-radius: 12px; padding: 24px 16px; text-align: center;">
+                        <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #8C532B; margin-bottom: 8px;">EMAIL UPDATE VERIFICATION CODE</div>
+                        <div class="email-otp-box" style="font-family: \'Courier New\', Courier, monospace; font-size: 38px; font-weight: 800; letter-spacing: 12px; color: #1D1E20; text-indent: 12px; margin: 4px 0 8px; line-height: 1;">' . esc_html($code) . '</div>
+                        <div style="font-size: 12px; color: #78716C; font-weight: 500;">⏱ Valid for <strong>60 minutes</strong></div>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Security Notice Box -->
+            <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 0 0 24px;">
+                <tr>
+                    <td bgcolor="#FFFDFB" style="background-color: #FFFDFB; border-left: 3px solid #CC723F; border-radius: 0 8px 8px 0; padding: 14px 18px;">
+                        <p style="margin: 0; font-size: 13px; color: #6B7280; line-height: 1.5;"><strong>Security Reminder:</strong> If you did not request this email change, please log into your account immediately to review your settings.</p>
+                    </td>
+                </tr>
+            </table>
+
+            <p style="margin: 0; font-size: 14px; color: #4B5563; line-height: 1.5;">Warm regards,<br><strong style="color: #1D1E20;">Arab Zawaj Matchmaking Team</strong></p>
+        ';
+
+        $html = $this->wrap_email_layout($inner);
+
+        $from_email = $this->get_sender_email();
+        $from_name  = $this->get_sender_name();
+
+        $headers = [
+            'Content-Type: text/html; charset=UTF-8',
+            'From: ' . $from_name . ' <' . $from_email . '>',
+        ];
+
+        $from_email_filter   = static fn(): string => $from_email;
+        $from_name_filter    = static fn(): string => $from_name;
+        $content_type_filter = static fn(): string => 'text/html';
+
+        add_filter('wp_mail_from', $from_email_filter, 999);
+        add_filter('wp_mail_from_name', $from_name_filter, 999);
+        add_filter('wp_mail_content_type', $content_type_filter, 999);
+
+        $mail_error = null;
+        $error_listener = static function ($wp_error) use (&$mail_error): void {
+            if (is_wp_error($wp_error)) {
+                $mail_error = $wp_error->get_error_message();
+            } elseif (is_string($wp_error)) {
+                $mail_error = $wp_error;
+            }
+        };
+
+        add_action('wp_mail_failed', $error_listener, 10, 1);
+
+        $sent = (bool) wp_mail($to_email, $subject, $html, $headers);
+
+        remove_action('wp_mail_failed', $error_listener, 10);
+        remove_filter('wp_mail_content_type', $content_type_filter, 999);
+        remove_filter('wp_mail_from_name', $from_name_filter, 999);
+        remove_filter('wp_mail_from', $from_email_filter, 999);
+
+        return $sent;
+    }
+
+    /**
+     * Verify the code submitted for pending email update.
+     * Updates wp_users.user_email upon successful verification.
+     *
+     * @param int    $user_id
+     * @param string $code
+     * @return array{success: bool, message: string, new_email?: string}
+     */
+    public function verify_pending_email_code(int $user_id, string $code): array
+    {
+        if ($user_id <= 0) {
+            return ['success' => false, 'message' => __('Invalid user session.', 'matchmaker')];
+        }
+
+        $pending_email = (string) get_user_meta($user_id, 'mm_pending_new_email', true);
+        if (empty($pending_email) || !is_email($pending_email)) {
+            return ['success' => false, 'message' => __('No pending email update found.', 'matchmaker')];
+        }
+
+        $clean_code = preg_replace('/\D/', '', trim($code));
+        if (strlen((string) $clean_code) !== 6) {
+            return ['success' => false, 'message' => __('Please enter a valid 6-digit verification code.', 'matchmaker')];
+        }
+
+        $stored_code = (string) get_user_meta($user_id, 'mm_pending_verification_code', true);
+        $expires_at  = (int) get_user_meta($user_id, 'mm_pending_verification_expires_at', true);
+        $repo        = \Matchmaker\Repository\MatchRepository::instance();
+
+        if (empty($stored_code) || time() > $expires_at) {
+            $repo->log_event(
+                'email',
+                'pending_email_verify_failed',
+                sprintf(__('Pending Email Code Expired: %s', 'matchmaker'), $pending_email),
+                __('User attempted verification with an expired or non-existent code.', 'matchmaker'),
+                ['user_id' => $user_id, 'pending_email' => $pending_email, 'expired' => true],
+                null,
+                $user_id,
+                $pending_email,
+                'warning'
+            );
+
+            return ['success' => false, 'message' => __('Your verification code has expired. Please request a new code.', 'matchmaker')];
+        }
+
+        if (!hash_equals($stored_code, (string) $clean_code)) {
+            $repo->log_event(
+                'email',
+                'pending_email_verify_failed',
+                sprintf(__('Invalid Pending Verification Code Attempt: %s', 'matchmaker'), $pending_email),
+                sprintf(__('User submitted invalid code "%s".', 'matchmaker'), $clean_code),
+                ['user_id' => $user_id, 'pending_email' => $pending_email, 'attempted' => $clean_code],
+                null,
+                $user_id,
+                $pending_email,
+                'warning'
+            );
+
+            return ['success' => false, 'message' => __('Invalid verification code. Please check your email and try again.', 'matchmaker')];
+        }
+
+        // Check if email was claimed by another user
+        $email_holder = email_exists($pending_email);
+        if ($email_holder && (int) $email_holder !== $user_id) {
+            return ['success' => false, 'message' => __('That email address is already registered to another user.', 'matchmaker')];
+        }
+
+        // Update user_email in wp_users
+        $update_res = wp_update_user([
+            'ID'         => $user_id,
+            'user_email' => $pending_email,
+        ]);
+
+        if (\is_wp_error($update_res)) {
+            return ['success' => false, 'message' => $update_res->get_error_message()];
+        }
+
+        // Clean up pending meta
+        delete_user_meta($user_id, 'mm_pending_new_email');
+        delete_user_meta($user_id, 'mm_pending_verification_code');
+        delete_user_meta($user_id, 'mm_pending_verification_expires_at');
+        delete_user_meta($user_id, 'mm_pending_verification_last_sent_at');
+        update_user_meta($user_id, 'mm_email_verified', 1);
+
+        $repo->log_event(
+            'email',
+            'pending_email_verified',
+            sprintf(__('Email Address Updated & Verified: %s', 'matchmaker'), $pending_email),
+            sprintf(__('User #%d successfully verified and updated email address to %s.', 'matchmaker'), $user_id, $pending_email),
+            ['user_id' => $user_id, 'new_email' => $pending_email],
+            null,
+            $user_id,
+            $pending_email,
+            'success'
+        );
+
+        return [
+            'success'   => true,
+            'message'   => __('Your email address has been successfully verified and updated!', 'matchmaker'),
+            'new_email' => $pending_email,
+        ];
+    }
+
+    /**
+     * AJAX handler for verifying pending email change code.
+     *
+     * @return void
+     */
+    public function handle_ajax_verify_pending_email(): void
+    {
+        $nonce   = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash((string) $_POST['nonce'])) : '';
+        $user_id = get_current_user_id();
+
+        if ($user_id <= 0 && !empty($_POST['user_id'])) {
+            $user_id = (int) $_POST['user_id'];
+        }
+
+        $valid_nonce = wp_verify_nonce($nonce, 'mm_pending_verify_nonce')
+            || wp_verify_nonce($nonce, 'mm_verify_nonce')
+            || ($user_id > 0 && wp_verify_nonce($nonce, 'mm_verify_nonce_' . $user_id));
+
+        if (!$valid_nonce) {
+            wp_send_json_error(['message' => __('Security check failed. Please refresh the page.', 'matchmaker')]);
+        }
+
+        if ($user_id <= 0) {
+            wp_send_json_error(['message' => __('User session not found. Please log in again.', 'matchmaker')]);
+        }
+
+        $code = isset($_POST['code']) ? sanitize_text_field(wp_unslash((string) $_POST['code'])) : '';
+        $res  = $this->verify_pending_email_code($user_id, $code);
+
+        if ($res['success']) {
+            wp_send_json_success($res);
+        } else {
+            wp_send_json_error($res);
+        }
+    }
+
+    /**
+     * AJAX handler for resending verification code to pending email.
+     *
+     * @return void
+     */
+    public function handle_ajax_resend_pending_email(): void
+    {
+        $nonce   = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash((string) $_POST['nonce'])) : '';
+        $user_id = get_current_user_id();
+
+        if ($user_id <= 0 && !empty($_POST['user_id'])) {
+            $user_id = (int) $_POST['user_id'];
+        }
+
+        $valid_nonce = wp_verify_nonce($nonce, 'mm_pending_verify_nonce')
+            || wp_verify_nonce($nonce, 'mm_verify_nonce')
+            || ($user_id > 0 && wp_verify_nonce($nonce, 'mm_verify_nonce_' . $user_id));
+
+        if (!$valid_nonce) {
+            wp_send_json_error(['message' => __('Security check failed. Please refresh the page.', 'matchmaker')]);
+        }
+
+        if ($user_id <= 0) {
+            wp_send_json_error(['message' => __('User session not found. Please log in again.', 'matchmaker')]);
+        }
+
+        $pending_email = (string) get_user_meta($user_id, 'mm_pending_new_email', true);
+        if (empty($pending_email)) {
+            wp_send_json_error(['message' => __('No pending email update found.', 'matchmaker')]);
+        }
+
+        $res = $this->generate_and_send_pending_code($user_id, $pending_email, false);
+
+        if ($res['success']) {
+            wp_send_json_success($res);
+        } else {
+            wp_send_json_error($res);
+        }
+    }
+
+    /**
+     * PMPro Account Page hook callback to render pending email banner.
+     *
+     * @return void
+     */
+    public function render_pending_email_notice_on_pmpro_account(): void
+    {
+        echo $this->render_pending_email_notice();
+    }
+
+    /**
+     * Render the pending email notification banner and OTP modal for Dashboard & PMPro account.
+     *
+     * @param int $user_id
+     * @return string
+     */
+    public function render_pending_email_notice(int $user_id = 0): string
+    {
+        if ($user_id <= 0) {
+            $user_id = get_current_user_id();
+        }
+
+        if ($user_id <= 0) {
+            return '';
+        }
+
+        $pending_email = (string) get_user_meta($user_id, 'mm_pending_new_email', true);
+        if (empty($pending_email)) {
+            return '';
+        }
+
+        $nonce    = wp_create_nonce('mm_pending_verify_nonce');
+        $ajax_url = admin_url('admin-ajax.php');
+
+        $cooldown_limit     = $this->get_cooldown_seconds();
+        $last_sent          = (int) get_user_meta($user_id, 'mm_pending_verification_last_sent_at', true);
+        $time_diff          = time() - $last_sent;
+        $cooldown_remaining = ($time_diff < $cooldown_limit) ? ($cooldown_limit - $time_diff) : 0;
+
+        ob_start();
+        ?>
+        <div class="mm-pending-email-notice-wrap" id="mm-pending-email-notice-wrap" style="margin: 0 0 20px;">
+            <!-- Notice Banner -->
+            <div class="mm-pending-email-notice" style="background:#FFFBEB; border:1px solid #FDE68A; border-left:4px solid #D97706; padding:12px 18px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                <div style="color:#92400E; font-size:14px; font-weight:500; display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:18px;">⚠️</span>
+                    <span><?php printf(esc_html__('Please verify your email %s to update your account.', 'matchmaker'), '<strong>' . esc_html($pending_email) . '</strong>'); ?></span>
+                </div>
+                <div>
+                    <button type="button" id="mm-open-pending-verify-modal-btn" style="background:#CC723F; color:#ffffff; border:none; padding:7px 16px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; transition: background 0.15s ease;">
+                        <?php esc_html_e('Verify Email', 'matchmaker'); ?>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pending Email OTP Verification Modal -->
+            <div id="mm-pending-verify-modal" class="mm-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:99999; justify-content:center; align-items:center; padding:15px; box-sizing:border-box;">
+                <div class="mm-modal-card" style="background:#ffffff; max-width:440px; width:100%; border-radius:14px; padding:28px 24px; box-shadow:0 20px 40px rgba(0,0,0,0.2); position:relative; text-align:center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    <button type="button" id="mm-close-pending-modal-btn" style="position:absolute; top:14px; right:16px; background:none; border:none; font-size:22px; color:#9ca3af; cursor:pointer; line-height:1;">&times;</button>
+                    
+                    <div style="font-size:36px; margin-bottom:8px;">✉️</div>
+                    <h3 style="font-family:'Marcellus', Georgia, serif; font-size:20px; font-weight:700; color:#1D1E20; margin:0 0 6px;">
+                        <?php esc_html_e('Verify New Email', 'matchmaker'); ?>
+                    </h3>
+                    <p style="font-size:14px; color:#6b7280; margin:0 0 20px; line-height:1.5;">
+                        <?php printf(esc_html__('We sent a 6-digit code to %s. Enter it below to confirm your new email.', 'matchmaker'), '<br><strong style="color:#1D1E20;">' . esc_html($pending_email) . '</strong>'); ?>
+                    </p>
+
+                    <div id="mm-pending-verify-alert" style="display:none; padding:10px 14px; border-radius:6px; font-size:13px; margin-bottom:16px; text-align:left;"></div>
+
+                    <form id="mm-pending-verify-form" style="margin:0 0 16px;">
+                        <input type="hidden" name="action" value="mm_verify_pending_email_code">
+                        <input type="hidden" name="nonce" value="<?php echo esc_attr($nonce); ?>">
+                        <input type="hidden" name="user_id" value="<?php echo (int) $user_id; ?>">
+
+                        <div style="margin-bottom:16px;">
+                            <input type="text" id="mm-pending-otp-input" name="code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="· · · · · ·" style="font-family:'Courier New', monospace; font-size:28px; letter-spacing:8px; text-align:center; width:200px; padding:10px; border:2px solid #e5e7eb; border-radius:8px; outline:none; transition:border-color 0.2s;" autocomplete="one-time-code" required>
+                        </div>
+
+                        <button type="submit" id="mm-pending-verify-submit-btn" style="width:100%; background:#CC723F; color:#ffffff; border:none; padding:12px; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; transition: background 0.15s ease;">
+                            <?php esc_html_e('Confirm &amp; Update Email', 'matchmaker'); ?>
+                        </button>
+                    </form>
+
+                    <div style="font-size:13px; color:#6b7280;">
+                        <?php esc_html_e("Didn't receive the code?", 'matchmaker'); ?>
+                        <button type="button" id="mm-pending-resend-btn" style="background:none; border:none; color:#CC723F; font-weight:600; cursor:pointer; padding:0; text-decoration:underline; font-size:13px;" <?php echo ($cooldown_remaining > 0) ? 'disabled' : ''; ?>>
+                            <?php echo ($cooldown_remaining > 0) ? sprintf(esc_html__('Resend in %ds', 'matchmaker'), $cooldown_remaining) : esc_html__('Resend Code', 'matchmaker'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            (function() {
+                var modal = document.getElementById('mm-pending-verify-modal');
+                var openBtn = document.getElementById('mm-open-pending-verify-modal-btn');
+                var closeBtn = document.getElementById('mm-close-pending-modal-btn');
+                var form = document.getElementById('mm-pending-verify-form');
+                var otpInput = document.getElementById('mm-pending-otp-input');
+                var submitBtn = document.getElementById('mm-pending-verify-submit-btn');
+                var resendBtn = document.getElementById('mm-pending-resend-btn');
+                var alertBox = document.getElementById('mm-pending-verify-alert');
+                var cooldown = <?php echo (int) $cooldown_remaining; ?>;
+                var timerInterval = null;
+
+                function showAlert(msg, isSuccess) {
+                    if (!alertBox) return;
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = isSuccess ? '#ecfdf5' : '#fef2f2';
+                    alertBox.style.border = isSuccess ? '1px solid #a7f3d0' : '1px solid #fecaca';
+                    alertBox.style.color = isSuccess ? '#065f46' : '#991b1b';
+                    alertBox.innerHTML = msg;
+                }
+
+                function startCooldown(seconds) {
+                    cooldown = seconds;
+                    if (timerInterval) clearInterval(timerInterval);
+                    if (!resendBtn) return;
+                    resendBtn.disabled = true;
+                    resendBtn.innerText = 'Resend in ' + cooldown + 's';
+
+                    timerInterval = setInterval(function() {
+                        cooldown--;
+                        if (cooldown <= 0) {
+                            clearInterval(timerInterval);
+                            resendBtn.disabled = false;
+                            resendBtn.innerText = 'Resend Code';
+                        } else {
+                            resendBtn.innerText = 'Resend in ' + cooldown + 's';
+                        }
+                    }, 1000);
+                }
+
+                if (cooldown > 0) {
+                    startCooldown(cooldown);
+                }
+
+                if (openBtn && modal) {
+                    openBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        modal.style.display = 'flex';
+                        if (otpInput) otpInput.focus();
+                    });
+                }
+
+                if (closeBtn && modal) {
+                    closeBtn.addEventListener('click', function() {
+                        modal.style.display = 'none';
+                    });
+                }
+
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        var code = (otpInput ? otpInput.value : '').replace(/\D/g, '');
+                        if (code.length !== 6) {
+                            showAlert('Please enter the complete 6-digit code.', false);
+                            return;
+                        }
+
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.innerText = 'Verifying...';
+                        }
+
+                        var fd = new FormData();
+                        fd.append('action', 'mm_verify_pending_email_code');
+                        fd.append('nonce', '<?php echo esc_js($nonce); ?>');
+                        fd.append('user_id', '<?php echo (int) $user_id; ?>');
+                        fd.append('code', code);
+
+                        fetch('<?php echo esc_url($ajax_url); ?>', {
+                            method: 'POST',
+                            body: fd
+                        })
+                        .then(function(r) { return r.json(); })
+                        .then(function(res) {
+                            if (res.success) {
+                                showAlert(res.data && res.data.message ? res.data.message : 'Email updated successfully!', true);
+                                setTimeout(function() {
+                                    window.location.reload();
+                                }, 1200);
+                            } else {
+                                if (submitBtn) {
+                                    submitBtn.disabled = false;
+                                    submitBtn.innerText = 'Confirm & Update Email';
+                                }
+                                showAlert(res.data && res.data.message ? res.data.message : 'Verification failed.', false);
+                            }
+                        })
+                        .catch(function() {
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.innerText = 'Confirm & Update Email';
+                            }
+                            showAlert('Network error. Please try again.', false);
+                        });
+                    });
+                }
+
+                if (resendBtn) {
+                    resendBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        if (resendBtn.disabled) return;
+                        resendBtn.disabled = true;
+                        resendBtn.innerText = 'Sending...';
+
+                        var fd = new FormData();
+                        fd.append('action', 'mm_resend_pending_email_code');
+                        fd.append('nonce', '<?php echo esc_js($nonce); ?>');
+                        fd.append('user_id', '<?php echo (int) $user_id; ?>');
+
+                        fetch('<?php echo esc_url($ajax_url); ?>', {
+                            method: 'POST',
+                            body: fd
+                        })
+                        .then(function(r) { return r.json(); })
+                        .then(function(res) {
+                            if (res.success) {
+                                showAlert(res.data && res.data.message ? res.data.message : 'New code sent!', true);
+                                var cd = (res.data && res.data.cooldown_remaining) ? res.data.cooldown_remaining : 60;
+                                startCooldown(cd);
+                            } else {
+                                resendBtn.disabled = false;
+                                resendBtn.innerText = 'Resend Code';
+                                showAlert(res.data && res.data.message ? res.data.message : 'Could not send code.', false);
+                            }
+                        })
+                        .catch(function() {
+                            resendBtn.disabled = false;
+                            resendBtn.innerText = 'Resend Code';
+                            showAlert('Network error. Please try again.', false);
+                        });
+                    });
+                }
+            })();
+            </script>
+        </div>
+        <?php
+        return (string) ob_get_clean();
+    }
 }
+

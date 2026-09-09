@@ -128,5 +128,32 @@ class FormWizardAndShortcodesTest
             throw new \RuntimeException("Expected male pref_modesty field to contain Traditional and No Preference: " . $pref_male_html);
         }
     }
+
+    public function test_photo_fields_and_yearly_income_labels(): void
+    {
+        // 1. Photo field upload has required star
+        $photo1_html = $this->field_generator->render_single_field('user_photo1');
+        if (!str_contains($photo1_html, 'mm-required-star') || !str_contains($photo1_html, '*')) {
+            throw new \RuntimeException("Expected user_photo1 to have required star indicator: " . $photo1_html);
+        }
+
+        // 2. Photo section open has required star
+        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear photos', 'upload-section', true);
+        if (!str_contains($section_html, 'mm-required-star') || !str_contains($section_html, '*')) {
+            throw new \RuntimeException("Expected photo section header to have required star indicator: " . $section_html);
+        }
+
+        // 3. Yearly Income Range labels
+        $income_html = $this->field_generator->render_single_field('user_income');
+        if (!str_contains($income_html, 'Yearly Income Range')) {
+            throw new \RuntimeException("Expected user_income to have label 'Yearly Income Range': " . $income_html);
+        }
+
+        $pref_income_html = $this->field_generator->render_single_field('pref_income');
+        if (!str_contains($pref_income_html, 'Preferred Yearly Income Range')) {
+            throw new \RuntimeException("Expected pref_income to have label 'Preferred Yearly Income Range': " . $pref_income_html);
+        }
+    }
 }
+
 

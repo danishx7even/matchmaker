@@ -100,7 +100,7 @@ $photo3 = $meta['user_photo3'] ?? '';
             <tr><th><?php esc_html_e('Marital Status', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_marital_status'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Children', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_children'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Education Level', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_education'] ?: '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Income Range', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_income'] ?: '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Yearly Income Range', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_income'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_social_links'] ?: '—'); ?></td></tr>
         </table>
     </div>
@@ -125,7 +125,7 @@ $photo3 = $meta['user_photo3'] ?? '';
             <tr><th><?php esc_html_e('Preferred Marital Status', 'matchmaker'); ?></th><td><?php echo esc_html($meta['pref_marital_status'] ?: 'Any'); ?></td></tr>
             <tr><th><?php esc_html_e('Preferred Children', 'matchmaker'); ?></th><td><?php echo esc_html($meta['pref_children'] ?: 'Any'); ?></td></tr>
             <tr><th><?php esc_html_e('Preferred Education', 'matchmaker'); ?></th><td><?php echo esc_html($meta['pref_education'] ?: 'Any'); ?></td></tr>
-            <tr><th><?php esc_html_e('Preferred Income Range', 'matchmaker'); ?></th><td><?php echo esc_html($meta['pref_income'] ?: 'Any'); ?></td></tr>
+            <tr><th><?php esc_html_e('Preferred Yearly Income Range', 'matchmaker'); ?></th><td><?php echo esc_html($meta['pref_income'] ?: 'Any'); ?></td></tr>
         </table>
 
         <?php if (!empty($meta['pref_additional_info'])) : ?>

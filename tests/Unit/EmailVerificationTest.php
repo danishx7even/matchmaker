@@ -252,7 +252,181 @@ final class EmailVerificationTest extends TestCase
         $this->assertTrue(has_action('wp_ajax_nopriv_mm_verify_email_code'));
         $this->assertTrue(has_action('wp_ajax_mm_resend_verification_code'));
         $this->assertTrue(has_action('wp_ajax_nopriv_mm_resend_verification_code'));
+        $this->assertTrue(has_action('wp_ajax_mm_verify_pending_email_code'));
+        $this->assertTrue(has_action('wp_ajax_mm_resend_pending_email_code'));
+        $this->assertTrue(has_action('mm_purge_unverified_users_job'));
+    }
+
+    public function test_default_expiry_is_60_minutes(): void
+    {
+        $service = EmailVerificationService::instance();
+        delete_option('mm_email_verify_expiry_hours');
+
+        $this->assertEquals(3600, $service->get_expiry_seconds());
+
+        $html = $service->get_email_html('Fatima', '123456', 'fatima@example.com');
+        $this->assertStringContainsString('60 minutes', $html);
+    }
+
+    public function test_purge_unverified_users_older_than_48h_deletes_account_and_membership(): void
+    {
+        global $wpdb;
+        $service = EmailVerificationService::instance();
+
+        // Create test unverified user registered 3 days ago
+        $uid = 601;
+        $user = new \FakeWP_User($uid, 'unverified601', 'unverified601@example.com');
+        $user->user_registered = gmdate('Y-m-d H:i:s', time() - (72 * 3600)); // 72 hours ago
+        $user->roles = ['subscriber'];
+        $GLOBALS['__mm_users'][$uid] = $user;
+        $GLOBALS['__mm_user_pmpro_level'][$uid] = 3; // Assigned PMPro level
+        update_user_meta($uid, 'mm_email_verified', 0);
+
+        // Mock wpdb get_results for cutoff query
+        $cutoff_date = gmdate('Y-m-d H:i:s', time() - (48 * 3600));
+        $wpdb->mock_results["
+            SELECT u.ID, u.user_email, u.user_registered 
+            FROM wp_users u
+            LEFT JOIN wp_usermeta um ON (u.ID = um.user_id AND um.meta_key = 'mm_email_verified')
+            WHERE u.user_registered <= '{$cutoff_date}'
+              AND (um.meta_value IS NULL OR um.meta_value = '' OR um.meta_value = '0')
+        "] = [
+            (object) [
+                'ID' => $uid,
+                'user_email' => 'unverified601@example.com',
+                'user_registered' => $user->user_registered,
+            ]
+        ];
+
+        $purged = $service->purge_unverified_users();
+        $this->assertEquals(1, $purged);
+
+        // User should be deleted from wp_users
+        $this->assertArrayNotHasKey($uid, $GLOBALS['__mm_users']);
+
+        // PMPro level should be cancelled (0 or removed)
+        $this->assertEquals(0, $GLOBALS['__mm_user_pmpro_level'][$uid] ?? 0);
+    }
+
+    public function test_purge_unverified_users_skips_admins(): void
+    {
+        global $wpdb;
+        $service = EmailVerificationService::instance();
+
+        // Create administrator registered 3 days ago
+        $admin_uid = 602;
+        $admin_user = new \FakeWP_User($admin_uid, 'admin602', 'admin602@example.com');
+        $admin_user->user_registered = gmdate('Y-m-d H:i:s', time() - (72 * 3600));
+        $admin_user->roles = ['administrator'];
+        $GLOBALS['__mm_users'][$admin_uid] = $admin_user;
+
+        $cutoff_date = gmdate('Y-m-d H:i:s', time() - (48 * 3600));
+        $wpdb->mock_results["
+            SELECT u.ID, u.user_email, u.user_registered 
+            FROM wp_users u
+            LEFT JOIN wp_usermeta um ON (u.ID = um.user_id AND um.meta_key = 'mm_email_verified')
+            WHERE u.user_registered <= '{$cutoff_date}'
+              AND (um.meta_value IS NULL OR um.meta_value = '' OR um.meta_value = '0')
+        "] = [
+            (object) [
+                'ID' => $admin_uid,
+                'user_email' => 'admin602@example.com',
+                'user_registered' => $admin_user->user_registered,
+            ]
+        ];
+
+        $purged = $service->purge_unverified_users();
+        $this->assertEquals(0, $purged);
+
+        // Admin must not be deleted
+        $this->assertArrayHasKey($admin_uid, $GLOBALS['__mm_users']);
+    }
+
+    public function test_intercept_profile_email_update_holds_pending_email_and_sends_code(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 603;
+        $user = new \FakeWP_User($uid, 'member603', 'old603@example.com');
+        $user->roles = ['subscriber'];
+        $GLOBALS['__mm_users'][$uid] = $user;
+        update_user_meta($uid, 'mm_email_verified', 1);
+
+        // Simulate PMPro profile form POST submission with new email
+        $_POST['email'] = 'new603@example.com';
+        $user_obj = (object) ['ID' => $uid, 'user_email' => 'new603@example.com'];
+        $errors = new \WP_Error();
+
+        $service->intercept_profile_email_update($errors, true, $user_obj);
+
+        // Primary user_email in $user_obj and $_POST should remain old email
+        $this->assertEquals('old603@example.com', $user_obj->user_email);
+        $this->assertEquals('old603@example.com', $_POST['email']);
+
+        // Pending email should be saved in usermeta
+        $this->assertEquals('new603@example.com', get_user_meta($uid, 'mm_pending_new_email', true));
+
+        // Verification code should be generated and stored
+        $code = (string) get_user_meta($uid, 'mm_pending_verification_code', true);
+        $this->assertEquals(6, strlen($code));
+
+        // Email should have been sent to the new email address
+        $last_mail = end($GLOBALS['__mm_sent_mails']);
+        $this->assertEquals('new603@example.com', $last_mail['to']);
+        $this->assertStringContainsString($code, $last_mail['subject']);
+
+        // User remains email verified for their account (portal & questionnaire remain unlocked)
+        $this->assertTrue($service->is_user_verified($uid));
+    }
+
+    public function test_verify_pending_email_code_updates_user_email(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 604;
+        $user = new \FakeWP_User($uid, 'member604', 'old604@example.com');
+        $GLOBALS['__mm_users'][$uid] = $user;
+
+        // Set pending email and code
+        update_user_meta($uid, 'mm_pending_new_email', 'new604@example.com');
+        update_user_meta($uid, 'mm_pending_verification_code', '889900');
+        update_user_meta($uid, 'mm_pending_verification_expires_at', time() + 3600);
+
+        // 1. Wrong code fails
+        $wrong_res = $service->verify_pending_email_code($uid, '112233');
+        $this->assertFalse($wrong_res['success']);
+        $this->assertEquals('old604@example.com', $GLOBALS['__mm_users'][$uid]->user_email);
+
+        // 2. Correct code succeeds, updates wp_users.user_email and cleans up pending metas
+        $ok_res = $service->verify_pending_email_code($uid, '889900');
+        $this->assertTrue($ok_res['success']);
+        $this->assertEquals('new604@example.com', $GLOBALS['__mm_users'][$uid]->user_email);
+        $this->assertEmpty(get_user_meta($uid, 'mm_pending_new_email', true));
+        $this->assertEmpty(get_user_meta($uid, 'mm_pending_verification_code', true));
+    }
+
+    public function test_render_pending_email_notice_outputs_banner_and_modal(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 605;
+        $user = new \FakeWP_User($uid, 'member605', 'old605@example.com');
+        $GLOBALS['__mm_users'][$uid] = $user;
+
+        // When no pending email, notice is empty string
+        $this->assertEmpty($service->render_pending_email_notice($uid));
+
+        // When pending email is set, notice contains banner and modal markup
+        update_user_meta($uid, 'mm_pending_new_email', 'pending605@example.com');
+        $html = $service->render_pending_email_notice($uid);
+
+        $this->assertNotEmpty($html);
+        $this->assertStringContainsString('mm-pending-email-notice', $html);
+        $this->assertStringContainsString('pending605@example.com', $html);
+        $this->assertStringContainsString('mm-pending-verify-modal', $html);
+        $this->assertStringContainsString('Verify Email', $html);
     }
 }
+
 
 
