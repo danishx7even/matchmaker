@@ -989,6 +989,34 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+### Task 59: PMPro Profile Email Interception & Multi-Layer Notice Delivery
+- **Objective**: Fix email change interception on PMPro's custom frontend member profile edit form (`[pmpro_member_profile_edit]`) and ensure the pending email verification notice banner and OTP popup modal render reliably on all PMPro account views and member dashboards.
+- **Root Cause & Discovery**:
+  - Investigated local PMPro plugin source code (`paid-memberships-pro/includes/profile.php`).
+  - Discovered PMPro frontend form does **not** trigger WordPress core's `user_profile_update_errors` (which only runs in WP admin `edit_user()` context).
+  - PMPro triggers its own action: `do_action_ref_array('pmpro_user_profile_update_errors', array(&$errors, $update, &$user))` where `$errors` is an array (not `WP_Error`) and `$user` is a `stdClass` object.
+  - PMPro triggers `do_action('pmpro_personal_options_update', $user->ID)` before validation.
+  - PMPro calls `wp_update_user($user)` directly if `$errors` is empty.
+  - Standard shortcode rendering bypasses `pmpro_account_preheader` template action.
+- **Implemented**:
+  - `src/Service/EmailVerificationService.php`:
+    - **Layer 1 (`pmpro_user_profile_update_errors`)**: Added `intercept_pmpro_profile_update(mixed &$errors, bool $update, \stdClass &$user)` supporting array errors, detecting new email, saving to `mm_pending_new_email`, generating and dispatching 6-digit OTP to the new email, and reverting `$user->user_email`, `$_POST['user_email']`, and `$_POST['email']` to the current verified email.
+    - **Layer 2 (`pmpro_personal_options_update`)**: Added `intercept_pmpro_personal_options_update(int $user_id)`.
+    - **Layer 3 (`wp_pre_insert_user_data`)**: Added universal WordPress core filter `intercept_wp_pre_insert_user_data()` to prevent unverified email changes from persisting into `wp_users` table across any frontend or backend caller, while bypassing during OTP-verified updates via `$GLOBALS['__mm_updating_verified_email']`.
+    - **Layer 4 (Multi-Hook Banner Delivery)**: Hooked `the_content` (`filter_the_content_for_pending_email_notice()`), `pmpro_shortcode_account`, `pmpro_shortcode_member_profile_edit` (`filter_pmpro_shortcode_notice()`), and `pmpro_account_bullets_top` (`render_pending_email_notice_on_pmpro_account()`) with deduplication checks (`!str_contains($content, 'mm-pending-email-notice')`).
+  - `tests/bootstrap.php`:
+    - Added `apply_filters` and `do_action` support for WordPress hook testing.
+    - Enhanced `wp_update_user` stub to run `wp_pre_insert_user_data` and accept `stdClass` objects.
+  - `tests/Unit/EmailVerificationTest.php`:
+    - Added unit test `test_pmpro_profile_update_hook_intercepts_array_errors_and_resets_user_object()`.
+    - Added unit test `test_pmpro_personal_options_update_hook_saves_pending_email()`.
+    - Added unit test `test_wp_pre_insert_user_data_prevents_unverified_email_update()`.
+    - Added unit test `test_content_and_shortcode_filters_prepend_notice_banner()`.
+  - **Verification**: Ran full automated test suite (`tests/run_tests.php`) — all 89 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
 
 

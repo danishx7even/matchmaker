@@ -426,7 +426,103 @@ final class EmailVerificationTest extends TestCase
         $this->assertStringContainsString('mm-pending-verify-modal', $html);
         $this->assertStringContainsString('Verify Email', $html);
     }
+
+    public function test_pmpro_profile_update_hook_intercepts_array_errors_and_resets_user_object(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 606;
+        $user = new \FakeWP_User($uid, 'member606', 'original606@example.com');
+        $user->roles = ['subscriber'];
+        $GLOBALS['__mm_users'][$uid] = $user;
+
+        // PMPro passes errors as array and user as stdClass
+        $errors = [];
+        $user_obj = (object) ['ID' => $uid, 'user_email' => 'updated606@example.com'];
+        $_POST['user_email'] = 'updated606@example.com';
+
+        $service->intercept_pmpro_profile_update($errors, true, $user_obj);
+
+        // Errors array should be empty (valid email)
+        $this->assertEmpty($errors);
+
+        // user_email in stdClass and $_POST must be reverted back to original
+        $this->assertEquals('original606@example.com', $user_obj->user_email);
+        $this->assertEquals('original606@example.com', $_POST['user_email']);
+
+        // Usermeta holds pending new email
+        $this->assertEquals('updated606@example.com', get_user_meta($uid, 'mm_pending_new_email', true));
+
+        // OTP dispatched
+        $last_mail = end($GLOBALS['__mm_sent_mails']);
+        $this->assertEquals('updated606@example.com', $last_mail['to']);
+    }
+
+    public function test_pmpro_personal_options_update_hook_saves_pending_email(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 607;
+        $user = new \FakeWP_User($uid, 'member607', 'old607@example.com');
+        $GLOBALS['__mm_users'][$uid] = $user;
+
+        $_POST['user_email'] = 'new607@example.com';
+
+        $service->intercept_pmpro_personal_options_update($uid);
+
+        $this->assertEquals('new607@example.com', get_user_meta($uid, 'mm_pending_new_email', true));
+        $this->assertEquals('old607@example.com', $_POST['user_email']);
+    }
+
+    public function test_wp_pre_insert_user_data_prevents_unverified_email_update(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 608;
+        $user = new \FakeWP_User($uid, 'member608', 'keep608@example.com');
+        $GLOBALS['__mm_users'][$uid] = $user;
+
+        $incoming_data = [
+            'user_email' => 'sneaky608@example.com',
+            'display_name' => 'Member 608',
+        ];
+
+        $filtered = $service->intercept_wp_pre_insert_user_data($incoming_data, true, $uid, []);
+
+        // Filter should revert user_email to keep608@example.com
+        $this->assertEquals('keep608@example.com', $filtered['user_email']);
+        $this->assertEquals('Member 608', $filtered['display_name']);
+
+        // Pending email should be set
+        $this->assertEquals('sneaky608@example.com', get_user_meta($uid, 'mm_pending_new_email', true));
+    }
+
+    public function test_content_and_shortcode_filters_prepend_notice_banner(): void
+    {
+        $service = EmailVerificationService::instance();
+
+        $uid = 609;
+        $user = new \FakeWP_User($uid, 'member609', 'old609@example.com');
+        $GLOBALS['__mm_users'][$uid] = $user;
+        $GLOBALS['__mm_current_user_id'] = $uid;
+
+        update_user_meta($uid, 'mm_pending_new_email', 'pending609@example.com');
+
+        // Content containing pmpro shortcode
+        $post_content = '<p>Your account details:</p>[pmpro_account]';
+        $filtered = $service->filter_the_content_for_pending_email_notice($post_content);
+
+        $this->assertStringContainsString('mm-pending-email-notice', $filtered);
+        $this->assertStringContainsString('pending609@example.com', $filtered);
+        $this->assertStringContainsString('[pmpro_account]', $filtered);
+
+        // PMPro shortcode filter
+        $shortcode_output = '<div class="pmpro_account_wrap">Account Content</div>';
+        $shortcode_filtered = $service->filter_pmpro_shortcode_notice($shortcode_output);
+        $this->assertStringContainsString('mm-pending-email-notice', $shortcode_filtered);
+    }
 }
+
 
 
 

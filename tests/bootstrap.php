@@ -195,13 +195,25 @@ function wp_create_user($username, $password, $email) {
 }
 
 function wp_update_user($args) {
-    $uid = $args['ID'] ?? 0;
+    $uid = is_object($args) ? ($args->ID ?? 0) : ($args['ID'] ?? 0);
     if ($uid && isset($GLOBALS['__mm_users'][$uid])) {
-        if (!empty($args['display_name'])) {
-            $GLOBALS['__mm_users'][$uid]->display_name = $args['display_name'];
+        $raw_email = is_object($args) ? ($args->user_email ?? '') : ($args['user_email'] ?? '');
+        $raw_name  = is_object($args) ? ($args->display_name ?? '') : ($args['display_name'] ?? '');
+
+        $data = [
+            'user_email'   => !empty($raw_email) ? $raw_email : $GLOBALS['__mm_users'][$uid]->user_email,
+            'display_name' => !empty($raw_name) ? $raw_name : $GLOBALS['__mm_users'][$uid]->display_name,
+        ];
+
+        if (function_exists('apply_filters')) {
+            $data = apply_filters('wp_pre_insert_user_data', $data, true, $uid, (array) $args);
         }
-        if (!empty($args['user_email'])) {
-            $GLOBALS['__mm_users'][$uid]->user_email = $args['user_email'];
+
+        if (!empty($data['display_name'])) {
+            $GLOBALS['__mm_users'][$uid]->display_name = $data['display_name'];
+        }
+        if (!empty($data['user_email'])) {
+            $GLOBALS['__mm_users'][$uid]->user_email = $data['user_email'];
         }
     }
     return $uid;
@@ -607,6 +619,27 @@ function has_action($hook, $callback_to_check = false) {
         return false;
     }
     return !empty($GLOBALS['__mm_actions'][$hook]);
+}
+
+function apply_filters($hook, $value, ...$args) {
+    if (!empty($GLOBALS['__mm_filters'][$hook])) {
+        foreach ($GLOBALS['__mm_filters'][$hook] as $cb) {
+            if (is_callable($cb)) {
+                $value = $cb($value, ...$args);
+            }
+        }
+    }
+    return $value;
+}
+
+function do_action($hook, ...$args) {
+    if (!empty($GLOBALS['__mm_actions'][$hook])) {
+        foreach ($GLOBALS['__mm_actions'][$hook] as $cb) {
+            if (is_callable($cb)) {
+                $cb(...$args);
+            }
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------

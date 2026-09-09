@@ -56,10 +56,17 @@ class EmailVerificationService
         add_action('pmpro_after_checkout', [$this, 'on_pmpro_checkout'], 20, 2);
 
         // Intercept profile email updates on PMPro / WordPress edit profile
-        add_action('user_profile_update_errors', [$this, 'intercept_profile_email_update'], 10, 3);
-        add_action('personal_options_update',    [$this, 'intercept_personal_options_update'], 5, 1);
+        add_action('pmpro_user_profile_update_errors', [$this, 'intercept_pmpro_profile_update'], 10, 3);
+        add_action('pmpro_personal_options_update',    [$this, 'intercept_pmpro_personal_options_update'], 5, 1);
+        add_filter('wp_pre_insert_user_data',          [$this, 'intercept_wp_pre_insert_user_data'], 10, 4);
+        add_action('user_profile_update_errors',       [$this, 'intercept_profile_email_update'], 10, 3);
+        add_action('personal_options_update',          [$this, 'intercept_personal_options_update'], 5, 1);
 
-        // PMPro Account Page Notice Hooks
+        // PMPro Account Page & Content Notice Hooks
+        add_filter('the_content',                             [$this, 'filter_the_content_for_pending_email_notice'], 5, 1);
+        add_filter('pmpro_shortcode_account',                 [$this, 'filter_pmpro_shortcode_notice'], 5, 1);
+        add_filter('pmpro_shortcode_member_profile_edit',     [$this, 'filter_pmpro_shortcode_notice'], 5, 1);
+        add_action('pmpro_account_bullets_top',               [$this, 'render_pending_email_notice_on_pmpro_account']);
         add_action('pmpro_account_preheader',                 [$this, 'render_pending_email_notice_on_pmpro_account']);
         add_action('pmpro_member_profile_edit_after_panel',   [$this, 'render_pending_email_notice_on_pmpro_account']);
 
@@ -964,7 +971,231 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
     }
 
     /**
-     * Intercept profile email updates on WordPress / PMPro edit profile.
+     * Intercept PMPro frontend member profile edit errors and email change.
+     * PMPro passes ($errors, $update, $user) where $errors is an array or WP_Error.
+     *
+     * @param mixed     $errors
+     * @param bool      $update
+     * @param \stdClass $user
+     * @return void
+     */
+    public function intercept_pmpro_profile_update(mixed &$errors, bool $update, \stdClass &$user): void
+    {
+        if (!$update || empty($user->ID)) {
+            return;
+        }
+
+        $user_id = (int) $user->ID;
+        $current_user = get_userdata($user_id);
+        if (!$current_user || empty($current_user->user_email)) {
+            return;
+        }
+
+        // Allow administrators editing other users in wp-admin to update directly
+        if (function_exists('is_admin') && is_admin() && function_exists('current_user_can') && current_user_can('manage_options') && get_current_user_id() !== $user_id) {
+            return;
+        }
+
+        $submitted_email = '';
+        if (isset($user->user_email)) {
+            $submitted_email = sanitize_email((string) $user->user_email);
+        } elseif (isset($_POST['user_email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['user_email']));
+        } elseif (isset($_POST['email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['email']));
+        }
+
+        if (empty($submitted_email) || !is_email($submitted_email)) {
+            return;
+        }
+
+        $current_email = (string) $current_user->user_email;
+
+        // If email has not changed, do nothing
+        if (strtolower(trim($submitted_email)) === strtolower(trim($current_email))) {
+            return;
+        }
+
+        // Check if email already belongs to another user
+        $existing_user_id = email_exists($submitted_email);
+        if ($existing_user_id && (int) $existing_user_id !== $user_id) {
+            $msg = __('This email is already registered, please choose another one.', 'paid-memberships-pro');
+            if (is_array($errors)) {
+                $errors[] = $msg;
+            } elseif (is_object($errors) && method_exists($errors, 'add')) {
+                $errors->add('email_exists', $msg);
+            }
+            return;
+        }
+
+        // Save new email as unverified in usermeta
+        update_user_meta($user_id, 'mm_pending_new_email', $submitted_email);
+
+        // Send 6-digit verification code to the NEW email address
+        $this->generate_and_send_pending_code($user_id, $submitted_email, true);
+
+        // Keep current email intact in $user object and $_POST so PMPro and WP do not overwrite wp_users.user_email
+        $user->user_email = $current_email;
+        if (isset($_POST['user_email'])) {
+            $_POST['user_email'] = $current_email;
+        }
+        if (isset($_POST['email'])) {
+            $_POST['email'] = $current_email;
+        }
+    }
+
+    /**
+     * Intercept PMPro frontend personal_options_update.
+     *
+     * @param int $user_id
+     * @return void
+     */
+    public function intercept_pmpro_personal_options_update(int $user_id): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        if (function_exists('is_admin') && is_admin() && function_exists('current_user_can') && current_user_can('manage_options') && get_current_user_id() !== $user_id) {
+            return;
+        }
+
+        $current_user = get_userdata($user_id);
+        if (!$current_user || empty($current_user->user_email)) {
+            return;
+        }
+
+        $submitted_email = '';
+        if (isset($_POST['user_email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['user_email']));
+        } elseif (isset($_POST['email'])) {
+            $submitted_email = sanitize_email((string) wp_unslash($_POST['email']));
+        }
+
+        if (empty($submitted_email) || !is_email($submitted_email)) {
+            return;
+        }
+
+        $current_email = (string) $current_user->user_email;
+        if (strtolower(trim($submitted_email)) !== strtolower(trim($current_email))) {
+            update_user_meta($user_id, 'mm_pending_new_email', $submitted_email);
+            $this->generate_and_send_pending_code($user_id, $submitted_email, true);
+            $_POST['user_email'] = $current_email;
+            $_POST['email'] = $current_email;
+        }
+    }
+
+    /**
+     * Universal WordPress core filter: intercept any user update before inserting into wp_users.
+     *
+     * @param array    $data     Array of data to be updated/inserted in wp_users.
+     * @param bool     $update   Whether this is an existing user update.
+     * @param int|null $user_id  User ID being updated.
+     * @param array    $userdata Raw user data passed to wp_insert_user.
+     * @return array Modified data array.
+     */
+    public function intercept_wp_pre_insert_user_data(array $data, bool $update, ?int $user_id, array $userdata): array
+    {
+        if (!$update || empty($user_id) || $user_id <= 0) {
+            return $data;
+        }
+
+        // If this update is coming from our own verify_pending_email_code(), allow it through!
+        if (!empty($GLOBALS['__mm_updating_verified_email'])) {
+            return $data;
+        }
+
+        // Allow administrators editing other users in wp-admin
+        if (function_exists('is_admin') && is_admin() && function_exists('current_user_can') && current_user_can('manage_options') && get_current_user_id() !== $user_id) {
+            return $data;
+        }
+
+        $current_user = get_userdata($user_id);
+        if (!$current_user || empty($current_user->user_email)) {
+            return $data;
+        }
+
+        $current_email = (string) $current_user->user_email;
+        $new_email     = isset($data['user_email']) ? sanitize_email((string) $data['user_email']) : '';
+
+        if (!empty($new_email) && is_email($new_email) && strtolower(trim($new_email)) !== strtolower(trim($current_email))) {
+            // Check if email already belongs to another user
+            $existing_user_id = email_exists($new_email);
+            if ($existing_user_id && (int) $existing_user_id !== $user_id) {
+                return $data;
+            }
+
+            // Intercept! Save new email as pending and dispatch verification code
+            update_user_meta($user_id, 'mm_pending_new_email', $new_email);
+            $this->generate_and_send_pending_code($user_id, $new_email, true);
+
+            // Revert email in $data so wp_users is NOT updated yet
+            $data['user_email'] = $current_email;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Filter the_content to prepend the pending email notice banner on PMPro and Dashboard pages.
+     *
+     * @param string $content
+     * @return string
+     */
+    public function filter_the_content_for_pending_email_notice(string $content): string
+    {
+        if (!is_user_logged_in()) {
+            return $content;
+        }
+
+        $user_id = get_current_user_id();
+        $pending_email = (string) get_user_meta($user_id, 'mm_pending_new_email', true);
+        if (empty($pending_email)) {
+            return $content;
+        }
+
+        // Check if page contains PMPro or Portal shortcodes or is a PMPro page
+        $is_pmpro_page = (function_exists('pmpro_is_pmpro_page') && pmpro_is_pmpro_page());
+        $has_shortcode = str_contains($content, '[pmpro_')
+            || str_contains($content, 'pmpro_')
+            || str_contains($content, '[az_profile')
+            || str_contains($content, '[matchmaker_member_portal');
+
+        if ($is_pmpro_page || $has_shortcode) {
+            // Avoid duplicate rendering
+            if (!str_contains($content, 'mm-pending-email-notice')) {
+                $notice_html = $this->render_pending_email_notice($user_id);
+                return $notice_html . $content;
+            }
+        }
+
+        return $content;
+    }
+
+    /**
+     * Filter PMPro account / member profile edit shortcode output.
+     *
+     * @param string $content
+     * @return string
+     */
+    public function filter_pmpro_shortcode_notice(string $content): string
+    {
+        if (!is_user_logged_in()) {
+            return $content;
+        }
+
+        $user_id = get_current_user_id();
+        $pending_email = (string) get_user_meta($user_id, 'mm_pending_new_email', true);
+        if (empty($pending_email) || str_contains($content, 'mm-pending-email-notice')) {
+            return $content;
+        }
+
+        $notice_html = $this->render_pending_email_notice($user_id);
+        return $notice_html . $content;
+    }
+
+    /**
+     * Intercept profile email updates on WordPress edit profile.
      * Prevents immediate overwrite in wp_users, storing pending new email in usermeta and sending OTP.
      *
      * @param \WP_Error $errors
@@ -1346,10 +1577,12 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
         }
 
         // Update user_email in wp_users
+        $GLOBALS['__mm_updating_verified_email'] = true;
         $update_res = wp_update_user([
             'ID'         => $user_id,
             'user_email' => $pending_email,
         ]);
+        unset($GLOBALS['__mm_updating_verified_email']);
 
         if (\is_wp_error($update_res)) {
             return ['success' => false, 'message' => $update_res->get_error_message()];
