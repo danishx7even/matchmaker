@@ -917,9 +917,29 @@ This document maintains a chronological, step-by-step history of all features, a
     - Updated flexible scoring documentation for Dimension 1 (Origin / Ethnicity) referencing `ethinicity.json` and `'Any Origin'`.
   - `tests/Unit/LocationCascadeTest.php` & `tests/Unit/MatchingEngineTest.php`:
     - Added comprehensive unit tests validating `options_origin()`, `options_pref_origin()`, and flexible score calculation for `'Any Origin'`.
-  - **Verification**: Ran full automated test suite (`tests/run_tests.php`) — all 77 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+### Task 56: Gender-Specific Modesty and Preferred Modesty Options
+- **Objective**:
+  - Show modesty options based on gender for both self-profile (`user_modesty`) and preferred partner modesty (`pref_modesty`).
+  - For Female: `Full Veil`, `Abaya & Hijab`, `Hijab Only`, `Modest`, `Modern / Casual`
+  - For Male: `Traditional`, `Conservative`, `Moderate`, `Casual Modern`, `Trend-focused`
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Added `options_modesty_female()`, `options_modesty_male()`, `options_modesty(string $gender = 'female')`.
+    - Added `options_pref_modesty_female()`, `options_pref_modesty_male()`, `options_pref_modesty(string $gender = 'female')` with `'No Preference'`.
+    - Updated `render_single_field()` to dynamically evaluate `$user_gender` for `user_modesty` and `$pref_gender` (or opposite of `$user_gender`) for `pref_modesty`.
+  - `assets/js/matchmaking-form.js`:
+    - Added real-time gender-based modesty synchronization.
+    - Switching `user_gender` radio dynamically updates `user_modesty` dropdown options and auto-syncs `pref_gender` to opposite gender.
+    - Switching `pref_gender` radio dynamically updates `pref_modesty` dropdown options in real time.
+  - `src/View/admin/pool/manual-match.php`:
+    - Replaced `f_modesty` text input with gender-aware `<select>` dropdown populated via `$fg->options_pref_modesty($cand_gender)`.
+    - Added client-side JavaScript syncing `#mm_f_modesty` when candidate gender `#mm_f_gender` changes.
+  - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Added comprehensive unit tests for female/male modesty options and field rendering.
+  - **Verification**: Ran full automated test suite (`tests/run_tests.php`) — all 78 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
 ---
+
 
 
 

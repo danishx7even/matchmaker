@@ -39,6 +39,8 @@ $state_options       = $fg->options_pref_state($f_country ?? '');
 $city_options        = $fg->options_pref_city($f_country ?? '', $f_state ?? '');
 $citizenship_options = $fg->options_pref_citizenship();
 $origin_options      = $fg->options_pref_origin();
+$cand_gender         = !empty($f_gender) ? $f_gender : ($pool['pref_gender'] ?? 'female');
+$modesty_options     = $fg->options_pref_modesty($cand_gender);
 $hierarchy_json      = json_encode($fg->get_hierarchy_data(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['country'] ?: ($pool['location'] ?: '—')));
@@ -78,7 +80,7 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
             <!-- Row 1: Core Demographics & Location -->
             <div style="flex:1 1 180px;">
                 <label><strong><?php esc_html_e('Candidate Gender', 'matchmaker'); ?></strong></label><br>
-                <select name="f_gender" style="width:100%;">
+                <select name="f_gender" id="mm_f_gender" style="width:100%;">
                     <option value="female" <?php selected(strtolower($f_gender ?? ''), 'female'); ?>><?php esc_html_e('Female', 'matchmaker'); ?></option>
                     <option value="male"   <?php selected(strtolower($f_gender ?? ''), 'male');   ?>><?php esc_html_e('Male', 'matchmaker'); ?></option>
                     <option value="any"    <?php selected(strtolower($f_gender ?? ''), 'any');    ?>><?php esc_html_e('Any Gender', 'matchmaker'); ?></option>
@@ -159,7 +161,13 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
 
             <div style="flex:1 1 180px;">
                 <label><strong><?php esc_html_e('Modesty Level', 'matchmaker'); ?></strong></label><br>
-                <input type="text" name="f_modesty" value="<?php echo esc_attr($f_modesty ?? ''); ?>" placeholder="<?php esc_attr_e('e.g. Hijab, Niqab or Any', 'matchmaker'); ?>" style="width:100%;">
+                <select name="f_modesty" id="mm_f_modesty" style="width:100%;">
+                    <?php foreach ($modesty_options as $mod_opt) : ?>
+                        <option value="<?php echo esc_attr($mod_opt); ?>" <?php selected(strcasecmp($f_modesty ?? '', $mod_opt) === 0); ?>>
+                            <?php echo esc_html($mod_opt); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <div style="flex:1 1 180px;">
@@ -236,6 +244,31 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
     stateSelect.addEventListener('change', function() {
         populateCities(countrySelect.value, this.value, '');
     });
+
+    var modestyConfigs = {
+        female: <?php echo json_encode($fg->options_pref_modesty('female')); ?>,
+        male:   <?php echo json_encode($fg->options_pref_modesty('male')); ?>
+    };
+    var genderSelect  = document.getElementById('mm_f_gender');
+    var modestySelect = document.getElementById('mm_f_modesty');
+
+    if (genderSelect && modestySelect) {
+        genderSelect.addEventListener('change', function() {
+            var g = (genderSelect.value || '').toLowerCase();
+            var opts = (g === 'male') ? modestyConfigs.male : modestyConfigs.female;
+            var curr = modestySelect.value;
+            modestySelect.innerHTML = '';
+            opts.forEach(function(opt) {
+                var el = document.createElement('option');
+                el.value = opt;
+                el.textContent = opt;
+                if (curr && opt.toLowerCase() === curr.toLowerCase()) {
+                    el.selected = true;
+                }
+                modestySelect.appendChild(el);
+            });
+        });
+    }
 })();
 </script>
 

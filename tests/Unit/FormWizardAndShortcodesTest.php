@@ -101,4 +101,32 @@ class FormWizardAndShortcodesTest
             throw new \RuntimeException("Expected min >= max to be detected as invalid range.");
         }
     }
+
+    public function test_render_gender_specific_modesty_fields(): void
+    {
+        // 1. Female self modesty
+        $female_mod_html = $this->field_generator->render_single_field('user_modesty', ['user_gender' => 'Female']);
+        if (!str_contains($female_mod_html, 'Full Veil') || !str_contains($female_mod_html, 'Abaya &amp; Hijab') && !str_contains($female_mod_html, 'Abaya & Hijab')) {
+            throw new \RuntimeException("Expected female user_modesty field to contain Full Veil and Abaya & Hijab: " . $female_mod_html);
+        }
+
+        // 2. Male self modesty
+        $male_mod_html = $this->field_generator->render_single_field('user_modesty', ['user_gender' => 'Male']);
+        if (!str_contains($male_mod_html, 'Traditional') || !str_contains($male_mod_html, 'Trend-focused')) {
+            throw new \RuntimeException("Expected male user_modesty field to contain Traditional and Trend-focused: " . $male_mod_html);
+        }
+
+        // 3. Female preferred modesty
+        $pref_female_html = $this->field_generator->render_single_field('pref_modesty', ['pref_gender' => 'Female']);
+        if (!str_contains($pref_female_html, 'Full Veil') || !str_contains($pref_female_html, 'No Preference')) {
+            throw new \RuntimeException("Expected female pref_modesty field to contain Full Veil and No Preference: " . $pref_female_html);
+        }
+
+        // 4. Male preferred modesty
+        $pref_male_html = $this->field_generator->render_single_field('pref_modesty', ['pref_gender' => 'Male']);
+        if (!str_contains($pref_male_html, 'Traditional') || !str_contains($pref_male_html, 'No Preference')) {
+            throw new \RuntimeException("Expected male pref_modesty field to contain Traditional and No Preference: " . $pref_male_html);
+        }
+    }
 }
+

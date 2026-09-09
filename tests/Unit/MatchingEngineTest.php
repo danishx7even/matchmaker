@@ -124,8 +124,20 @@ final class MatchingEngineTest extends TestCase
         $this->assertNotContains('No Preference', $gen->options_religion());
         $this->assertContains('No Preference', $gen->options_pref_religion());
 
-        $this->assertNotContains('No Preference', $gen->options_modesty());
-        $this->assertContains('No Preference', $gen->options_pref_modesty());
+        $this->assertNotContains('No Preference', $gen->options_modesty('female'));
+        $this->assertContains('Full Veil', $gen->options_modesty('female'));
+        $this->assertContains('Abaya & Hijab', $gen->options_modesty('female'));
+        $this->assertContains('Modern / Casual', $gen->options_modesty('female'));
+
+        $this->assertNotContains('No Preference', $gen->options_modesty('male'));
+        $this->assertContains('Traditional', $gen->options_modesty('male'));
+        $this->assertContains('Conservative', $gen->options_modesty('male'));
+        $this->assertContains('Trend-focused', $gen->options_modesty('male'));
+
+        $this->assertContains('No Preference', $gen->options_pref_modesty('female'));
+        $this->assertContains('No Preference', $gen->options_pref_modesty('male'));
+        $this->assertContains('Full Veil', $gen->options_pref_modesty('female'));
+        $this->assertContains('Traditional', $gen->options_pref_modesty('male'));
 
         $this->assertNotContains('No Preference', $gen->options_drinking());
         $this->assertContains('No Preference', $gen->options_pref_drinking());

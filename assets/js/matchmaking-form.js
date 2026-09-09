@@ -204,6 +204,67 @@
     });
 
     /* -------------------------------------------------------
+       Gender-Based Modesty & Preferred Modesty Synchronization
+    ------------------------------------------------------- */
+    var modestyConfig = {
+        female: {
+            self: ['Select preference', 'Full Veil', 'Abaya & Hijab', 'Hijab Only', 'Modest', 'Modern / Casual'],
+            pref: ['Select preference', 'Full Veil', 'Abaya & Hijab', 'Hijab Only', 'Modest', 'Modern / Casual', 'No Preference']
+        },
+        male: {
+            self: ['Select preference', 'Traditional', 'Conservative', 'Moderate', 'Casual Modern', 'Trend-focused'],
+            pref: ['Select preference', 'Traditional', 'Conservative', 'Moderate', 'Casual Modern', 'Trend-focused', 'No Preference']
+        }
+    };
+
+    function syncModestyOptionsForUserGender(userGender) {
+        var gKey = (userGender && userGender.toLowerCase() === 'male') ? 'male' : 'female';
+        var userModestySel = form.querySelector('select[name="form_fields[user_modesty]"]');
+        var currentVal = userModestySel ? userModestySel.value : '';
+        updateCustomSelect('user_modesty', modestyConfig[gKey].self, currentVal, 'Select preference');
+    }
+
+    function syncModestyOptionsForPrefGender(prefGender) {
+        var gKey = (prefGender && prefGender.toLowerCase() === 'male') ? 'male' : 'female';
+        var prefModestySel = form.querySelector('select[name="form_fields[pref_modesty]"]');
+        var currentVal = prefModestySel ? prefModestySel.value : '';
+        updateCustomSelect('pref_modesty', modestyConfig[gKey].pref, currentVal, 'Select preference');
+    }
+
+    // Listen to user_gender radio changes
+    var userGenderRadios = form.querySelectorAll('input[type="radio"][name="form_fields[user_gender]"]');
+    userGenderRadios.forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            if (radio.checked) {
+                var uGender = radio.value;
+                syncModestyOptionsForUserGender(uGender);
+
+                // Auto-suggest opposite gender for pref_gender if not yet chosen
+                var targetPrefGender = (uGender.toLowerCase() === 'male') ? 'Female' : 'Male';
+                var currentPrefRadioChecked = form.querySelector('input[type="radio"][name="form_fields[pref_gender]"]:checked');
+                var prefRadio = form.querySelector('input[type="radio"][name="form_fields[pref_gender]"][value="' + targetPrefGender + '"]');
+                
+                if (!currentPrefRadioChecked && prefRadio) {
+                    prefRadio.checked = true;
+                    syncModestyOptionsForPrefGender(targetPrefGender);
+                } else if (currentPrefRadioChecked) {
+                    syncModestyOptionsForPrefGender(currentPrefRadioChecked.value);
+                }
+            }
+        });
+    });
+
+    // Listen to pref_gender radio changes
+    var prefGenderRadios = form.querySelectorAll('input[type="radio"][name="form_fields[pref_gender]"]');
+    prefGenderRadios.forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            if (radio.checked) {
+                syncModestyOptionsForPrefGender(radio.value);
+            }
+        });
+    });
+
+    /* -------------------------------------------------------
        Multi-select custom dropdowns
     ------------------------------------------------------- */
     form.querySelectorAll('.custom-multiselect-wrapper').forEach(function (wrapper) {

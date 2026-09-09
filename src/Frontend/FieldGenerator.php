@@ -322,18 +322,70 @@ class FieldGenerator {
     public function options_pref_children(): array { return array_merge($this->options_children(), ['No Preference']); }
 
     /**
-     * Get modesty options
+     * Get female modesty options
      *
-     * @return array
+     * @return list<string>
      */
-    public function options_modesty(): array { return ['Select preference', 'Modest', 'Hijab', 'No Hijab', 'Sometimes', 'Niqab']; }
+    public function options_modesty_female(): array
+    {
+        return ['Select preference', 'Full Veil', 'Abaya & Hijab', 'Hijab Only', 'Modest', 'Modern / Casual'];
+    }
+
+    /**
+     * Get male modesty options
+     *
+     * @return list<string>
+     */
+    public function options_modesty_male(): array
+    {
+        return ['Select preference', 'Traditional', 'Conservative', 'Moderate', 'Casual Modern', 'Trend-focused'];
+    }
+
+    /**
+     * Get modesty options according to gender
+     *
+     * @param string $gender 'female', 'male', or empty (defaults to female)
+     * @return list<string>
+     */
+    public function options_modesty(string $gender = 'female'): array
+    {
+        return strtolower(trim($gender)) === 'male'
+            ? $this->options_modesty_male()
+            : $this->options_modesty_female();
+    }
     
     /**
-     * Get preferred modesty options (with No Preference)
+     * Get preferred female modesty options (with No Preference)
      *
-     * @return array
+     * @return list<string>
      */
-    public function options_pref_modesty(): array { return array_merge($this->options_modesty(), ['No Preference']); }
+    public function options_pref_modesty_female(): array
+    {
+        return array_merge($this->options_modesty_female(), ['No Preference']);
+    }
+
+    /**
+     * Get preferred male modesty options (with No Preference)
+     *
+     * @return list<string>
+     */
+    public function options_pref_modesty_male(): array
+    {
+        return array_merge($this->options_modesty_male(), ['No Preference']);
+    }
+
+    /**
+     * Get preferred modesty options according to target/preferred gender (with No Preference)
+     *
+     * @param string $gender 'female', 'male', or empty (defaults to female)
+     * @return list<string>
+     */
+    public function options_pref_modesty(string $gender = 'female'): array
+    {
+        return strtolower(trim($gender)) === 'male'
+            ? $this->options_pref_modesty_male()
+            : $this->options_pref_modesty_female();
+    }
 
     /**
      * Get drinking options
@@ -665,6 +717,28 @@ class FieldGenerator {
             return $html;
         }
 
+        if ($name === 'user_modesty') {
+            $user_gender = (string) ($values['user_gender'] ?? $values['gender'] ?? 'female');
+            $html .= $this->field_open('user_modesty');
+            $html .= $this->label('user_modesty', 'Hijab / Modesty Practice');
+            $html .= $this->select('user_modesty', $this->options_modesty($user_gender), $val);
+            $html .= $this->field_close();
+            return $html;
+        }
+
+        if ($name === 'pref_modesty') {
+            $pref_gender = (string) ($values['pref_gender'] ?? '');
+            if (empty($pref_gender)) {
+                $user_gender = strtolower(trim((string) ($values['user_gender'] ?? $values['gender'] ?? '')));
+                $pref_gender = ($user_gender === 'male') ? 'female' : (($user_gender === 'female') ? 'male' : 'female');
+            }
+            $html .= $this->field_open('pref_modesty');
+            $html .= $this->label('pref_modesty', 'Preferred Hijab / Modesty');
+            $html .= $this->select('pref_modesty', $this->options_pref_modesty($pref_gender), $val);
+            $html .= $this->field_close();
+            return $html;
+        }
+
         $text_configs = [
             'full_name'      => ['text', 'Full Name', 'Enter your full name'],
             'phone_number'   => ['text', 'Phone Number', 'Enter your phone number'],
@@ -680,7 +754,6 @@ class FieldGenerator {
             'user_height'         => ['Height', $this->options_height()],
             'user_marital_status' => ['Marital Status', $this->options_marital()],
             'user_children'       => ['Do You Have Children', $this->options_children()],
-            'user_modesty'        => ['Hijab / Modesty Practice', $this->options_modesty()],
             'user_drinking'       => ['Drinking Habits', $this->options_drinking()],
             'user_smoking'        => ['Smoking Habits', $this->options_smoking()],
             'user_prayer'         => ['Prayer Habits', $this->options_prayer()],
@@ -690,7 +763,6 @@ class FieldGenerator {
             'pref_religion'       => ['Preferred Religion', $this->options_pref_religion()],
             'pref_marital_status' => ['Preferred Marital Status', $this->options_pref_marital()],
             'pref_children'       => ['Children Preference', $this->options_pref_children()],
-            'pref_modesty'        => ['Preferred Hijab / Modesty', $this->options_pref_modesty()],
             'pref_drinking'       => ['Drinking Preference', $this->options_pref_drinking()],
             'pref_smoking'        => ['Smoking Preference', $this->options_pref_smoking()],
             'pref_prayer'         => ['Prayer Habits Preference', $this->options_pref_prayer()],
