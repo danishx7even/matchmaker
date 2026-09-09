@@ -72,7 +72,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                 $approved_cnt = (int) ($c['approved_matches'] ?? 0);
                 $pending_cnt  = (int) ($c['pending_matches'] ?? 0);
                 $has_mutual   = $repo->has_mutual_match_this_month($uid);
-                $c_has_vip    = !empty($c['has_one_on_one']);
+                $c_has_vip    = !empty($c['has_one_on_one']) || ($c['user_type'] ?? '') === 'one_on_one' || $repo->has_one_on_one($uid);
             ?>
                 <tr>
                     <td>

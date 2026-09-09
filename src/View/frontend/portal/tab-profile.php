@@ -67,7 +67,10 @@ $badge_label = $repo->format_tier_label($user_type);
         </div>
     </div>
 
-    <?php if (!empty($has_one_on_one)) : ?>
+    <?php 
+    $is_vip_active = !empty($has_one_on_one) || (!empty($user_id) && $repo->has_one_on_one((int) $user_id));
+    if ($is_vip_active) : 
+    ?>
         <div class="az-card mm-vip-service-card" style="background:linear-gradient(135deg, #FFFDFB 0%, #FAF5F0 100%); border:1px solid rgba(204,114,63,0.3); border-left:4px solid #CC723F; padding:20px 24px; border-radius:12px; margin-bottom:20px; box-shadow:0 4px 14px rgba(204,114,63,0.06);">
             <div style="display:flex; align-items:center; gap:14px;">
                 <div style="width:42px; height:42px; border-radius:10px; background:rgba(204,114,63,0.12); color:#CC723F; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">

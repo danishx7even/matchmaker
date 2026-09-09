@@ -61,6 +61,29 @@ class ProfileService {
     }
 
     /**
+     * Check if user has 1-on-1 VIP matchmaking active.
+     *
+     * @param int $user_id The user ID.
+     * @return bool
+     */
+    public function has_one_on_one(int $user_id): bool {
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        $has_one_on_one = \Matchmaker\Core\PMProSync::instance()->has_active_one_on_one_service($user_id);
+
+        // Self-heal: ensure usermeta and pool are synced if there is a mismatch
+        $stored_meta = (bool) get_user_meta($user_id, 'mm_has_one_on_one', true);
+        if ($stored_meta !== $has_one_on_one) {
+            update_user_meta($user_id, 'mm_has_one_on_one', $has_one_on_one ? 1 : 0);
+            MatchRepository::instance()->update_pool_one_on_one($user_id, $has_one_on_one);
+        }
+
+        return $has_one_on_one;
+    }
+
+    /**
      * Assemble profile data.
      *
      * @param int $user_id The user ID.

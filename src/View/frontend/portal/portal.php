@@ -61,7 +61,10 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
         </nav>
 
         <div class="header-actions">
-            <?php if (!empty($has_one_on_one)) : ?>
+            <?php 
+            $is_vip_active = !empty($has_one_on_one) || (!empty($user_id) && $repo->has_one_on_one((int) $user_id));
+            if ($is_vip_active) : 
+            ?>
                 <span class="mm-vip-header-badge" style="display:inline-flex; align-items:center; gap:5px; background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; box-shadow:0 2px 6px rgba(204,114,63,0.12);">
                     <span style="font-size:12px;">★</span> <?php esc_html_e('1-on-1 VIP', 'matchmaker'); ?>
                 </span>

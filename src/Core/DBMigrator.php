@@ -198,6 +198,12 @@ class DBMigrator {
                 $wpdb->query("UPDATE {$pool_table} SET pref_country = pref_location WHERE pref_country = '' AND pref_location != ''");
                 $wpdb->query("ALTER TABLE {$pool_table} DROP COLUMN pref_location");
             }
+            if (!in_array('has_one_on_one', $cols, true)) {
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN has_one_on_one tinyint(1) NOT NULL DEFAULT 0 AFTER user_type");
+                $wpdb->query("ALTER TABLE {$pool_table} ADD INDEX idx_one_on_one (has_one_on_one)");
+            }
+            // Auto backfill has_one_on_one from user_type = 'one_on_one'
+            $wpdb->query("UPDATE {$pool_table} SET has_one_on_one = 1 WHERE user_type = 'one_on_one'");
         }
 
         update_option($option_name, $new_version);

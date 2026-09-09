@@ -171,19 +171,21 @@ class PMProSync {
                         return true;
                     }
                 }
-                return false;
             }
         }
 
         if (function_exists('pmpro_getMembershipLevelForUser')) {
             $membership = pmpro_getMembershipLevelForUser($user_id);
             if (is_object($membership) && !empty($membership->id)) {
-                return in_array((int) $membership->id, $one_on_one_levels, true);
+                if (in_array((int) $membership->id, $one_on_one_levels, true)) {
+                    return true;
+                }
             }
         }
 
-        // Fallback to usermeta if PMPro functions are not available
-        return (bool) get_user_meta($user_id, 'mm_has_one_on_one', true);
+        // Fallback to usermeta and legacy user_type
+        return (bool) get_user_meta($user_id, 'mm_has_one_on_one', true)
+            || (string) get_user_meta($user_id, 'user_type', true) === 'one_on_one';
     }
 
     /**

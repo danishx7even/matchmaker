@@ -371,8 +371,12 @@ class MatchRepository
             $args[]  = $filters['user_type'];
         }
         if (isset($filters['has_one_on_one']) && $filters['has_one_on_one'] !== '') {
-            $where[] = 'p.has_one_on_one = %d';
-            $args[]  = (int) $filters['has_one_on_one'];
+            $is_one_on_one_filter = (int) $filters['has_one_on_one'];
+            if ($is_one_on_one_filter === 1) {
+                $where[] = '(p.has_one_on_one = 1 OR p.user_type = \'one_on_one\')';
+            } else {
+                $where[] = '(p.has_one_on_one = 0 AND p.user_type != \'one_on_one\')';
+            }
         }
         if (!empty($filters['gender'])) {
             $where[] = 'p.gender = %s';
@@ -695,16 +699,27 @@ class MatchRepository
             return false;
         }
 
-        global $wpdb;
-        $table = $wpdb->prefix . 'matchmaking_pool';
-        $val = $wpdb->get_var(
-            $wpdb->prepare("SELECT has_one_on_one FROM {$table} WHERE user_id = %d", $user_id)
-        );
-        if ($val !== null) {
-            return (int) $val === 1;
+        if (class_exists('\\Matchmaker\\Core\\PMProSync')) {
+            $is_active = \Matchmaker\Core\PMProSync::instance()->has_active_one_on_one_service($user_id);
+            if ($is_active) {
+                return true;
+            }
         }
 
-        return (bool) get_user_meta($user_id, 'mm_has_one_on_one', true);
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaking_pool';
+        $row = $wpdb->get_row(
+            $wpdb->prepare("SELECT has_one_on_one, user_type FROM {$table} WHERE user_id = %d", $user_id),
+            ARRAY_A
+        );
+        if ($row !== null) {
+            if (!empty($row['has_one_on_one']) || ($row['user_type'] ?? '') === 'one_on_one') {
+                return true;
+            }
+        }
+
+        return (bool) get_user_meta($user_id, 'mm_has_one_on_one', true)
+            || (string) get_user_meta($user_id, 'user_type', true) === 'one_on_one';
     }
 
     /**

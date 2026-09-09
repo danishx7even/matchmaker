@@ -1108,6 +1108,21 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Ran automated test runner (`tests/run_tests.php`) — all 95 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
+### Task 64: Fix 1-on-1 VIP Service Detection, Multi-Source Fallbacks & Pool Filtering
+- **Objective**:
+  - Resolve issue where 1-on-1 VIP badges and filter were not displaying in the Admin Candidate Pool and Member Portal.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`: Added direct `ALTER TABLE` column patch and automatic SQL backfill (`UPDATE wp_matchmaking_pool SET has_one_on_one = 1 WHERE user_type = 'one_on_one'`).
+  - `src/Core/PMProSync.php`: Enhanced `has_active_one_on_one_service()` to verify live PMPro membership levels (`pmpro_getMembershipLevelsForUser` / `pmpro_getMembershipLevelForUser`), usermeta `mm_has_one_on_one`, and legacy usermeta `user_type = 'one_on_one'`.
+  - `src/Service/ProfileService.php`: Added `has_one_on_one(int $user_id): bool` with automatic self-healing sync to `wp_usermeta` and `wp_matchmaking_pool`.
+  - `src/Repository/MatchRepository.php`:
+    - Updated `has_one_on_one(int $user_id)` to check PMProSync, pool table rows, and usermeta.
+    - Updated `search_pool()` filtering so filtering for 1-on-1 VIP matches both `has_one_on_one = 1` and `user_type = 'one_on_one'`.
+  - `src/View/admin/pool/pool-list.php`: Updated table row condition `$c_has_vip` to check `has_one_on_one`, `user_type = 'one_on_one'`, and `MatchRepository::has_one_on_one($uid)`.
+  - `src/View/frontend/portal/portal.php` & `src/View/frontend/portal/tab-profile.php`: Updated VIP check to verify all sources.
+- **Verification**:
+  - Ran automated test runner (`tests/run_tests.php`) — all 95 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
 ---
 
 
