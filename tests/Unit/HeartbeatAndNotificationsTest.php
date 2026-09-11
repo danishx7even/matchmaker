@@ -21,6 +21,7 @@ class HeartbeatAndNotificationsTest
         $GLOBALS['wpdb']->mock_vars = [];
 
         // Level ID 3 is the default Monthly Tier in PMProSync
+        $GLOBALS['__mm_current_user_id'] = 1;
         $GLOBALS['__mm_user_pmpro_level'][1] = 3;
         update_user_meta(1, 'user_type', 'monthly');
 

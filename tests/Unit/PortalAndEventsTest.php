@@ -19,7 +19,7 @@ final class PortalAndEventsTest extends TestCase
         $GLOBALS['__mm_pmpro_levels'] = [];
     }
 
-    public function test_event_tier_portal_hides_matches_tab(): void
+    public function test_event_tier_portal_shows_all_tabs_including_matches_and_services(): void
     {
         $user_id = 901;
         $user_type = 'event';
@@ -32,19 +32,22 @@ final class PortalAndEventsTest extends TestCase
         $pool = null;
         $repo = MatchRepository::instance();
         $dashboard_url = 'https://example.com/dashboard/';
+        $matches = [];
 
         ob_start();
         include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/portal.php';
         $html = (string) ob_get_clean();
 
         $this->assertStringContainsString('data-tab="profile"', $html);
+        $this->assertStringContainsString('data-tab="matches"', $html);
         $this->assertStringContainsString('data-tab="events"', $html);
-        $this->assertStringNotContainsString('data-tab="matches"', $html);
-        $this->assertStringNotContainsString('id="mm-tab-matches"', $html);
+        $this->assertStringContainsString('data-tab="services"', $html);
+        $this->assertStringContainsString('id="mm-tab-matches"', $html);
         $this->assertStringContainsString('id="mm-tab-events"', $html);
+        $this->assertStringContainsString('id="mm-tab-services"', $html);
     }
 
-    public function test_monthly_tier_portal_shows_matches_tab(): void
+    public function test_monthly_tier_portal_shows_matches_and_services_tab(): void
     {
         $user_id = 902;
         $user_type = 'monthly';
@@ -57,6 +60,7 @@ final class PortalAndEventsTest extends TestCase
         $pool = null;
         $repo = MatchRepository::instance();
         $dashboard_url = 'https://example.com/dashboard/';
+        $matches = [];
 
         ob_start();
         include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/portal.php';
@@ -65,32 +69,33 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('data-tab="profile"', $html);
         $this->assertStringContainsString('data-tab="matches"', $html);
         $this->assertStringContainsString('data-tab="events"', $html);
+        $this->assertStringContainsString('data-tab="services"', $html);
         $this->assertStringContainsString('id="mm-tab-matches"', $html);
         $this->assertStringContainsString('id="mm-tab-events"', $html);
+        $this->assertStringContainsString('id="mm-tab-services"', $html);
     }
 
-    public function test_ajax_reload_tab_gating_blocks_event_tier_matches(): void
+    public function test_ajax_reload_tab_services_returns_rendered_html(): void
     {
         $controller = PortalController::instance();
         $_POST['nonce'] = wp_create_nonce('mm_portal_nonce');
-        $_POST['tab']   = 'matches';
+        $_POST['tab']   = 'services';
 
-        // Set user 1 as event type
-        $GLOBALS['__mm_user_pmpro_level'][1] = 6;
-        update_user_meta(1, 'user_type', 'event');
-        update_user_meta(1, 'az_user_type', 'event');
+        update_user_meta(1, 'user_type', 'monthly');
 
         ob_start();
         try {
             $controller->handle_ajax_reload_tab();
         } catch (\Exception $e) {
-            // wp_send_json_error throws in mock
+            // wp_send_json_success throws in mock
         }
         $output = ob_get_clean();
         $response = json_decode($output, true);
 
-        $this->assertFalse($response['success'] ?? true);
-        $this->assertStringContainsString('not available for Event memberships', $response['data']['message'] ?? '');
+        $this->assertTrue($response['success'] ?? false);
+        $this->assertEquals('services', $response['data']['tab'] ?? '');
+        $this->assertStringContainsString('mm-services-wrap', $response['data']['html'] ?? '');
+        $this->assertStringContainsString('Accelerate Your Matrimony Journey', $response['data']['html'] ?? '');
     }
 
     public function test_ajax_reload_tab_events_returns_rendered_html(): void

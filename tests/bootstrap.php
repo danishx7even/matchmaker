@@ -282,6 +282,10 @@ function wp_kses_post($val) {
     return $val;
 }
 
+function wp_specialchars_decode($string, $quote_style = ENT_NOQUOTES) {
+    return htmlspecialchars_decode((string)$string, $quote_style);
+}
+
 function wp_json_encode($data, $options = 0, $depth = 512) {
     return json_encode($data, $options, $depth);
 }
@@ -486,6 +490,10 @@ function current_time($type = 'mysql') {
 
 function home_url($path = '') {
     return 'https://example.com' . $path;
+}
+
+function get_bloginfo($show = '') {
+    return 'Arab Zawaj';
 }
 
 function wpautop($pee, $br = true) {

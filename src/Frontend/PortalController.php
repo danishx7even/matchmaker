@@ -210,7 +210,7 @@ class PortalController
     }
 
     /**
-     * AJAX handler for dynamic tab reload (Profile or Matches) sent by member-portal.js
+     * AJAX handler for dynamic tab reload (Profile, Matches, Events, or Services) sent by member-portal.js
      *
      * @return void
      */
@@ -230,15 +230,12 @@ class PortalController
         $user_type = \Matchmaker\Service\ProfileService::instance()->get_user_type($user_id);
         $page      = isset($_POST['page']) ? max(1, (int) $_POST['page']) : 1;
 
-        // Tab Gating: Members with 'event' membership are not permitted to access matches
-        if ($user_type === 'event' && $tab === 'matches') {
-            wp_send_json_error(['message' => __('Matches are not available for Event memberships.', 'matchmaker')]);
-        }
-
         if ($tab === 'matches') {
             $html = $this->render_matches_html($user_id, $user_type);
         } elseif ($tab === 'events') {
             $html = $this->render_events_html($user_id, $user_type, $page);
+        } elseif ($tab === 'services') {
+            $html = $this->render_services_html($user_id, $user_type);
         } else {
             $html = $this->render_profile_html($user_id);
         }
@@ -257,11 +254,13 @@ class PortalController
         if ($action === 'accept_match' || $action === 'decline_match') {
             $_POST['response_action'] = ($action === 'accept_match') ? 'accept' : 'decline';
             $this->handle_ajax_match_response();
-        } elseif ($action === 'get_matches_html' || $action === 'get_profile_html' || $action === 'get_events_html') {
+        } elseif ($action === 'get_matches_html' || $action === 'get_profile_html' || $action === 'get_events_html' || $action === 'get_services_html') {
             if ($action === 'get_matches_html') {
                 $_POST['tab'] = 'matches';
             } elseif ($action === 'get_events_html') {
                 $_POST['tab'] = 'events';
+            } elseif ($action === 'get_services_html') {
+                $_POST['tab'] = 'services';
             } else {
                 $_POST['tab'] = 'profile';
             }
@@ -320,16 +319,34 @@ class PortalController
         $repo = \Matchmaker\Repository\MatchRepository::instance();
         $user = wp_get_current_user();
         $user_type = \Matchmaker\Service\ProfileService::instance()->get_user_type($user_id);
-        $has_one_on_one = $repo->has_one_on_one($user_id);
-        $pool = $repo->get_user_pool($user_id);
-        $meta = $repo->get_meta_block($user_id);
-        $stats = $repo->get_match_stats($user_id);
-        $photos = $repo->get_user_photos($user_id);
-        $is_premium = in_array($user_type, ['monthly'], true);
+        $pool          = $repo->get_user_pool($user_id);
+        $meta          = $repo->get_meta_block($user_id);
+        $stats         = $repo->get_match_stats($user_id);
+        $photos        = $repo->get_user_photos($user_id);
+        $is_premium    = in_array($user_type, ['monthly'], true);
         $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
         
         ob_start();
         include __DIR__ . '/../View/frontend/portal/tab-profile.php';
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the services tab HTML
+     *
+     * @param int    $user_id
+     * @param string $user_type
+     * @return string
+     */
+    private function render_services_html(int $user_id, string $user_type): string
+    {
+        $repo           = \Matchmaker\Repository\MatchRepository::instance();
+        $user           = wp_get_current_user();
+        $has_one_on_one = $repo->has_one_on_one($user_id);
+        $is_premium     = in_array($user_type, ['monthly'], true);
+
+        ob_start();
+        include __DIR__ . '/../View/frontend/portal/tab-services.php';
         return (string) ob_get_clean();
     }
 }

@@ -316,11 +316,29 @@ class AdminPortal
                 foreach ($_POST['mm_pmpro_levels'] as $lvl_id => $tier_slug) {
                     $lvl  = (int) $lvl_id;
                     $tier = sanitize_key((string) $tier_slug);
-                    if ($lvl > 0 && in_array($tier, ['monthly', 'one_on_one', 'event', 'free'], true)) {
+                    if ($lvl > 0 && in_array($tier, ['monthly', 'event', 'free'], true)) {
                         $new_mapping[$lvl] = $tier;
                     }
                 }
                 update_option('mm_pmpro_tier_mapping', $new_mapping);
+            }
+
+            // PMPro Level Custom Tags
+            if (isset($_POST['mm_pmpro_level_tags']) && is_array($_POST['mm_pmpro_level_tags'])) {
+                $new_tags = [];
+                foreach ($_POST['mm_pmpro_level_tags'] as $lvl_id => $tag_val) {
+                    $lvl = (int) $lvl_id;
+                    $tag = sanitize_text_field(wp_unslash((string) $tag_val));
+                    if ($lvl > 0 && !empty($tag)) {
+                        $new_tags[$lvl] = $tag;
+                    }
+                }
+                update_option('mm_pmpro_level_tags', $new_tags);
+            }
+
+            // PMPro Services Group ID
+            if (isset($_POST['mm_services_group_id'])) {
+                update_option('mm_services_group_id', max(1, (int) $_POST['mm_services_group_id']));
             }
 
             // Quotas & Expiry Rules
@@ -367,7 +385,7 @@ class AdminPortal
                 update_option('mm_email_approval_template', wp_kses_post(wp_unslash($_POST['mm_email_approval_template'])));
             }
 
-            // Section 6: Verification Email Configuration
+            // Verification Email Configuration
             if (isset($_POST['mm_email_verify_from_email'])) {
                 update_option('mm_email_verify_from_email', sanitize_email(wp_unslash($_POST['mm_email_verify_from_email'])));
             }
@@ -391,6 +409,17 @@ class AdminPortal
             }
             if (isset($_POST['mm_email_verify_cooldown_seconds'])) {
                 update_option('mm_email_verify_cooldown_seconds', max(5, (int) $_POST['mm_email_verify_cooldown_seconds']));
+            }
+
+            // Admin Service Purchase Email Configuration
+            if (isset($_POST['mm_email_admin_service_recipient'])) {
+                update_option('mm_email_admin_service_recipient', sanitize_email(wp_unslash($_POST['mm_email_admin_service_recipient'])));
+            }
+            if (isset($_POST['mm_email_admin_service_purchase_subject'])) {
+                update_option('mm_email_admin_service_purchase_subject', sanitize_text_field(wp_unslash($_POST['mm_email_admin_service_purchase_subject'])));
+            }
+            if (isset($_POST['mm_email_admin_service_purchase_template'])) {
+                update_option('mm_email_admin_service_purchase_template', wp_kses_post(wp_unslash($_POST['mm_email_admin_service_purchase_template'])));
             }
 
             add_settings_error('mm_admin_notices', 'settings_saved', __('Settings saved successfully.', 'matchmaker'), 'updated');
@@ -733,9 +762,11 @@ class AdminPortal
         $environment_mode = $repo->get_environment_mode();
         $is_test_mode     = $repo->is_test_mode();
 
-        // 1. PMPro Mapping
-        $current_mapping = $pmpro_sync->get_tier_mapping();
-        $pmpro_levels    = function_exists('pmpro_getAllLevels') ? pmpro_getAllLevels(true, true) : [];
+        // 1. PMPro Mapping & Level Tags
+        $current_mapping    = $pmpro_sync->get_tier_mapping();
+        $pmpro_levels       = function_exists('pmpro_getAllLevels') ? pmpro_getAllLevels(true, true) : [];
+        $pmpro_level_tags   = $pmpro_sync->get_level_tags();
+        $services_group_id  = $pmpro_sync->get_services_group_id();
 
         // 2. Quotas & Expiry
         $max_matches     = $repo->get_max_cycle_matches();
@@ -793,6 +824,23 @@ class AdminPortal
 
         $verify_expiry_hours     = (int) get_option('mm_email_verify_expiry_hours', 24);
         $verify_cooldown_seconds = (int) get_option('mm_email_verify_cooldown_seconds', 60);
+
+        // 6B. Admin Service Purchase Email Settings
+        $admin_service_recipient         = (string) get_option('mm_email_admin_service_recipient', get_option('admin_email'));
+        $default_admin_service_subject   = __('[Arab Zawaj] New Service Purchased: {service_name} by {user_name}', 'matchmaker');
+        $admin_service_subject           = (string) get_option('mm_email_admin_service_purchase_subject', $default_admin_service_subject);
+        $default_admin_service_template  = "<h2>" . esc_html__('New Service Purchase Alert', 'matchmaker') . "</h2>\n"
+            . "<p>A member has just purchased an additional service on {site_name}.</p>\n"
+            . "<p><strong>Member Details:</strong><br>\n"
+            . "Name: {user_name}<br>\n"
+            . "Email: {user_email}<br>\n"
+            . "User ID: #{user_id}</p>\n"
+            . "<p><strong>Purchased Service:</strong><br>\n"
+            . "Service: {service_name}<br>\n"
+            . "Price: {service_price}<br>\n"
+            . "Date: {purchase_date}</p>\n"
+            . "<p><a href=\"{admin_profile_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;\">View Member in Candidate Pool &rarr;</a></p>";
+        $admin_service_template          = (string) get_option('mm_email_admin_service_purchase_template', $default_admin_service_template);
 
         require dirname(__DIR__) . '/View/admin/settings/settings.php';
     }

@@ -38,9 +38,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     </select>
 
     <select name="filter_one_on_one">
-        <option value=""><?php esc_html_e('All VIP Services', 'matchmaker'); ?></option>
-        <option value="1" <?php selected($one_on_one ?? '', '1'); ?>><?php esc_html_e('⭐ Has 1-on-1 VIP', 'matchmaker'); ?></option>
-        <option value="0" <?php selected($one_on_one ?? '', '0'); ?>><?php esc_html_e('No 1-on-1 VIP', 'matchmaker'); ?></option>
+        <option value=""><?php esc_html_e('All Services / VIP', 'matchmaker'); ?></option>
+        <option value="1" <?php selected($one_on_one ?? '', '1'); ?>><?php esc_html_e('⭐ Has VIP / Service', 'matchmaker'); ?></option>
+        <option value="0" <?php selected($one_on_one ?? '', '0'); ?>><?php esc_html_e('No Active Services', 'matchmaker'); ?></option>
     </select>
 
     <input type="submit" class="button" value="<?php esc_attr_e('Filter', 'matchmaker'); ?>">
@@ -54,7 +54,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <th><?php esc_html_e('Gender', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Age', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Location', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Tier & VIP', 'matchmaker'); ?></th>
+            <th><?php esc_html_e('Tier & Services', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Active Matches', 'matchmaker'); ?></th>
             <th style="width:100px; text-align:center;"><?php esc_html_e('Actions', 'matchmaker'); ?></th>
         </tr>

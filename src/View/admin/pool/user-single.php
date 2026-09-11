@@ -239,15 +239,8 @@ $photo3 = $meta['user_photo3'] ?? '';
                         <td><small style="color:#555;"><?php echo esc_html(substr($m['created_at'] ?? '', 0, 10)); ?></small></td>
                         <td style="text-align:center;">
                             <?php if ($st === 'pending_review') : ?>
-                                <?php if ($is_event_only) : ?>
-                                    <span style="display:block; margin-bottom:4px; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b;" title="<?php esc_attr_e('Matching approvals are disabled for Event users.', 'matchmaker'); ?>">
-                                        ⚠️ Event Tier Only
-                                    </span>
-                                    <a href="<?php echo esc_url($reject_url); ?>" class="button button-small mm-reject-link"><?php esc_html_e('Reject', 'matchmaker'); ?></a>
-                                <?php else : ?>
-                                    <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-small"><?php esc_html_e('Approve', 'matchmaker'); ?></a>
-                                    <a href="<?php echo esc_url($reject_url); ?>" class="button button-small mm-reject-link"><?php esc_html_e('Reject', 'matchmaker'); ?></a>
-                                <?php endif; ?>
+                                <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-small"><?php esc_html_e('Approve', 'matchmaker'); ?></a>
+                                <a href="<?php echo esc_url($reject_url); ?>" class="button button-small mm-reject-link"><?php esc_html_e('Reject', 'matchmaker'); ?></a>
                             <?php else : ?>
                                 <a href="<?php echo esc_url($view_match_url); ?>" class="button button-small"><?php esc_html_e('View Comparison', 'matchmaker'); ?></a>
                             <?php endif; ?>

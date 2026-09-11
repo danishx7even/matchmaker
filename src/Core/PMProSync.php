@@ -20,8 +20,6 @@ class PMProSync {
      */
     public const DEFAULT_LEVEL_MAPPING = [
         3 => 'monthly',
-        4 => 'one_on_one',
-        5 => 'one_on_one',
         6 => 'event',
         2 => 'free',
     ];
@@ -41,10 +39,9 @@ class PMProSync {
      * Combined tier priority fallback rank (for backwards compatibility).
      */
     public const TIER_PRIORITY = [
-        'one_on_one' => 4,
-        'monthly'    => 3,
-        'event'      => 2,
-        'free'       => 1,
+        'monthly' => 3,
+        'event'   => 2,
+        'free'    => 1,
     ];
 
     /**
@@ -65,6 +62,7 @@ class PMProSync {
         add_action('pmpro_after_checkout', [$this, 'handle_checkout_sync'], 10, 2);
         add_action('pmpro_subscription_payment_completed', [$this, 'reset_user_quota_on_renewal'], 10, 1);
         add_action('pmpro_membership_post_membership_expiry', [$this, 'handle_expiry_sync'], 10, 2);
+        add_filter('pmpro_registration_checks', [$this, 'check_service_requires_basic_membership'], 10, 1);
     }
 
     /**
@@ -146,6 +144,214 @@ class PMProSync {
     }
 
     /**
+     * Returns the configured PMPro Services Group ID (Group 3 by default).
+     *
+     * @return int
+     */
+    public function get_services_group_id(): int
+    {
+        $gid = (int) get_option('mm_services_group_id', 3);
+        return $gid > 0 ? $gid : 3;
+    }
+
+    /**
+     * Returns all registered PMPro levels belonging to the Services Group.
+     *
+     * @return array<int, object> Array of level objects.
+     */
+    public function get_services_levels(): array
+    {
+        $group_id = $this->get_services_group_id();
+        $levels   = [];
+
+        // 1. PMPro core function if available
+        if (function_exists('pmpro_getLevelsForGroup')) {
+            $grp_levels = pmpro_getLevelsForGroup($group_id);
+            if (is_array($grp_levels) && !empty($grp_levels)) {
+                return $grp_levels;
+            }
+        }
+        if (function_exists('pmpro_getMembershipLevelsForGroup')) {
+            $grp_levels = pmpro_getMembershipLevelsForGroup($group_id);
+            if (is_array($grp_levels) && !empty($grp_levels)) {
+                return $grp_levels;
+            }
+        }
+
+        // 2. Check all levels and filter by group_id if property exists
+        if (function_exists('pmpro_getAllLevels')) {
+            $all = pmpro_getAllLevels(true, true);
+            if (is_array($all) && !empty($all)) {
+                foreach ($all as $lvl) {
+                    if (is_object($lvl) && isset($lvl->group_id) && (int) $lvl->group_id === $group_id) {
+                        $levels[] = $lvl;
+                    }
+                }
+                if (!empty($levels)) {
+                    return $levels;
+                }
+            }
+        }
+
+        // 3. Direct DB query fallback
+        global $wpdb;
+        if (!empty($wpdb) && isset($wpdb->prefix)) {
+            $table_levels = $wpdb->prefix . 'pmpro_membership_levels';
+            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_levels));
+            if ($table_exists === $table_levels) {
+                // Check if group_id column exists
+                $col_check = $wpdb->get_results("SHOW COLUMNS FROM `{$table_levels}` LIKE 'group_id'");
+                if (!empty($col_check)) {
+                    $db_levels = $wpdb->get_results($wpdb->prepare("SELECT * FROM `{$table_levels}` WHERE `group_id` = %d AND `id` > 0 ORDER BY `id` ASC", $group_id));
+                    if (!empty($db_levels)) {
+                        return $db_levels;
+                    }
+                }
+
+                // Check wp_pmpro_membership_level_groups or wp_pmpro_group_levels table
+                $table_gl  = $wpdb->prefix . 'pmpro_membership_level_groups';
+                $gl_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_gl));
+                if ($gl_exists === $table_gl) {
+                    $db_levels = $wpdb->get_results($wpdb->prepare(
+                        "SELECT l.* FROM `{$table_levels}` l INNER JOIN `{$table_gl}` g ON l.id = g.level_id WHERE g.group_id = %d ORDER BY l.id ASC",
+                        $group_id
+                    ));
+                    if (!empty($db_levels)) {
+                        return $db_levels;
+                    }
+                }
+            }
+        }
+
+        // 4. Default fallback mock service levels (Levels 4, 5) if available or mapped
+        if (function_exists('pmpro_getLevel')) {
+            foreach ([4, 5] as $lid) {
+                $l = pmpro_getLevel($lid);
+                if ($l && is_object($l)) {
+                    $levels[] = $l;
+                }
+            }
+        }
+        if (empty($levels) && function_exists('pmpro_getAllLevels')) {
+            $all = pmpro_getAllLevels(true, true);
+            if (is_array($all)) {
+                foreach ($all as $lvl) {
+                    if (is_object($lvl) && in_array((int) $lvl->id, [4, 5], true)) {
+                        $levels[] = $lvl;
+                    }
+                }
+            }
+        }
+
+        return $levels;
+    }
+
+    /**
+     * Checks whether a level ID is a service level in the Services Group.
+     *
+     * @param int $level_id
+     * @return bool
+     */
+    public function is_service_level(int $level_id): bool
+    {
+        if ($level_id <= 0) {
+            return false;
+        }
+
+        $services = $this->get_services_levels();
+        foreach ($services as $srv) {
+            $sid = is_object($srv) ? (int) ($srv->id ?? 0) : (int) $srv;
+            if ($sid === $level_id) {
+                return true;
+            }
+        }
+
+        return in_array($level_id, [4, 5], true);
+    }
+
+    /**
+     * Retrieves custom tag names for PMPro levels.
+     *
+     * @return array<int, string>
+     */
+    public function get_level_tags(): array
+    {
+        $tags = get_option('mm_pmpro_level_tags', null);
+        if (is_array($tags)) {
+            $normalized = [];
+            foreach ($tags as $lid => $tag) {
+                if (is_numeric($lid) && is_string($tag)) {
+                    $normalized[(int) $lid] = sanitize_text_field($tag);
+                }
+            }
+            return $normalized;
+        }
+        return [];
+    }
+
+    /**
+     * Retrieves a custom tag for a specific level ID.
+     *
+     * @param int    $level_id
+     * @param string $default
+     * @return string
+     */
+    public function get_level_tag(int $level_id, string $default = ''): string
+    {
+        $tags = $this->get_level_tags();
+        return !empty($tags[$level_id]) ? (string) $tags[$level_id] : $default;
+    }
+
+    /**
+     * Gating check on PMPro checkout submission for Service levels.
+     * Members must have an active basic plan (Free, Monthly, Event) before purchasing a service.
+     *
+     * @param bool $okay
+     * @return bool
+     */
+    public function check_service_requires_basic_membership(bool $okay): bool
+    {
+        if (!$okay) {
+            return false;
+        }
+
+        $level_id = 0;
+        if (!empty($_REQUEST['level'])) {
+            $level_id = (int) $_REQUEST['level'];
+        } elseif (isset($_POST['pmpro_level'])) {
+            $level_id = (int) $_POST['pmpro_level'];
+        } elseif (function_exists('pmpro_getLevelAtCheckout')) {
+            $lvl_obj = pmpro_getLevelAtCheckout();
+            if (is_object($lvl_obj) && !empty($lvl_obj->id)) {
+                $level_id = (int) $lvl_obj->id;
+            }
+        }
+
+        if ($level_id <= 0 || !$this->is_service_level($level_id)) {
+            return $okay;
+        }
+
+        $user_id   = get_current_user_id();
+        $has_basic = false;
+
+        if ($user_id > 0) {
+            $user_type = $this->get_current_user_type($user_id);
+            if (in_array($user_type, ['free', 'monthly', 'event'], true)) {
+                $has_basic = true;
+            }
+        }
+
+        if (!$has_basic) {
+            global $pmpro_msg, $pmpro_msgt;
+            $pmpro_msg  = __('A basic membership plan (Free, Monthly, or Event) is required before purchasing additional services. Please select a membership plan first.', 'matchmaker');
+            $pmpro_msgt = 'pmpro_error';
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Checks whether the user holds an active 1-on-1 VIP service level (Group 3).
      *
      * @param int $user_id
@@ -157,9 +363,16 @@ class PMProSync {
             return false;
         }
 
-        $one_on_one_levels = $this->get_levels_for_tier('one_on_one');
-        if (empty($one_on_one_levels)) {
-            $one_on_one_levels = [4, 5];
+        $service_levels = [];
+        $services = $this->get_services_levels();
+        foreach ($services as $srv) {
+            $sid = is_object($srv) ? (int) ($srv->id ?? 0) : (int) $srv;
+            if ($sid > 0) {
+                $service_levels[] = $sid;
+            }
+        }
+        if (empty($service_levels)) {
+            $service_levels = [4, 5];
         }
 
         if (function_exists('pmpro_getMembershipLevelsForUser')) {
@@ -167,7 +380,7 @@ class PMProSync {
             if (is_array($active_levels) && !empty($active_levels)) {
                 foreach ($active_levels as $lvl) {
                     $lid = is_object($lvl) ? (int) ($lvl->id ?? 0) : (int) $lvl;
-                    if ($lid > 0 && in_array($lid, $one_on_one_levels, true)) {
+                    if ($lid > 0 && in_array($lid, $service_levels, true)) {
                         return true;
                     }
                 }
@@ -177,7 +390,7 @@ class PMProSync {
         if (function_exists('pmpro_getMembershipLevelForUser')) {
             $membership = pmpro_getMembershipLevelForUser($user_id);
             if (is_object($membership) && !empty($membership->id)) {
-                if (in_array((int) $membership->id, $one_on_one_levels, true)) {
+                if (in_array((int) $membership->id, $service_levels, true)) {
                     return true;
                 }
             }
@@ -313,6 +526,19 @@ class PMProSync {
         }
 
         $this->sync_all_membership_levels($user_id);
+
+        $level_id = 0;
+        if (is_object($morder) && !empty($morder->membership_id)) {
+            $level_id = (int) $morder->membership_id;
+        } elseif (!empty($_REQUEST['level'])) {
+            $level_id = (int) $_REQUEST['level'];
+        } elseif (isset($_POST['pmpro_level'])) {
+            $level_id = (int) $_POST['pmpro_level'];
+        }
+
+        if ($level_id > 0 && $this->is_service_level($level_id)) {
+            \Matchmaker\Service\NotificationService::instance()->send_admin_service_purchase_notification($user_id, $level_id, $morder);
+        }
     }
 
     /**

@@ -1114,7 +1114,43 @@ a.az-edit-btn:hover {
 
 .mm-upsell-card {
     text-align: center;
-    padding: 48px 30px;
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.mm-upsell-card h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    line-height: 1.3;
+}
+
+.mm-upsell-card p {
+    max-width: 580px;
+    margin: 0 auto 20px;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+.mm-upsell-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 13px 32px;
+    font-size: 14.5px;
+    font-weight: 600;
+    border-radius: 10px;
+    text-decoration: none;
+    margin-top: 6px;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    text-align: center;
 }
 
 .az-card.mm-upsell-card.profile-card {
@@ -1130,6 +1166,118 @@ a.az-edit-btn:hover {
     padding: 6px 16px;
     border-radius: 20px;
     margin-bottom: 16px;
+}
+
+/* Services Tab (Group 3 Add-ons) */
+.mm-services-wrap {
+    padding: 24px 36px 40px;
+}
+
+.mm-services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+    align-items: stretch;
+}
+
+.mm-service-card {
+    background: #ffffff;
+    border: 1px solid #EAE4DD;
+    border-radius: 18px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+}
+
+.mm-service-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(204,114,63,0.12);
+    border-color: rgba(204,114,63,0.4);
+}
+
+.mm-service-card.mm-service-active {
+    border-color: rgba(204,114,63,0.6);
+    background: linear-gradient(180deg, #FFFDFB 0%, #FAF6F1 100%);
+}
+
+.mm-service-card-header {
+    margin-bottom: 14px;
+}
+
+.mm-service-tag-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #FAF5F0;
+    color: #CC723F;
+    border: 1px solid rgba(204,114,63,0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.mm-service-title {
+    font-family: 'Cormorant SC', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px;
+    line-height: 1.25;
+}
+
+.mm-service-price-pill {
+    font-size: 15px;
+    font-weight: 700;
+    color: #CC723F;
+    margin-bottom: 14px;
+}
+
+.mm-service-card-body {
+    flex: 1 1 auto;
+    margin-bottom: 24px;
+}
+
+.mm-service-description {
+    font-size: 13.5px;
+    color: #64748b;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.mm-service-card-footer {
+    margin-top: auto;
+}
+
+.mm-service-cta-btn {
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 10px;
+    box-sizing: border-box;
+}
+
+.mm-service-active-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+    padding: 11px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13.5px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* ----------------------------------------------------
@@ -1187,6 +1335,38 @@ a.az-edit-btn:hover {
     .profile-view-body,
     .az-wrap {
         padding: 15px;
+    }
+
+    .mm-upsell-card {
+        padding: 28px 18px !important;
+    }
+
+    .mm-upsell-card h2 {
+        font-size: 20px !important;
+    }
+
+    .mm-upsell-card p {
+        font-size: 13.5px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .mm-upsell-btn {
+        width: 100% !important;
+        padding: 12px 18px !important;
+        font-size: 14px !important;
+    }
+
+    .mm-services-wrap {
+        padding: 15px 10px 30px !important;
+    }
+
+    .mm-services-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .mm-service-card {
+        padding: 20px !important;
     }
 
     .az-mm-header {

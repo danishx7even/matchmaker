@@ -85,10 +85,6 @@ class NotificationService {
             }
         }
 
-        if ($user_type === 'event') {
-            return $response;
-        }
-
         $repo = MatchRepository::instance();
         $unread_count = $repo->get_unread_count($user_id);
 
@@ -486,5 +482,101 @@ class NotificationService {
             $admin_email,
             $admin_sent ? 'success' : 'error'
         );
+    }
+
+    /**
+     * Send email notification to admin when a user purchases a service level.
+     *
+     * @param int        $user_id  The member user ID.
+     * @param int        $level_id The purchased service level ID.
+     * @param mixed|null $morder   Optional PMPro MemberOrder object.
+     * @return bool
+     */
+    public function send_admin_service_purchase_notification(int $user_id, int $level_id, mixed $morder = null): bool
+    {
+        $repo = MatchRepository::instance();
+        $user = get_userdata($user_id);
+        if (!$user) {
+            return false;
+        }
+
+        $recipient = (string) get_option('mm_email_admin_service_recipient', get_option('admin_email'));
+        if (empty($recipient)) {
+            $recipient = (string) get_option('admin_email');
+        }
+        if (empty($recipient)) {
+            return false;
+        }
+
+        $level_name = "Service Level #{$level_id}";
+        $level_cost = "—";
+        if (function_exists('pmpro_getLevel')) {
+            $lvl = pmpro_getLevel($level_id);
+            if ($lvl && !empty($lvl->name)) {
+                $level_name = (string) $lvl->name;
+            }
+            if ($lvl && isset($lvl->initial_payment)) {
+                $level_cost = function_exists('pmpro_formatPrice') ? pmpro_formatPrice((float) $lvl->initial_payment) : '$' . number_format((float) $lvl->initial_payment, 2);
+            }
+        }
+        if (is_object($morder) && !empty($morder->total)) {
+            $level_cost = function_exists('pmpro_formatPrice') ? pmpro_formatPrice((float) $morder->total) : '$' . number_format((float) $morder->total, 2);
+        }
+
+        $admin_profile_url = admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id);
+        $site_name         = function_exists('get_bloginfo') ? (get_bloginfo('name') ?: 'Arab Zawaj') : (string) get_option('blogname', 'Arab Zawaj');
+        $purchase_date     = current_time('mysql');
+
+        $default_subject  = sprintf(__('[%s] New Service Purchased: %s by %s', 'matchmaker'), $site_name, $level_name, $user->display_name);
+        $default_template = "<h2>" . esc_html__('New Service Purchase Alert', 'matchmaker') . "</h2>\n"
+            . "<p>A member has just purchased an additional service on {site_name}.</p>\n"
+            . "<p><strong>Member Details:</strong><br>\n"
+            . "Name: {user_name}<br>\n"
+            . "Email: {user_email}<br>\n"
+            . "User ID: #{user_id}</p>\n"
+            . "<p><strong>Purchased Service:</strong><br>\n"
+            . "Service: {service_name}<br>\n"
+            . "Price: {service_price}<br>\n"
+            . "Date: {purchase_date}</p>\n"
+            . "<p><a href=\"{admin_profile_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;\">View Member in Candidate Pool &rarr;</a></p>";
+
+        $subject  = (string) get_option('mm_email_admin_service_purchase_subject', $default_subject);
+        $template = (string) get_option('mm_email_admin_service_purchase_template', $default_template);
+
+        $body = str_replace(
+            ['{site_name}', '{service_name}', '{service_price}', '{user_name}', '{user_email}', '{user_id}', '{purchase_date}', '{admin_profile_url}'],
+            [$site_name, $level_name, $level_cost, $user->display_name, $user->user_email, (string) $user_id, $purchase_date, $admin_profile_url],
+            $template
+        );
+        $subject = str_replace(
+            ['{site_name}', '{service_name}', '{user_name}'],
+            [$site_name, $level_name, $user->display_name],
+            $subject
+        );
+
+        add_filter('wp_mail_content_type', static fn() => 'text/html');
+        $sent = wp_mail($recipient, $subject, wpautop($body));
+        remove_filter('wp_mail_content_type', static fn() => 'text/html');
+
+        $repo->log_event(
+            'email',
+            'admin_service_purchase_alert',
+            sprintf(__('Admin Service Purchase Alert: %s bought %s', 'matchmaker'), $user->display_name, $level_name),
+            $subject,
+            [
+                'user_id'       => $user_id,
+                'level_id'      => $level_id,
+                'recipient'     => $recipient,
+                'subject'       => $subject,
+                'body_html'     => wpautop($body),
+                'delivery_stat' => $sent ? 'delivered' : 'failed',
+            ],
+            null,
+            $user_id,
+            $recipient,
+            $sent ? 'success' : 'error'
+        );
+
+        return $sent;
     }
 }

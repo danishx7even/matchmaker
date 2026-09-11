@@ -118,6 +118,33 @@
 
             openModal();
         });
+
+        /* Settings Page Tab Switching */
+        $(document).on('click', '.mm-settings-tab-wrapper a.nav-tab', function (e) {
+            e.preventDefault();
+            var $tab = $(this);
+            var targetTab = $tab.attr('data-tab');
+            if (!targetTab) return;
+
+            $('.mm-settings-tab-wrapper a.nav-tab').removeClass('nav-tab-active');
+            $tab.addClass('nav-tab-active');
+
+            $('.mm-settings-tab-panel').hide();
+            $('#mm-panel-' + targetTab).show();
+
+            if (history.replaceState) {
+                history.replaceState(null, null, '#tab-' + targetTab);
+            }
+        });
+
+        // Initialize active tab from hash if present
+        if (window.location.hash && $('.mm-settings-tab-wrapper').length) {
+            var hashTab = window.location.hash.replace('#tab-', '').replace('#', '');
+            var $targetNavTab = $('.mm-settings-tab-wrapper a[data-tab="' + hashTab + '"]');
+            if ($targetNavTab.length) {
+                $targetNavTab.trigger('click');
+            }
+        }
     }
 
     function escapeHtml(str) {

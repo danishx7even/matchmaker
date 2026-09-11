@@ -46,17 +46,21 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
             <button type="button" class="nav-tab active" data-tab="profile" role="tab">
                 <?php esc_html_e('Profile', 'matchmaker'); ?>
             </button>
-            <?php if ($user_type !== 'event') : ?>
-                <button type="button" class="nav-tab" data-tab="matches" role="tab">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" style="margin-right:2px;">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                    </svg>
-                    <?php esc_html_e('Matches', 'matchmaker'); ?>
-                    <span class="mm-tab-badge <?php echo $unread_count > 0 ? '' : 'mm-hidden'; ?>" <?php echo $unread_count > 0 ? '' : 'style="display:none;"'; ?>><?php echo (int) $unread_count; ?></span>
-                </button>
-            <?php endif; ?>
+            <button type="button" class="nav-tab" data-tab="matches" role="tab">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" style="margin-right:2px;">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+                <?php esc_html_e('Matches', 'matchmaker'); ?>
+                <span class="mm-tab-badge <?php echo $unread_count > 0 ? '' : 'mm-hidden'; ?>" <?php echo $unread_count > 0 ? '' : 'style="display:none;"'; ?>><?php echo (int) $unread_count; ?></span>
+            </button>
             <button type="button" class="nav-tab" data-tab="events" role="tab">
                 <?php esc_html_e('Events', 'matchmaker'); ?>
+            </button>
+            <button type="button" class="nav-tab" data-tab="services" role="tab">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px;">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+                <?php esc_html_e('Services', 'matchmaker'); ?>
             </button>
         </nav>
 
@@ -94,16 +98,19 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
         <?php include __DIR__ . '/tab-profile.php'; ?>
     </div>
 
-    <!-- TAB 2: MATCHES VIEW (Hidden for event tier) -->
-    <?php if ($user_type !== 'event') : ?>
-        <div class="portal-tab-panel" id="mm-tab-matches" style="display:none;">
-            <?php include __DIR__ . '/tab-matches.php'; ?>
-        </div>
-    <?php endif; ?>
+    <!-- TAB 2: MATCHES VIEW -->
+    <div class="portal-tab-panel" id="mm-tab-matches" style="display:none;">
+        <?php include __DIR__ . '/tab-matches.php'; ?>
+    </div>
 
     <!-- TAB 3: EVENTS VIEW -->
     <div class="portal-tab-panel" id="mm-tab-events" style="display:none;">
         <?php include __DIR__ . '/tab-events.php'; ?>
+    </div>
+
+    <!-- TAB 4: SERVICES VIEW -->
+    <div class="portal-tab-panel" id="mm-tab-services" style="display:none;">
+        <?php include __DIR__ . '/tab-services.php'; ?>
     </div>
 
 </div><!-- .mm-portal-canvas -->

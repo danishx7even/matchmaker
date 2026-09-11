@@ -49,14 +49,14 @@ class MatchService {
     }
 
     /**
-     * Check if the pair is info-only (e.g. event users who do not participate in matching).
+     * Check if the pair is info-only (legacy method, all registered tiers are eligible for approval).
      *
      * @param string $type_a The user A type.
      * @param string $type_b The user B type.
      * @return bool
      */
     public function is_info_only_pair(string $type_a, string $type_b): bool {
-        return in_array($type_a, ['event'], true) || in_array($type_b, ['event'], true);
+        return false;
     }
 
     /**
@@ -147,19 +147,6 @@ class MatchService {
 
         if ($match) {
             $pool1 = $repo->get_user_pool((int)$match['user_one_id']);
-            $pool2 = $repo->get_user_pool((int)$match['user_two_id']);
-            $type1 = $pool1['user_type'] ?? 'free';
-            $type2 = $pool2['user_type'] ?? 'free';
-
-            if ($this->is_info_only_pair($type1, $type2)) {
-                $msg = __('Cannot approve match: one or both users belong to Event membership tier.', 'matchmaker');
-                $repo->log_event('match_lifecycle', 'admin_approval_blocked', sprintf(__('Approval Blocked for Match #%d (Event Tier)', 'matchmaker'), $match_id), $msg, ['match_id' => $match_id, 'type1' => $type1, 'type2' => $type2], $match_id, $admin_id, null, 'warning');
-                return [
-                    'success' => false,
-                    'message' => $msg,
-                ];
-            }
-
             $u1_id = (int) $match['user_one_id'];
             $u2_id = (int) $match['user_two_id'];
 

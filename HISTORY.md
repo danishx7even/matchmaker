@@ -1125,17 +1125,43 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+### Task 65: PMPro Services Group (ID: 3), Services Tab in Member Portal, Event Member Parity, Settings 5-Tab Reorganization with Custom Level Tags, Admin Service Purchase Email, and Pool Browser Services Filter
+- **Objective**:
+  - Implement full PMPro Services Group support (default Group ID: 3) as add-on purchases requiring an active base membership plan (`free`, `monthly`, `event`).
+  - Introduce a dedicated "Services" tab (`data-tab="services"`) in the Member Portal displaying a dynamic responsive grid of all Group 3 PMPro service levels with dynamic descriptions, custom level tags, formatted prices, and checkout CTAs.
+  - Fix desktop and mobile padding/spacing for `.mm-upsell-card` and `.mm-upsell-btn` ("Monthly membership required").
+  - Provide full feature parity for Event members with Free members (can view Matches tab, receive admin-approved matches without quota restrictions, receive in-app notifications, and view the Monthly upsell card).
+  - Reorganize Admin Settings into 5 modern, tabbed sections with URL hash navigation (*General & Mode*, *Membership & Services*, *Quotas & Matching*, *Email Templates*, *Shortcodes & System*).
+  - Add custom level Tag/Badge name inputs for all registered PMPro levels in Admin Settings.
+  - Implement Admin Service Purchase transactional email notification with customizable template and placeholder tokens.
+  - Update Candidate Pool Browser filter for Services / VIP.
+- **Implemented**:
+  - `src/Core/PMProSync.php`:
+    - Removed standalone `one_on_one` from base level mapping (`DEFAULT_LEVEL_MAPPING`).
+    - Added `get_services_group_id()`, `get_services_levels()`, `is_service_level(int $level_id): bool`.
+    - Added `get_level_tags()` and `get_level_tag(int $level_id, string $default): string`.
+    - Hooked `pmpro_registration_checks` via `check_service_requires_basic_membership()` to block checkout if user lacks a basic plan.
+    - Hooked `pmpro_after_checkout` via `handle_checkout_sync()` to trigger admin email alert when a service level is purchased.
+    - Updated `has_active_one_on_one_service()` to dynamically check all Group 3 service levels.
+  - `src/Service/NotificationService.php`:
+    - Added `send_admin_service_purchase_notification(int $user_id, int $level_id, mixed $morder = null): bool` with placeholder replacements (`{site_name}`, `{service_name}`, `{service_price}`, `{user_name}`, `{user_email}`, `{user_id}`, `{purchase_date}`, `{admin_profile_url}`).
+    - Logged structured event `admin_service_purchase_alert` in `wp_matchmaker_logs`.
+    - Removed event tier heartbeat pulse suppression so event members receive in-app notifications.
+  - `src/Service/MatchService.php` & `src/Repository/MatchRepository.php`:
+    - Updated `is_info_only_pair()` and `process_admin_approve()` / `approve_match()` to allow admin approval for event members.
+    - Updated `format_tier_label()` to incorporate custom level tags.
+  - `src/Frontend/PortalController.php` & Views:
+    - Created `src/View/frontend/portal/tab-services.php` rendering service cards with custom tags, prices, descriptions, and dynamic action buttons (`✓ Active Service` vs `Purchase Service →`).
+    - Updated `portal.php` to render Matches and Services navigation tabs for all member tiers.
+    - Fixed padding and margin styling for `.mm-upsell-card` and `.mm-upsell-btn` in `assets/css/member-portal.css`.
+  - `src/Admin/AdminPortal.php` & Admin Views:
+    - Re-architected `src/View/admin/settings/settings.php` into 5 clean, responsive tabs with hash persistence in `assets/js/admin-matchmaker.js`.
+    - Added Services Group ID configuration and custom Tag/Badge input fields for each PMPro level.
+    - Updated `src/View/admin/pool/pool-list.php` Services filter and table headers.
+    - Removed event-only approval restrictions in `match-single.php` and `user-single.php`.
+  - `tests/`:
+    - Updated `SettingsAndPlanMappingTest.php`, `PortalAndEventsTest.php`, `HeartbeatAndNotificationsTest.php`, and added `test_send_admin_service_purchase_notification()` in `NotificationAndApprovalTest.php`.
+- **Verification**:
+  - Ran automated test runner (`tests/run_tests.php`) — all 97 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+---

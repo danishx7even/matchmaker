@@ -1212,18 +1212,6 @@ class MatchRepository
             return ['success' => false, 'message' => __('Match record not found.', 'matchmaker')];
         }
 
-        // Tier gate: Event users cannot have approved matches
-        $u1_type = (string) $wpdb->get_var(
-            $wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $match['user_one_id'])
-        );
-        $u2_type = (string) $wpdb->get_var(
-            $wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $match['user_two_id'])
-        );
-
-        if ($u1_type === 'event' || $u2_type === 'event') {
-            return ['success' => false, 'message' => __('Approval blocked: Matches involving an Event tier user cannot be approved.', 'matchmaker')];
-        }
-
         // Quota gate: Only paid users (monthly/1-on-1) have monthly cycle quota limits
         $initiator_id   = (int) $match['initiator_user_id'];
         $initiator_type = (string) $wpdb->get_var(

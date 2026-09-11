@@ -234,4 +234,40 @@ class NotificationAndApprovalTest
             throw new \RuntimeException("Expected admin approval for free user to succeed, got: " . var_export($result, true));
         }
     }
+
+    public function test_send_admin_service_purchase_notification(): void
+    {
+        global $wpdb;
+        $GLOBALS['__mm_sent_mails'] = [];
+        update_option('admin_email', 'admin@example.com');
+        update_option('mm_email_admin_service_recipient', 'services-admin@example.com');
+
+        $notif_service = \Matchmaker\Service\NotificationService::instance();
+        $user_id = 10;
+        $level_id = 4;
+
+        $sent = $notif_service->send_admin_service_purchase_notification($user_id, $level_id);
+
+        if (!$sent) {
+            throw new \RuntimeException("Expected send_admin_service_purchase_notification to return true");
+        }
+
+        if (empty($GLOBALS['__mm_sent_mails'])) {
+            throw new \RuntimeException("Expected admin service purchase notification email to be dispatched");
+        }
+
+        $last_mail = end($GLOBALS['__mm_sent_mails']);
+        if ($last_mail['to'] !== 'services-admin@example.com') {
+            throw new \RuntimeException("Expected email recipient to be services-admin@example.com, got: " . $last_mail['to']);
+        }
+
+        if (!str_contains($last_mail['subject'], 'user10') && !str_contains($last_mail['subject'], '1-on-1 VIP Matchmaking')) {
+            throw new \RuntimeException("Expected email subject to include candidate name or service title, got: " . $last_mail['subject']);
+        }
+
+        $queries_str = implode("\n", $wpdb->queries);
+        if (!str_contains($queries_str, 'wp_matchmaker_logs')) {
+            throw new \RuntimeException("Expected admin_service_purchase_alert to be logged in wp_matchmaker_logs");
+        }
+    }
 }

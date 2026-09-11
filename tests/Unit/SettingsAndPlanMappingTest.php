@@ -22,31 +22,66 @@ final class SettingsAndPlanMappingTest extends TestCase
         $sync = PMProSync::instance();
         
         $this->assertEquals('monthly', $sync->get_user_type_by_level_id(3));
-        $this->assertEquals('one_on_one', $sync->get_user_type_by_level_id(4));
-        $this->assertEquals('one_on_one', $sync->get_user_type_by_level_id(5));
         $this->assertEquals('event', $sync->get_user_type_by_level_id(6));
         $this->assertEquals('free', $sync->get_user_type_by_level_id(2));
         $this->assertEquals('free', $sync->get_user_type_by_level_id(999));
+        $this->assertEquals(3, $sync->get_services_group_id());
+        $this->assertTrue($sync->is_service_level(4));
+        $this->assertTrue($sync->is_service_level(5));
     }
 
-    public function test_custom_pmpro_tier_mapping(): void
+    public function test_custom_pmpro_tier_mapping_and_level_tags(): void
     {
         $custom_mapping = [
             10 => 'monthly',
-            11 => 'one_on_one',
             12 => 'event',
             1  => 'free',
         ];
         update_option('mm_pmpro_tier_mapping', $custom_mapping);
+        update_option('mm_pmpro_level_tags', [
+            10 => 'Featured Monthly',
+            4  => 'VIP 1-on-1',
+        ]);
+        update_option('mm_services_group_id', 5);
 
         $sync = PMProSync::instance();
         
         $this->assertEquals('monthly', $sync->get_user_type_by_level_id(10));
-        $this->assertEquals('one_on_one', $sync->get_user_type_by_level_id(11));
         $this->assertEquals('event', $sync->get_user_type_by_level_id(12));
         $this->assertEquals('free', $sync->get_user_type_by_level_id(1));
         $this->assertEquals([10], $sync->get_levels_for_tier('monthly'));
         $this->assertEquals(10, $sync->get_primary_level_for_tier('monthly'));
+        $this->assertEquals('Featured Monthly', $sync->get_level_tag(10));
+        $this->assertEquals('VIP 1-on-1', $sync->get_level_tag(4));
+        $this->assertEquals(5, $sync->get_services_group_id());
+    }
+
+    public function test_service_checkout_gating_blocks_user_without_basic_membership(): void
+    {
+        $sync = PMProSync::instance();
+
+        // 1. Guest user attempting to checkout service level 4 -> should be blocked
+        $GLOBALS['__mm_current_user_id'] = 0;
+        $_REQUEST['level'] = 4;
+        $result = $sync->check_service_requires_basic_membership(true);
+        $this->assertFalse($result);
+
+        // 2. Logged in member with Free tier -> should be allowed
+        $GLOBALS['__mm_current_user_id'] = 801;
+        $GLOBALS['__mm_user_pmpro_levels'][801] = [
+            new \FakePMProLevel(2, 'Free Membership'),
+        ];
+        $result = $sync->check_service_requires_basic_membership(true);
+        $this->assertTrue($result);
+
+        // 3. Checkout non-service level (e.g. Monthly level 3) -> should not be gated
+        $_REQUEST['level'] = 3;
+        $GLOBALS['__mm_current_user_id'] = 0;
+        $result = $sync->check_service_requires_basic_membership(true);
+        $this->assertTrue($result);
+
+        unset($_REQUEST['level']);
+        unset($GLOBALS['__mm_current_user_id']);
     }
 
     public function test_dynamic_page_url_resolvers(): void

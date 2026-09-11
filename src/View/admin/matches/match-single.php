@@ -39,20 +39,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         </p>
     </div>
     <div>
-        <?php if ($st === 'pending_review') :
-            $t1 = is_array($p1) ? ($p1['user_type'] ?? 'free') : 'free';
-            $t2 = is_array($p2) ? ($p2['user_type'] ?? 'free') : 'free';
-            $is_event_only = ($t1 === 'event') || ($t2 === 'event');
-        ?>
-            <?php if ($is_event_only) : ?>
-                <span style="display:inline-block; margin-right:8px; padding:6px 12px; border-radius:4px; font-size:12px; font-weight:600; background:#fef3c7; color:#92400e; border:1px solid #f59e0b;">
-                    ⚠️ Event Tier Only (Matching Disabled)
-                </span>
-                <a href="<?php echo esc_url($reject_url); ?>" class="button button-secondary button-hero mm-reject-link"><?php esc_html_e('Reject Match', 'matchmaker'); ?></a>
-            <?php else : ?>
-                <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-hero" style="margin-right:8px;"><?php esc_html_e('Approve Match', 'matchmaker'); ?></a>
-                <a href="<?php echo esc_url($reject_url); ?>" class="button button-secondary button-hero mm-reject-link"><?php esc_html_e('Reject Match', 'matchmaker'); ?></a>
-            <?php endif; ?>
+        <?php if ($st === 'pending_review') : ?>
+            <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-hero" style="margin-right:8px;"><?php esc_html_e('Approve Match', 'matchmaker'); ?></a>
+            <a href="<?php echo esc_url($reject_url); ?>" class="button button-secondary button-hero mm-reject-link"><?php esc_html_e('Reject Match', 'matchmaker'); ?></a>
         <?php endif; ?>
     </div>
 </div>
