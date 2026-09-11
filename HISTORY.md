@@ -1293,8 +1293,9 @@ This document maintains a chronological, step-by-step history of all features, a
   - `src/Repository/MatchRepository.php`:
     - Added `'is_parent_applying'` to `META_KEYS`.
     - Added `is_parent_applying` filter handling to `search_pool($filters)`.
-  - `src/Frontend/FieldGenerator.php`:
+  - `src/Frontend/FieldGenerator.php` & `assets/css/matchmaking-form.css`:
     - Added `is_parent_applying` checkbox rendering in `render_single_field()`.
+    - Styled `.elementor-field-group-is_parent_applying` with `flex: 1 1 100% !important; width: 100% !important; min-width: 100% !important;` to ensure it spans the entire width of its row directly above Full Name and Email.
   - `src/Frontend/FormController.php`:
     - Included `is_parent_applying` in `get_user_form_values()`.
     - Rendered `is_parent_applying` at the top of Step 1 in `render_form()`.

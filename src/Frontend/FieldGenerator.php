@@ -663,8 +663,8 @@ class FieldGenerator {
 
         if ($name === 'is_parent_applying') {
             $is_checked = !empty($val) && (string)$val !== '0';
-            $html .= '<div class="elementor-field-type-checkbox elementor-field-group elementor-column elementor-field-group-is_parent_applying elementor-col-100 mm-parent-applying-wrapper" style="margin-bottom: 15px;">';
-            $html .= '<label class="elementor-field-label" style="display:inline-flex; align-items:center; gap:8px; font-weight:500; cursor:pointer; color:#374151; font-size:14px;">';
+            $html .= '<div class="elementor-field-type-checkbox elementor-field-group elementor-column elementor-field-group-is_parent_applying elementor-col-100 mm-parent-applying-wrapper" style="flex:1 1 100% !important; width:100% !important; min-width:100% !important; margin-bottom:10px !important;">';
+            $html .= '<label class="elementor-field-label" style="display:inline-flex; align-items:center; gap:8px; font-weight:500; cursor:pointer; color:#374151; font-size:14px; text-transform:none !important; letter-spacing:normal !important; margin:0;">';
             $html .= '<input type="checkbox" name="form_fields[is_parent_applying]" id="form-field-is_parent_applying" value="1"' . ($is_checked ? ' checked' : '') . ' style="margin:0; width:18px; height:18px; cursor:pointer; accent-color:#CC723F;"> ';
             $html .= '<span>' . esc_html__('I am a parent applying on behalf of my child', 'matchmaker') . '</span>';
             $html .= '</label>';
