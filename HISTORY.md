@@ -1280,7 +1280,35 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-11 — Task 71: Optional Parent Application Checkbox, Pool Browser Filter, and Profile Tab Display
 
+- **Objective**:
+  1. Add an optional checkbox on the first form step beneath the "Personal Information" header and above the "Full Name" and "Email" fields with label: `"I am a parent applying on behalf of my child"`.
+  2. Save and persist this boolean value (`is_parent_applying`) in `wp_matchmaking_pool` and `wp_usermeta`.
+  3. If checked, display this information in the Member Portal Profile tab under user details.
+  4. Add a filter in the Admin Candidate Pool Browser (`admin.php?page=matchmaking-pool`) for parent application status and show an indicator/badge in candidate list and single user views.
+- **Changes**:
+  - `src/Core/DBMigrator.php`:
+    - Added `is_parent_applying tinyint(1) NOT NULL DEFAULT 0` column and index `KEY idx_parent_applying (is_parent_applying)` to `wp_matchmaking_pool` schema and migration alter table logic. Bumped DB schema version to `2.7.0`.
+  - `src/Repository/MatchRepository.php`:
+    - Added `'is_parent_applying'` to `META_KEYS`.
+    - Added `is_parent_applying` filter handling to `search_pool($filters)`.
+  - `src/Frontend/FieldGenerator.php`:
+    - Added `is_parent_applying` checkbox rendering in `render_single_field()`.
+  - `src/Frontend/FormController.php`:
+    - Included `is_parent_applying` in `get_user_form_values()`.
+    - Rendered `is_parent_applying` at the top of Step 1 in `render_form()`.
+    - Extracted and persisted `is_parent_applying` in `handle_ajax()` into both pool payload and user meta.
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Added "Application Type: Parent applying on behalf of child" row under the "About Me" user details when `is_parent_applying` is true.
+  - `src/Admin/AdminPortal.php` & `src/View/admin/pool/pool-list.php` & `user-single.php`:
+    - Added `filter_parent_applying` dropdown (All Applications / Parent Applying / Self Applying) in Candidate Pool Browser.
+    - Added `👨‍👩‍👧 Parent Applying` badge in Candidate list table rows and candidate profile header / details table.
+  - `tests/DBMigratorTest.php`, `tests/Unit/FormWizardAndShortcodesTest.php`, `tests/Unit/AdminWorkflowTest.php`:
+    - Updated version check to `2.7.0` and verified schema migration creates `is_parent_applying`.
+    - Added unit test verifying field generator renders `is_parent_applying` and form shortcode output includes the checkbox.
+    - Added unit test verifying `search_pool()` query generation with `is_parent_applying` filter.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 103 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
-
-
+---

@@ -129,6 +129,7 @@ class FormController {
         $pool = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
 
         if ($pool) {
+            $values['is_parent_applying']   = !empty($pool['is_parent_applying']) ? 1 : 0;
             $values['user_gender']          = !empty($pool['gender'])      ? ucfirst($pool['gender'])      : '';
             $values['pref_gender']          = !empty($pool['pref_gender']) ? ucfirst($pool['pref_gender']) : '';
             $values['birth_date']           = $pool['birth_date']          ?? '';
@@ -181,6 +182,7 @@ class FormController {
         }
 
         $meta_keys = [
+            'is_parent_applying',
             'phone_number', 'user_citizenship', 'user_social_links', 'user_marital_status',
             'user_children', 'user_prayer', 'user_education', 'user_income',
             'user_country', 'user_state', 'user_city',
@@ -258,6 +260,7 @@ class FormController {
                 <div class="elementor-column elementor-col-100 e-form__step" data-step="1">
 
                     <?php echo $this->fg->section_open('user', 'Personal Information'); ?>
+                        <?php echo $this->fg->render_single_field('is_parent_applying', $v); ?>
                         <?php echo $this->fg->render_single_field('full_name', $v); ?>
                         <?php echo $this->fg->render_single_field('email', $v); ?>
                         <?php echo $this->fg->render_single_field('phone_number', $v); ?>
@@ -533,6 +536,11 @@ class FormController {
             wp_send_json_error(['message' => __('Preferred Maximum Height must be higher than Minimum Height.', 'matchmaker')]);
         }
 
+        $is_parent_applying = !empty($f['is_parent_applying']) ? 1 : 0;
+        $existing_pool      = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
+        $is_update_profile  = !empty($existing_pool) && !empty($existing_pool['gender']);
+        $has_one_on_one     = !empty($existing_pool['has_one_on_one']) ? 1 : 0;
+
         // 7. Build pool payload (Country, State, City)
         $pool_payload = [
             'user_id'              => $user_id,
@@ -564,13 +572,12 @@ class FormController {
             'drinking'             => $sanitize_select((string) ($f['user_drinking'] ?? '')),
             'pref_drinking'        => $normalize_list($f['pref_drinking'] ?? ''),
             'user_type'            => $user_type,
+            'has_one_on_one'       => $has_one_on_one,
+            'is_parent_applying'   => $is_parent_applying,
             'is_active'            => 1,
         ];
 
-        // 8. Check if user is updating an existing profile (vs filling for the first time)
-        $existing_pool      = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
-        $is_update_profile  = !empty($existing_pool) && !empty($existing_pool['gender']);
-
+        // 8. Upsert candidate into pool
         $inserted = \Matchmaker\Repository\MatchRepository::instance()->upsert_pool($pool_payload);
 
         if ($inserted === false) {
@@ -586,6 +593,7 @@ class FormController {
 
         // 10. Save usermeta fields (remove pref_social_links)
         $meta_map = [
+            'is_parent_applying'  => $is_parent_applying,
             'phone_number'        => sanitize_text_field((string) ($f['phone_number'] ?? '')),
             'user_citizenship'    => sanitize_text_field((string) ($f['user_citizenship'] ?? '')),
             'user_social_links'   => sanitize_textarea_field((string) ($f['user_social_links'] ?? '')),

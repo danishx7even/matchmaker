@@ -50,6 +50,17 @@ class AdminWorkflowTest
         if (!str_contains($queries_str_vip, 'has_one_on_one = 1')) {
             throw new \RuntimeException("Expected pool search query with has_one_on_one = 1, executed:\n{$queries_str_vip}");
         }
+
+        // Test with is_parent_applying filter
+        $wpdb->queries = [];
+        $filters_parent = [
+            'is_parent_applying' => '1',
+        ];
+        $this->repo->search_pool($filters_parent);
+        $queries_str_parent = implode("\n", $wpdb->queries);
+        if (!str_contains($queries_str_parent, 'is_parent_applying = 1')) {
+            throw new \RuntimeException("Expected pool search query with is_parent_applying = 1, executed:\n{$queries_str_parent}");
+        }
     }
 
     public function test_admin_settings_options_save(): void

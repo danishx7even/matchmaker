@@ -40,7 +40,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.6.0';
+        $new_version = '2.7.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -95,6 +95,7 @@ class DBMigrator {
             pref_drinking varchar(100) DEFAULT NULL,
             user_type enum('monthly','one_on_one','free','event') NOT NULL,
             has_one_on_one tinyint(1) NOT NULL DEFAULT 0,
+            is_parent_applying tinyint(1) NOT NULL DEFAULT 0,
             is_active tinyint(1) NOT NULL DEFAULT 1,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -107,7 +108,8 @@ class DBMigrator {
             KEY idx_religion (religion),
             KEY idx_user_type (user_type),
             KEY idx_one_on_one (has_one_on_one),
-            KEY idx_active_one_on_one (is_active, has_one_on_one)
+            KEY idx_active_one_on_one (is_active, has_one_on_one),
+            KEY idx_parent_applying (is_parent_applying)
         ) {$charset_collate};";
 
         $sql_matches = "CREATE TABLE {$matches_table} (
@@ -201,6 +203,10 @@ class DBMigrator {
             if (!in_array('has_one_on_one', $cols, true)) {
                 $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN has_one_on_one tinyint(1) NOT NULL DEFAULT 0 AFTER user_type");
                 $wpdb->query("ALTER TABLE {$pool_table} ADD INDEX idx_one_on_one (has_one_on_one)");
+            }
+            if (!in_array('is_parent_applying', $cols, true)) {
+                $wpdb->query("ALTER TABLE {$pool_table} ADD COLUMN is_parent_applying tinyint(1) NOT NULL DEFAULT 0 AFTER has_one_on_one");
+                $wpdb->query("ALTER TABLE {$pool_table} ADD INDEX idx_parent_applying (is_parent_applying)");
             }
             // Auto backfill has_one_on_one from user_type = 'one_on_one'
             $wpdb->query("UPDATE {$pool_table} SET has_one_on_one = 1 WHERE user_type = 'one_on_one'");

@@ -43,6 +43,12 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <option value="0" <?php selected($one_on_one ?? '', '0'); ?>><?php esc_html_e('No Active Services', 'matchmaker'); ?></option>
     </select>
 
+    <select name="filter_parent_applying">
+        <option value=""><?php esc_html_e('All Applications', 'matchmaker'); ?></option>
+        <option value="1" <?php selected($parent_applying ?? '', '1'); ?>><?php esc_html_e('👨‍👩‍👧 Parent Applying', 'matchmaker'); ?></option>
+        <option value="0" <?php selected($parent_applying ?? '', '0'); ?>><?php esc_html_e('Self Applying', 'matchmaker'); ?></option>
+    </select>
+
     <input type="submit" class="button" value="<?php esc_attr_e('Filter', 'matchmaker'); ?>">
 </form>
 
@@ -87,6 +93,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     <td>
                         <strong><a href="<?php echo esc_url($view_url); ?>"><?php echo esc_html($user_obj ? $user_obj->display_name : 'User #' . $uid); ?></a></strong><br>
                         <small style="color:#666;"><?php echo esc_html($user_obj ? $user_obj->user_email : ''); ?></small>
+                        <?php if (!empty($c['is_parent_applying'])) : ?>
+                            <br><span class="mm-badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:10px; margin-top:3px; display:inline-block;">👨‍👩‍👧 <?php esc_html_e('Parent Applying', 'matchmaker'); ?></span>
+                        <?php endif; ?>
                     </td>
                     <td><?php echo esc_html(ucfirst($c['gender'] ?? '')); ?></td>
                     <td><?php echo esc_html($age); ?></td>

@@ -38,6 +38,11 @@ $photo3 = $meta['user_photo3'] ?? '';
             <span class="mm-badge mm-badge-<?php echo esc_attr($pool['user_type']); ?>">
                 <?php echo esc_html($repo->format_tier_label($pool['user_type'])); ?>
             </span>
+            <?php if (!empty($pool['is_parent_applying']) || !empty($meta['is_parent_applying'])) : ?>
+                <span class="mm-badge" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; font-weight:600; font-size:11px;">
+                    👨‍👩‍👧 <?php esc_html_e('Parent Applying on Behalf of Child', 'matchmaker'); ?>
+                </span>
+            <?php endif; ?>
             <?php 
             $user_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($user_id);
             if (!empty($user_services)) :
@@ -95,6 +100,9 @@ $photo3 = $meta['user_photo3'] ?? '';
         <?php endif; ?>
 
         <table class="mm-kv-table">
+            <?php if (!empty($pool['is_parent_applying']) || !empty($meta['is_parent_applying'])) : ?>
+                <tr><th><?php esc_html_e('Application Type', 'matchmaker'); ?></th><td><strong style="color:#CC723F;"><?php esc_html_e('Parent applying on behalf of child', 'matchmaker'); ?></strong></td></tr>
+            <?php endif; ?>
             <?php
             $u_loc_parts = array_filter([$pool['city'] ?? '', $pool['state'] ?? '', $pool['country'] ?? '']);
             $u_loc = !empty($u_loc_parts) ? implode(', ', $u_loc_parts) : ($pool['location'] ?? '—');

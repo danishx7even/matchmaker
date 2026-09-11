@@ -42,7 +42,7 @@ class MatchRepository
         'pref_additional_info',
         'user_photo1', 'user_photo2', 'user_photo3',
         'cycle_matches_count', 'mm_last_match_run',
-        'user_type', 'mm_has_one_on_one',
+        'user_type', 'mm_has_one_on_one', 'is_parent_applying',
     ];
 
     /**
@@ -381,6 +381,10 @@ class MatchRepository
         if (!empty($filters['gender'])) {
             $where[] = 'p.gender = %s';
             $args[]  = $filters['gender'];
+        }
+        if (isset($filters['is_parent_applying']) && $filters['is_parent_applying'] !== '') {
+            $where[] = 'p.is_parent_applying = %d';
+            $args[]  = (int) $filters['is_parent_applying'];
         }
         if (!empty($filters['search'])) {
             $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s OR p.country LIKE %s OR p.city LIKE %s)';

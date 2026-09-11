@@ -42,6 +42,11 @@ class FormWizardAndShortcodesTest
         if (!str_contains($html_gender, 'user_gender') || !str_contains($html_gender, 'Female')) {
             throw new \RuntimeException("FieldGenerator did not render gender field markup: " . $html_gender);
         }
+
+        $html_parent = $this->field_generator->render_single_field('is_parent_applying', ['is_parent_applying' => 1]);
+        if (!str_contains($html_parent, 'is_parent_applying') || !str_contains($html_parent, 'I am a parent applying on behalf of my child') || !str_contains($html_parent, 'checked')) {
+            throw new \RuntimeException("FieldGenerator did not render is_parent_applying checkbox: " . $html_parent);
+        }
     }
 
     public function test_render_standalone_field_shortcode(): void
@@ -66,6 +71,10 @@ class FormWizardAndShortcodesTest
         $out = $this->form_controller->render_form();
         if (empty($out) || (!str_contains($out, 'mmf-form') && !str_contains($out, 'matchmaking_form'))) {
             throw new \RuntimeException("Expected verified user to see matchmaking_form container: " . $out);
+        }
+
+        if (!str_contains($out, 'is_parent_applying') || !str_contains($out, 'I am a parent applying on behalf of my child')) {
+            throw new \RuntimeException("Expected form wizard markup to contain is_parent_applying field: " . $out);
         }
     }
 

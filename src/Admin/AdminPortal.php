@@ -554,16 +554,18 @@ class AdminPortal
     {
         $repo = MatchRepository::instance();
 
-        $search     = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
-        $gender     = isset($_GET['filter_gender']) ? sanitize_text_field(wp_unslash($_GET['filter_gender'])) : '';
-        $tier       = isset($_GET['filter_tier']) ? sanitize_text_field(wp_unslash($_GET['filter_tier'])) : '';
-        $one_on_one = isset($_GET['filter_one_on_one']) ? sanitize_text_field(wp_unslash($_GET['filter_one_on_one'])) : '';
+        $search          = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
+        $gender          = isset($_GET['filter_gender']) ? sanitize_text_field(wp_unslash($_GET['filter_gender'])) : '';
+        $tier            = isset($_GET['filter_tier']) ? sanitize_text_field(wp_unslash($_GET['filter_tier'])) : '';
+        $one_on_one      = isset($_GET['filter_one_on_one']) ? sanitize_text_field(wp_unslash($_GET['filter_one_on_one'])) : '';
+        $parent_applying = isset($_GET['filter_parent_applying']) ? sanitize_text_field(wp_unslash($_GET['filter_parent_applying'])) : '';
 
         $filters = [
-            'search'         => $search,
-            'gender'         => $gender,
-            'user_type'      => $tier,
-            'has_one_on_one' => $one_on_one,
+            'search'             => $search,
+            'gender'             => $gender,
+            'user_type'          => $tier,
+            'has_one_on_one'     => $one_on_one,
+            'is_parent_applying' => $parent_applying,
         ];
 
         $candidates = $repo->search_pool($filters);

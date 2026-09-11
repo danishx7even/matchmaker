@@ -54,6 +54,11 @@ $badge_label = $repo->format_tier_label($user_type);
 
             <div class="az-rows">
                 <?php
+                $is_parent = !empty($pool['is_parent_applying']) || !empty($meta['is_parent_applying']);
+                if ($is_parent) : ?>
+                    <div class="az-row"><span class="az-label"><?php esc_html_e('Application Type', 'matchmaker'); ?></span><span class="az-value" style="color:#CC723F; font-weight:600;"><?php esc_html_e('Parent applying on behalf of child', 'matchmaker'); ?></span></div>
+                <?php endif; ?>
+                <?php
                 $loc_parts = array_filter([$pool['city'] ?? '', $pool['state'] ?? '', $pool['country'] ?? '']);
                 $user_location_display = !empty($loc_parts) ? implode(', ', $loc_parts) : ($pool['location'] ?? '—');
                 ?>
