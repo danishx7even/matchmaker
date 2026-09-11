@@ -95,7 +95,8 @@ final class PortalAndEventsTest extends TestCase
         $this->assertTrue($response['success'] ?? false);
         $this->assertEquals('services', $response['data']['tab'] ?? '');
         $this->assertStringContainsString('mm-services-wrap', $response['data']['html'] ?? '');
-        $this->assertStringContainsString('Accelerate Your Matrimony Journey', $response['data']['html'] ?? '');
+        $this->assertStringContainsString('mm-services-grid', $response['data']['html'] ?? '');
+        $this->assertStringContainsString('Purchase Service →', $response['data']['html'] ?? '');
     }
 
     public function test_ajax_reload_tab_events_returns_rendered_html(): void

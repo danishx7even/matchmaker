@@ -187,7 +187,15 @@ class AdminPortal
      */
     public function enqueue_admin_assets(string $hook): void
     {
-        if (!str_contains($hook, 'matchmaking-pool') && !str_contains($hook, 'matchmaking-matches') && !str_contains($hook, 'matchmaking-settings') && !str_contains($hook, 'matchmaking-logs')) {
+        $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
+        $is_matchmaker_page = str_starts_with($page, 'matchmaking')
+            || str_contains($hook, 'matchmaking-pool')
+            || str_contains($hook, 'matchmaking-matches')
+            || str_contains($hook, 'matchmaking-settings')
+            || str_contains($hook, 'matchmaking-logs')
+            || str_contains($hook, 'matchmaking');
+
+        if (!$is_matchmaker_page) {
             return;
         }
 

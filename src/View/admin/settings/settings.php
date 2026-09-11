@@ -584,3 +584,71 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         </form>
     <?php endif; ?>
 </div>
+
+<script>
+(function() {
+    'use strict';
+    function initSettingsTabs() {
+        var tabLinks = document.querySelectorAll('.mm-settings-tab-wrapper a.nav-tab');
+        var panels   = document.querySelectorAll('.mm-settings-tab-panel');
+
+        if (!tabLinks.length || !panels.length) {
+            return;
+        }
+
+        function activateTab(tabKey) {
+            if (!tabKey) return;
+            var cleanKey = String(tabKey).replace(/^#?tab-/, '').replace(/^#/, '').trim();
+            if (!cleanKey) return;
+
+            var targetPanel = document.getElementById('mm-panel-' + cleanKey);
+            if (!targetPanel) return;
+
+            tabLinks.forEach(function(link) {
+                var lKey = (link.getAttribute('data-tab') || link.getAttribute('href') || '').replace(/^#?tab-/, '').replace(/^#/, '').trim();
+                if (lKey === cleanKey) {
+                    link.classList.add('nav-tab-active');
+                } else {
+                    link.classList.remove('nav-tab-active');
+                }
+            });
+
+            panels.forEach(function(panel) {
+                panel.style.display = 'none';
+                panel.classList.remove('active');
+            });
+
+            targetPanel.style.display = 'block';
+            targetPanel.classList.add('active');
+
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, null, '#tab-' + cleanKey);
+            }
+        }
+
+        tabLinks.forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                var tabKey = this.getAttribute('data-tab') || this.getAttribute('href') || '';
+                activateTab(tabKey);
+            });
+        });
+
+        if (window.location.hash) {
+            activateTab(window.location.hash);
+        }
+
+        window.addEventListener('hashchange', function() {
+            if (window.location.hash) {
+                activateTab(window.location.hash);
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSettingsTabs);
+    } else {
+        initSettingsTabs();
+    }
+})();
+</script>

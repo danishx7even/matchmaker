@@ -22,18 +22,6 @@ $checkout_base   = \Matchmaker\Service\ProfileService::instance()->get_membershi
 $level_tags      = $sync->get_level_tags();
 ?>
 <div class="az-wrap mm-services-wrap">
-    <div class="az-card mm-services-header-card" style="margin-bottom: 24px; text-align: center; padding: 32px 24px;">
-        <span class="status-pill" style="margin-bottom: 12px; background: #FAF5F0; border-color: rgba(204,114,63,0.25); color: #CC723F; font-weight: 700;">
-            ★ <?php esc_html_e('Exclusive VIP Services & Add-ons', 'matchmaker'); ?>
-        </span>
-        <h2 style="font-family: 'Cormorant SC', serif; font-size: 28px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">
-            <?php esc_html_e('Accelerate Your Matrimony Journey', 'matchmaker'); ?>
-        </h2>
-        <p style="max-width: 620px; margin: 0 auto; color: #64748b; font-size: 14.5px; line-height: 1.6;">
-            <?php esc_html_e('Enhance your matchmaking experience with our specialized 1-on-1 VIP matchmaking and consulting services. These add-ons can be purchased alongside any active membership plan.', 'matchmaker'); ?>
-        </p>
-    </div>
-
     <?php if (empty($services)) : ?>
         <div class="az-card" style="text-align: center; padding: 40px 20px;">
             <p style="color: #64748b; margin: 0; font-size: 15px;">

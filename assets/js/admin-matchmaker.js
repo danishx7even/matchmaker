@@ -120,31 +120,48 @@
         });
 
         /* Settings Page Tab Switching */
+        function switchAdminSettingsTab(tabKey) {
+            if (!tabKey) return;
+            var cleanKey = String(tabKey).replace(/^#?tab-/, '').replace(/^#/, '').trim();
+            if (!cleanKey) return;
+
+            var $targetPanel = $('#mm-panel-' + cleanKey);
+            if (!$targetPanel.length) return;
+
+            $('.mm-settings-tab-wrapper a.nav-tab').each(function () {
+                var $t = $(this);
+                var lKey = ($t.attr('data-tab') || $t.attr('href') || '').replace(/^#?tab-/, '').replace(/^#/, '').trim();
+                if (lKey === cleanKey) {
+                    $t.addClass('nav-tab-active');
+                } else {
+                    $t.removeClass('nav-tab-active');
+                }
+            });
+
+            $('.mm-settings-tab-panel').hide().removeClass('active');
+            $targetPanel.css('display', 'block').addClass('active');
+
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, null, '#tab-' + cleanKey);
+            }
+        }
+
         $(document).on('click', '.mm-settings-tab-wrapper a.nav-tab', function (e) {
             e.preventDefault();
-            var $tab = $(this);
-            var targetTab = $tab.attr('data-tab');
-            if (!targetTab) return;
-
-            $('.mm-settings-tab-wrapper a.nav-tab').removeClass('nav-tab-active');
-            $tab.addClass('nav-tab-active');
-
-            $('.mm-settings-tab-panel').hide();
-            $('#mm-panel-' + targetTab).show();
-
-            if (history.replaceState) {
-                history.replaceState(null, null, '#tab-' + targetTab);
-            }
+            var tabKey = $(this).attr('data-tab') || $(this).attr('href') || '';
+            switchAdminSettingsTab(tabKey);
         });
 
         // Initialize active tab from hash if present
         if (window.location.hash && $('.mm-settings-tab-wrapper').length) {
-            var hashTab = window.location.hash.replace('#tab-', '').replace('#', '');
-            var $targetNavTab = $('.mm-settings-tab-wrapper a[data-tab="' + hashTab + '"]');
-            if ($targetNavTab.length) {
-                $targetNavTab.trigger('click');
-            }
+            switchAdminSettingsTab(window.location.hash);
         }
+
+        $(window).on('hashchange', function () {
+            if (window.location.hash && $('.mm-settings-tab-wrapper').length) {
+                switchAdminSettingsTab(window.location.hash);
+            }
+        });
     }
 
     function escapeHtml(str) {

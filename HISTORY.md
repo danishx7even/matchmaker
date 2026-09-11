@@ -1162,6 +1162,20 @@ This document maintains a chronological, step-by-step history of all features, a
   - `tests/`:
     - Updated `SettingsAndPlanMappingTest.php`, `PortalAndEventsTest.php`, `HeartbeatAndNotificationsTest.php`, and added `test_send_admin_service_purchase_notification()` in `NotificationAndApprovalTest.php`.
 - **Verification**:
+---
+
+### Task 66: Fix Admin Settings Tabs Switching & Remove Header Card from Services Tab
+- **Objective**:
+  - Remove "Accelerate Your Matrimony Journey" header card from the Member Portal Services tab (`src/View/frontend/portal/tab-services.php`).
+  - Resolve tab navigation in Admin Settings page to ensure instant switching across all 5 panels (*General & Mode*, *Membership & Services*, *Quotas & Matching*, *Email Templates*, *Shortcodes & System*) with hash-based URL routing.
+- **Implemented**:
+  - `src/View/frontend/portal/tab-services.php`: Removed the `.mm-services-header-card` banner so only the service card grid is rendered directly.
+  - `src/View/admin/settings/settings.php`: Embedded a resilient, dependency-free vanilla JS tab switcher handling direct tab clicks, active class toggling, inline style management, hash URL persistence, and `hashchange` browser events.
+  - `assets/js/admin-matchmaker.js`: Enhanced delegated tab click handler with regex-clean tab key resolution and `hashchange` event listeners.
+  - `src/Admin/AdminPortal.php`: Updated `enqueue_admin_assets()` to ensure styles and scripts are loaded across all screen hook variants.
+  - `tests/Unit/PortalAndEventsTest.php`: Updated test assertions to match the clean services grid markup.
+- **Verification**:
   - Ran automated test runner (`tests/run_tests.php`) — all 97 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
 ---
+
