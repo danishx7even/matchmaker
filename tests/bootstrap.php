@@ -727,8 +727,39 @@ function pmpro_getAllLevels($include_hidden = false, $force = false) {
         new FakePMProLevel(3, 'Monthly Matchmaking', '$29/mo full access'),
         new FakePMProLevel(4, '1-on-1 VIP Matchmaking', '$99/mo VIP access'),
         new FakePMProLevel(5, 'Elite 1-on-1 VIP', '$199/mo premium access'),
-        new FakePMProLevel(6, 'Event Single Pass', 'Event only access'),
+        new FakePMProLevel(6, 'Social Media Post', 'Social media post service'),
     ];
+}
+
+function pmpro_getLevel($level_id) {
+    $lid = (int) (is_object($level_id) ? ($level_id->id ?? 0) : $level_id);
+    foreach (pmpro_getAllLevels() as $lvl) {
+        if ($lvl->id === $lid) {
+            return $lvl;
+        }
+    }
+    return new FakePMProLevel($lid, 'Level ' . $lid);
+}
+
+function pmpro_hasMembershipLevel($levels = null, $user_id = null): bool {
+    if ($user_id === null) {
+        $user_id = $GLOBALS['__mm_current_user_id'] ?? 1;
+    }
+    $active = pmpro_getMembershipLevelsForUser((int) $user_id);
+    if (empty($active)) {
+        return false;
+    }
+    if ($levels === null) {
+        return !empty($active);
+    }
+    $check_ids = is_array($levels) ? $levels : [$levels];
+    foreach ($active as $lvl) {
+        $lid = is_object($lvl) ? (int) $lvl->id : (int) $lvl;
+        if (in_array($lid, $check_ids, true)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function pmpro_getMembershipLevelForUser(int $user_id) {

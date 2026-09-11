@@ -98,5 +98,27 @@ class AuthAndRedirectsTest
 
         unset($_POST['action'], $GLOBALS['__mm_last_redirect']);
     }
+
+    public function test_pmpro_service_checkout_redirects_to_dashboard_and_membership_redirects_to_questionnaire(): void
+    {
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [4, 6],
+        ]);
+
+        $membership_level = (object) ['id' => 2, 'name' => 'Monthly Matchmaking'];
+        $service_level    = (object) ['id' => 6, 'name' => 'Social Media Post'];
+
+        $mem_redirect = $this->auth->custom_pmpro_level_based_registration_redirect('https://example.com/default/', 10, $membership_level);
+        $srv_redirect = $this->auth->custom_pmpro_level_based_registration_redirect('https://example.com/default/', 10, $service_level);
+
+        if (!str_contains($mem_redirect, 'personal-matchmaking-questionnaire')) {
+            throw new \RuntimeException("Expected membership checkout to redirect to questionnaire form, got: " . $mem_redirect);
+        }
+
+        if (!str_contains($srv_redirect, '/dashboard/')) {
+            throw new \RuntimeException("Expected service checkout to redirect to /dashboard/, got: " . $srv_redirect);
+        }
+    }
 }
 

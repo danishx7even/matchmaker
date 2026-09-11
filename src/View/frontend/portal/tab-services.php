@@ -100,14 +100,17 @@ $level_tags      = $sync->get_level_tags();
                         <?php endif; ?>
                     </div>
 
-                    <div class="mm-service-card-footer">
+                    <div class="mm-service-card-footer" style="display:flex; flex-direction:column; gap:8px; align-items:stretch;">
                         <?php if ($is_active_for_user) : ?>
-                            <span class="mm-service-active-pill">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                            <div style="display:flex; align-items:center; justify-content:center; gap:5px; font-size:12px; font-weight:600; color:#15803d; background:#dcfce7; padding:4px 10px; border-radius:6px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="20 6 9 17 4 12"></polyline>
                                 </svg>
-                                <?php esc_html_e('Active Service', 'matchmaker'); ?>
-                            </span>
+                                <?php esc_html_e('Purchased / Active', 'matchmaker'); ?>
+                            </div>
+                            <a href="<?php echo esc_url($checkout_url); ?>" class="btn btn-primary mm-service-cta-btn">
+                                <?php esc_html_e('Purchase Again →', 'matchmaker'); ?>
+                            </a>
                         <?php else : ?>
                             <a href="<?php echo esc_url($checkout_url); ?>" class="btn btn-primary mm-service-cta-btn">
                                 <?php esc_html_e('Purchase Service →', 'matchmaker'); ?>

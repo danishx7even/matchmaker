@@ -245,6 +245,10 @@ class AuthController
     public function custom_pmpro_level_based_registration_redirect(string $rurl, int $user_id, object $pmpro_level): string
     {
         if (!empty($pmpro_level->id)) {
+            $lid = (int) $pmpro_level->id;
+            if (\Matchmaker\Core\PMProSync::instance()->is_service_level($lid)) {
+                return \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
+            }
             return \Matchmaker\Service\ProfileService::instance()->get_form_url();
         }
         return $rurl;

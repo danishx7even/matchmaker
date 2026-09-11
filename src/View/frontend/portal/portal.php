@@ -66,13 +66,17 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
 
         <div class="header-actions">
             <?php 
-            $is_vip_active = !empty($has_one_on_one) || (!empty($user_id) && $repo->has_one_on_one((int) $user_id));
-            if ($is_vip_active) : 
+            $active_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services((int) $user_id);
+            if (!empty($active_services)) : 
+                foreach ($active_services as $srv_item) :
             ?>
                 <span class="mm-vip-header-badge" style="display:inline-flex; align-items:center; gap:5px; background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; box-shadow:0 2px 6px rgba(204,114,63,0.12);">
-                    <span style="font-size:12px;">★</span> <?php esc_html_e('1-on-1 VIP', 'matchmaker'); ?>
+                    <span style="font-size:12px;">★</span> <?php echo esc_html($srv_item['tag']); ?>
                 </span>
-            <?php endif; ?>
+            <?php 
+                endforeach;
+            endif; 
+            ?>
             <div class="mm-bell-wrapper" title="<?php esc_attr_e('Notifications', 'matchmaker'); ?>">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                 <span class="mm-bell-badge <?php echo $unread_count > 0 ? '' : 'mm-hidden'; ?>" <?php echo $unread_count > 0 ? '' : 'style="display:none;"'; ?>><?php echo (int) $unread_count; ?></span>

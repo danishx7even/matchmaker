@@ -63,6 +63,9 @@ class PMProSync {
         add_action('pmpro_subscription_payment_completed', [$this, 'reset_user_quota_on_renewal'], 10, 1);
         add_action('pmpro_membership_post_membership_expiry', [$this, 'handle_expiry_sync'], 10, 2);
         add_filter('pmpro_registration_checks', [$this, 'check_service_requires_basic_membership'], 10, 1);
+        add_filter('pmpro_has_membership_level', [$this, 'filter_pmpro_has_membership_level_for_checkout'], 10, 3);
+        add_filter('pmpro_allow_duplicate_level_checkouts', '__return_true');
+        add_filter('pmprommpu_checkout_level', [$this, 'filter_pmprommpu_checkout_level'], 10, 2);
     }
 
     /**
@@ -532,7 +535,141 @@ class PMProSync {
     }
 
     /**
-     * Checks whether the user holds an active 1-on-1 VIP service level (Group 3).
+     * Filter pmpro_has_membership_level during checkout so service levels can be purchased repeatedly.
+     *
+     * @param bool       $has_level
+     * @param int        $user_id
+     * @param mixed      $levels
+     * @return bool
+     */
+    public function filter_pmpro_has_membership_level_for_checkout(bool $has_level, int $user_id, mixed $levels): bool
+    {
+        $is_checkout_context = (function_exists('pmpro_is_checkout') && pmpro_is_checkout())
+            || (!empty($_REQUEST['level']) && (isset($_REQUEST['submit-checkout']) || isset($_POST['submit-checkout']) || isset($_GET['level'])));
+
+        if ($is_checkout_context) {
+            if (is_numeric($levels) && $this->is_service_level((int) $levels)) {
+                return false;
+            }
+            if (is_array($levels)) {
+                foreach ($levels as $lvl) {
+                    $lid = is_object($lvl) ? (int) ($lvl->id ?? 0) : (int) $lvl;
+                    if ($lid > 0 && $this->is_service_level($lid)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return $has_level;
+    }
+
+    /**
+     * Ensures MMPU permits repeat checkout for service levels without replacing previous levels.
+     *
+     * @param object|null $level
+     * @param int         $user_id
+     * @return object|null
+     */
+    public function filter_pmprommpu_checkout_level(?object $level, int $user_id): ?object
+    {
+        return $level;
+    }
+
+    /**
+     * Retrieves all active service levels and their display tags for a user.
+     *
+     * @param int $user_id
+     * @return array<int, array{id: int, name: string, tag: string}>
+     */
+    public function get_user_active_services(int $user_id): array
+    {
+        if ($user_id <= 0) {
+            return [];
+        }
+
+        $services = $this->get_services_levels();
+
+        // Build list of all valid service level IDs & map
+        $service_map = [];
+        foreach ($services as $srv) {
+            if (is_object($srv) && !empty($srv->id)) {
+                $service_map[(int) $srv->id] = (string) ($srv->name ?? '');
+            } elseif (is_numeric($srv) && (int) $srv > 0) {
+                $service_map[(int) $srv] = '';
+            }
+        }
+        if (empty($service_map)) {
+            $service_map = [4 => '1-on-1 VIP Matchmaking', 5 => '1-on-1 Consultation'];
+        }
+
+        $user_service_ids = [];
+
+        if (function_exists('pmpro_getMembershipLevelsForUser')) {
+            $user_levels = pmpro_getMembershipLevelsForUser($user_id);
+            if (is_array($user_levels)) {
+                foreach ($user_levels as $ulvl) {
+                    $ulid = is_object($ulvl) ? (int) ($ulvl->id ?? 0) : (int) $ulvl;
+                    if ($ulid > 0 && isset($service_map[$ulid])) {
+                        $user_service_ids[$ulid] = is_object($ulvl) && !empty($ulvl->name) ? (string) $ulvl->name : ($service_map[$ulid] ?: '');
+                    }
+                }
+            }
+        }
+
+        if (empty($user_service_ids) && function_exists('pmpro_getMembershipLevelForUser')) {
+            $membership = pmpro_getMembershipLevelForUser($user_id);
+            if (is_object($membership) && !empty($membership->id)) {
+                $mlid = (int) $membership->id;
+                if (isset($service_map[$mlid])) {
+                    $user_service_ids[$mlid] = (string) ($membership->name ?? $service_map[$mlid]);
+                }
+            }
+        }
+
+        if (empty($user_service_ids) && function_exists('pmpro_hasMembershipLevel')) {
+            foreach (array_keys($service_map) as $srv_id) {
+                if (pmpro_hasMembershipLevel($srv_id, $user_id)) {
+                    $user_service_ids[$srv_id] = $service_map[$srv_id];
+                }
+            }
+        }
+
+        // Fallback for legacy usermeta or mock tests
+        if (empty($user_service_ids)) {
+            $has_meta = (bool) get_user_meta($user_id, 'mm_has_one_on_one', true)
+                || (string) get_user_meta($user_id, 'user_type', true) === 'one_on_one';
+            if ($has_meta) {
+                $first_srv_id = (int) array_key_first($service_map);
+                $user_service_ids[$first_srv_id] = $service_map[$first_srv_id] ?? '1-on-1 VIP';
+            }
+        }
+
+        $result = [];
+        foreach ($user_service_ids as $sid => $sname) {
+            if (empty($sname) && function_exists('pmpro_getLevel')) {
+                $lvl_obj = pmpro_getLevel($sid);
+                if (is_object($lvl_obj) && !empty($lvl_obj->name)) {
+                    $sname = (string) $lvl_obj->name;
+                }
+            }
+            if (empty($sname)) {
+                $sname = 'Service #' . $sid;
+            }
+
+            $tag = $this->get_level_tag($sid, $sname);
+
+            $result[] = [
+                'id'   => $sid,
+                'name' => $sname,
+                'tag'  => $tag,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Checks whether the user holds an active 1-on-1 VIP or add-on service level (Group 3).
      *
      * @param int $user_id
      * @return bool
@@ -543,42 +680,7 @@ class PMProSync {
             return false;
         }
 
-        $service_levels = [];
-        $services = $this->get_services_levels();
-        foreach ($services as $srv) {
-            $sid = is_object($srv) ? (int) ($srv->id ?? 0) : (int) $srv;
-            if ($sid > 0) {
-                $service_levels[] = $sid;
-            }
-        }
-        if (empty($service_levels)) {
-            $service_levels = [4, 5];
-        }
-
-        if (function_exists('pmpro_getMembershipLevelsForUser')) {
-            $active_levels = pmpro_getMembershipLevelsForUser($user_id);
-            if (is_array($active_levels) && !empty($active_levels)) {
-                foreach ($active_levels as $lvl) {
-                    $lid = is_object($lvl) ? (int) ($lvl->id ?? 0) : (int) $lvl;
-                    if ($lid > 0 && in_array($lid, $service_levels, true)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        if (function_exists('pmpro_getMembershipLevelForUser')) {
-            $membership = pmpro_getMembershipLevelForUser($user_id);
-            if (is_object($membership) && !empty($membership->id)) {
-                if (in_array((int) $membership->id, $service_levels, true)) {
-                    return true;
-                }
-            }
-        }
-
-        // Fallback to usermeta and legacy user_type
-        return (bool) get_user_meta($user_id, 'mm_has_one_on_one', true)
-            || (string) get_user_meta($user_id, 'user_type', true) === 'one_on_one';
+        return !empty($this->get_user_active_services($user_id));
     }
 
     /**

@@ -271,5 +271,62 @@ final class SettingsAndPlanMappingTest extends TestCase
         $this->assertContains(30, $service_ids2);
         $this->assertTrue($sync->is_service_level(30));
     }
+
+    public function test_get_user_active_services_returns_dynamic_tags_and_names(): void
+    {
+        $sync = PMProSync::instance();
+
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [4, 6],
+        ]);
+        update_option('mm_pmpro_level_tags', [
+            6 => 'Featured Post Tag',
+        ]);
+
+        $user_id = 88;
+        // Mock PMPro functions level objects
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            (object) ['id' => 6, 'name' => 'Social Media Post'],
+        ];
+
+        $user_services = $sync->get_user_active_services($user_id);
+        $this->assertCount(1, $user_services);
+        $this->assertEquals(6, $user_services[0]['id']);
+        $this->assertEquals('Social Media Post', $user_services[0]['name']);
+        $this->assertEquals('Featured Post Tag', $user_services[0]['tag']);
+
+        // Test fallback to level name if no custom tag configured
+        update_option('mm_pmpro_level_tags', []);
+        $user_services2 = $sync->get_user_active_services($user_id);
+        $this->assertEquals('Social Media Post', $user_services2[0]['tag']);
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
+
+    public function test_service_repeat_checkout_filters_bypass_duplicate_checks(): void
+    {
+        $sync = PMProSync::instance();
+
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [6],
+        ]);
+
+        $user_id = 99;
+
+        // In checkout context with a service level ID
+        $_REQUEST['level'] = 6;
+        $_POST['submit-checkout'] = '1';
+
+        $has_level = true;
+        $filtered = $sync->filter_pmpro_has_membership_level_for_checkout($has_level, $user_id, 6);
+        $this->assertFalse($filtered, 'Should return false during service checkout to allow repeat purchase');
+
+        // Outside checkout context or non-service level
+        unset($_REQUEST['level'], $_POST['submit-checkout']);
+        $filtered_non_checkout = $sync->filter_pmpro_has_membership_level_for_checkout($has_level, $user_id, 2);
+        $this->assertTrue($filtered_non_checkout);
+    }
 }
 

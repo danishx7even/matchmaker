@@ -182,13 +182,22 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Direct Contact Information', $html);
     }
 
-    public function test_portal_renders_one_on_one_vip_badge_and_profile_card(): void
+    public function test_portal_renders_dynamic_service_tag_and_removes_vip_banner(): void
     {
         $repo = \Matchmaker\Repository\MatchRepository::instance();
         $user_id = 906;
         $user = new \FakeWP_User($user_id, 'VIP Member', 'vip@example.com');
         $GLOBALS['__mm_users'][$user_id] = $user;
         $GLOBALS['__mm_current_user_id'] = $user_id;
+
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [6],
+        ]);
+
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            (object) ['id' => 6, 'name' => 'Social Media Post'],
+        ];
 
         $user_type = 'monthly';
         $has_one_on_one = true;
@@ -215,21 +224,28 @@ final class PortalAndEventsTest extends TestCase
         $dashboard_url = 'https://example.com/dashboard/';
         $matches = [];
 
-        // 1. Test portal header badge
+        // 1. Test portal header badge renders dynamic service tag
         ob_start();
         include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/portal.php';
         $portal_html = (string) ob_get_clean();
 
         $this->assertStringContainsString('mm-vip-header-badge', $portal_html);
-        $this->assertStringContainsString('1-on-1 VIP', $portal_html);
+        $this->assertStringContainsString('Social Media Post', $portal_html);
 
-        // 2. Test profile tab VIP card
+        // 2. Test profile tab does NOT contain hardcoded VIP card, DOES contain dynamic service badge, and DOES contain contact notice
         ob_start();
         include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-profile.php';
         $profile_html = (string) ob_get_clean();
 
-        $this->assertStringContainsString('mm-vip-service-card', $profile_html);
-        $this->assertStringContainsString('1-on-1 VIP Matchmaking Active', $profile_html);
+        $this->assertStringNotContainsString('mm-vip-service-card', $profile_html);
+        $this->assertStringNotContainsString('1-on-1 VIP Matchmaking Active', $profile_html);
+        $this->assertStringContainsString('az-badge-service', $profile_html);
+        $this->assertStringContainsString('Social Media Post', $profile_html);
+        $this->assertStringContainsString('mm-service-notice-card', $profile_html);
+        $this->assertStringContainsString('You will be contacted by our team by your email or phone number', $profile_html);
+        $this->assertStringContainsString('Purchased Service: Social Media Post', $profile_html);
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
 }
 

@@ -68,18 +68,22 @@ $badge_label = $repo->format_tier_label($user_type);
     </div>
 
     <?php 
-    $is_vip_active = !empty($has_one_on_one) || (!empty($user_id) && $repo->has_one_on_one((int) $user_id));
-    if ($is_vip_active) : 
+    $active_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services((int) $user_id);
+    if (!empty($active_services)) : 
+        $srv_names = array_map(static fn($s) => $s['tag'] ?? $s['name'], $active_services);
+        $srv_names_str = implode(', ', $srv_names);
     ?>
-        <div class="az-card mm-vip-service-card" style="background:linear-gradient(135deg, #FFFDFB 0%, #FAF5F0 100%); border:1px solid rgba(204,114,63,0.3); border-left:4px solid #CC723F; padding:20px 24px; border-radius:12px; margin-bottom:20px; box-shadow:0 4px 14px rgba(204,114,63,0.06);">
-            <div style="display:flex; align-items:center; gap:14px;">
-                <div style="width:42px; height:42px; border-radius:10px; background:rgba(204,114,63,0.12); color:#CC723F; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
+        <div class="az-card mm-service-notice-card" style="background:linear-gradient(135deg, #FFFDFB 0%, #FAF5F0 100%); border:1px solid rgba(204,114,63,0.3); border-left:4px solid #CC723F; padding:18px 22px; border-radius:12px; margin-bottom:20px; box-shadow:0 4px 14px rgba(204,114,63,0.06);">
+            <div style="display:flex; align-items:flex-start; gap:14px;">
+                <div style="width:38px; height:38px; border-radius:10px; background:rgba(204,114,63,0.12); color:#CC723F; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; margin-top:2px;">
                     ★
                 </div>
                 <div>
-                    <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#CC723F; margin-bottom:2px;"><?php esc_html_e('1-on-1 VIP Matchmaking Active', 'matchmaker'); ?></div>
-                    <div style="font-size:14px; color:#374151; line-height:1.4;">
-                        <?php esc_html_e('You have dedicated 1-on-1 personal matchmaking service enabled. Our matchmakers actively review your preferences and coordinate high-touch introductions.', 'matchmaker'); ?>
+                    <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#CC723F; margin-bottom:4px;">
+                        <?php echo esc_html(sprintf(__('Purchased Service: %s', 'matchmaker'), $srv_names_str)); ?>
+                    </div>
+                    <div style="font-size:14px; color:#374151; line-height:1.5;">
+                        <?php echo esc_html(sprintf(__('You will be contacted by our team by your email or phone number regarding your %s.', 'matchmaker'), $srv_names_str)); ?>
                     </div>
                 </div>
             </div>
@@ -89,7 +93,19 @@ $badge_label = $repo->format_tier_label($user_type);
     <div class="az-card az-mm-card">
         <div class="az-mm-header">
             <h3><?php esc_html_e('Your Matchmaking', 'matchmaker'); ?></h3>
-            <span class="az-badge">● <?php echo esc_html($badge_label); ?></span>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="az-badge">● <?php echo esc_html($badge_label); ?></span>
+                <?php 
+                $active_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services((int) $user_id);
+                if (!empty($active_services)) :
+                    foreach ($active_services as $srv_item) :
+                ?>
+                    <span class="az-badge az-badge-service" style="background:#FAF5F0; color:#CC723F; border:1px solid rgba(204,114,63,0.3); font-weight:700;">★ <?php echo esc_html($srv_item['tag']); ?></span>
+                <?php 
+                    endforeach;
+                endif; 
+                ?>
+            </div>
         </div>
 
         

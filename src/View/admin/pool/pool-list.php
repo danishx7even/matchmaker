@@ -99,11 +99,16 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                         <span class="mm-badge mm-badge-<?php echo esc_attr($c['user_type'] ?? 'free'); ?>">
                             <?php echo esc_html($repo->format_tier_label($c['user_type'] ?? 'free')); ?>
                         </span>
-                        <?php if ($c_has_vip) : ?>
-                            <div style="margin-top:4px;">
-                                <span class="mm-badge" style="background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); font-weight:700; font-size:10px; letter-spacing:0.03em;">
-                                    ★ 1-on-1 VIP
-                                </span>
+                        <?php 
+                        $user_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($uid);
+                        if (!empty($user_services)) : 
+                        ?>
+                            <div style="margin-top:4px; display:flex; flex-direction:column; gap:2px;">
+                                <?php foreach ($user_services as $usrv) : ?>
+                                    <span class="mm-badge" style="background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); font-weight:700; font-size:10px; letter-spacing:0.03em;">
+                                        ★ <?php echo esc_html($usrv['tag']); ?>
+                                    </span>
+                                <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
                     </td>

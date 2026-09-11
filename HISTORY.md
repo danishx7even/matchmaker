@@ -1200,4 +1200,56 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-11 — Task 68: Dynamic Service Special Tag Display, Banner Removal & Service Purchase Redirect to Dashboard
+
+- **Objective**:
+  1. Remove the static `.mm-vip-service-card` banner from `tab-profile.php`.
+  2. Dynamically display service tags/badges according to the actual service(s) purchased by the user (e.g. "Social Media Post", custom configured tags, or other Group 3 services) in Member Portal header, Member Profile tab, and Admin Pool views.
+  3. Redirect users directly to the Member Portal Dashboard (`/dashboard/`) when purchasing an add-on service instead of redirecting to the matchmaking questionnaire form.
+- **Changes**:
+  - `src/Core/PMProSync.php`:
+    - Added `get_user_active_services(int $user_id): array` to discover and return all active service levels held by the member with their dynamic display tags (`get_level_tag()`) or level names.
+    - Updated `has_active_one_on_one_service()` to leverage `get_user_active_services()`.
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Completely removed the `.mm-vip-service-card` banner.
+    - Added dynamic active service tags (`.az-badge-service`) alongside the membership tier badge in the card header.
+  - `src/View/frontend/portal/portal.php`:
+    - Updated portal header actions to dynamically render active service badges for each service held by the user.
+  - `src/Frontend/AuthController.php`:
+    - Updated `custom_pmpro_level_based_registration_redirect()` to verify `PMProSync::is_service_level()`, routing service checkouts directly to `get_dashboard_url()` and membership plan checkouts to `get_form_url()`.
+  - `src/View/admin/pool/pool-list.php` & `src/View/admin/pool/user-single.php`:
+    - Updated candidate listing and profile views to render dynamic service tags for each active service held by candidate members.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`, `tests/Unit/AuthAndRedirectsTest.php`, `tests/Unit/PortalAndEventsTest.php`:
+    - Added unit test `test_get_user_active_services_returns_dynamic_tags_and_names()`.
+    - Added unit test `test_pmpro_service_checkout_redirects_to_dashboard_and_membership_redirects_to_questionnaire()`.
+    - Updated `test_portal_renders_dynamic_service_tag_and_removes_vip_banner()`.
+- **Verification**:
+  - Ran automated test runner (`tests/run_tests.php`) — all 100 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+## 2026-09-11 — Task 69: Profile Tab Service Contact Notice & Repeat Service Purchases
+
+- **Objective**:
+  1. Add a branded contact notice banner on the Profile tab (`tab-profile.php`) for members with purchased services stating: *"You will be contacted by our team by your email or phone number regarding your [Service Name]"*.
+  2. Enable unlimited repeat purchases for all add-on services on the Services tab (`tab-services.php`), displaying *"Purchase Again →"* alongside a *"Purchased / Active"* indicator.
+  3. Ensure PMPro allows repeated checkouts for service levels without throwing "already a member" duplicate blockers.
+- **Changes**:
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Added branded `.mm-service-notice-card` banner rendering the contact notice dynamically with all active service names/tags.
+  - `src/View/frontend/portal/tab-services.php`:
+    - Updated service card footer to always display the active purchase CTA button (`Purchase Again →` for previously purchased services and `Purchase Service →` for new services) alongside an active indicator.
+  - `src/Core/PMProSync.php`:
+    - Added `filter_pmpro_has_membership_level_for_checkout()` and `filter_pmprommpu_checkout_level()` to bypass PMPro duplicate level restrictions during service checkout.
+    - Added filter `pmpro_allow_duplicate_level_checkouts` returning `true`.
+  - `tests/Unit/PortalAndEventsTest.php` & `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added assertions for `mm-service-notice-card` and team contact message in `test_portal_renders_dynamic_service_tag_and_removes_vip_banner()`.
+    - Added unit test `test_service_repeat_checkout_filters_bypass_duplicate_checks()`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 101 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
+
 

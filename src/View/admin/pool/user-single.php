@@ -33,11 +33,23 @@ $photo3 = $meta['user_photo3'] ?? '';
 <div class="mm-detail-header">
     <div>
         <a href="<?php echo esc_url($back_url); ?>">&larr; <?php esc_html_e('Back to Candidate Pool', 'matchmaker'); ?></a>
-        <h2 style="margin:8px 0 4px;">
+        <h2 style="margin:8px 0 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <?php echo esc_html($user_obj->display_name); ?>
             <span class="mm-badge mm-badge-<?php echo esc_attr($pool['user_type']); ?>">
                 <?php echo esc_html($repo->format_tier_label($pool['user_type'])); ?>
             </span>
+            <?php 
+            $user_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($user_id);
+            if (!empty($user_services)) :
+                foreach ($user_services as $usrv) :
+            ?>
+                <span class="mm-badge" style="background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); font-weight:700; font-size:11px; letter-spacing:0.03em;">
+                    ★ <?php echo esc_html($usrv['tag']); ?>
+                </span>
+            <?php 
+                endforeach;
+            endif; 
+            ?>
         </h2>
         <p class="description" style="margin:0;">
             <strong><?php esc_html_e('Email:', 'matchmaker'); ?></strong> <?php echo esc_html($user_obj->user_email); ?> &nbsp;|&nbsp; 
