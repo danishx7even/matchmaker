@@ -236,5 +236,40 @@ final class SettingsAndPlanMappingTest extends TestCase
         $this->assertContains(3, $active_level_ids);
         $this->assertContains(4, $active_level_ids);
     }
+
+    public function test_dynamic_services_levels_discovery(): void
+    {
+        global $wpdb;
+        $sync = PMProSync::instance();
+
+        // 1. Dynamic discovery via options (pmpro_groups / pmprommpu_groups)
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [4, 5, 25, 26],
+        ]);
+
+        $services = $sync->get_services_levels();
+        $service_ids = array_map(static fn($s) => is_object($s) ? (int) $s->id : (int) $s, $services);
+
+        $this->assertContains(4, $service_ids);
+        $this->assertContains(5, $service_ids);
+        $this->assertContains(25, $service_ids);
+        $this->assertContains(26, $service_ids);
+        $this->assertTrue($sync->is_service_level(25));
+        $this->assertTrue($sync->is_service_level(26));
+
+        // 2. Dynamic discovery via custom tier mapping ('service')
+        update_option('pmprommpu_groups', []);
+        update_option('mm_pmpro_tier_mapping', [
+            3  => 'monthly',
+            2  => 'free',
+            30 => 'service',
+        ]);
+
+        $services2 = $sync->get_services_levels();
+        $service_ids2 = array_map(static fn($s) => is_object($s) ? (int) $s->id : (int) $s, $services2);
+        $this->assertContains(30, $service_ids2);
+        $this->assertTrue($sync->is_service_level(30));
+    }
 }
 

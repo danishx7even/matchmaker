@@ -267,6 +267,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                                             <option value="free" <?php selected($assigned, 'free'); ?>>
                                                 <?php esc_html_e('Free (Group 1 Plan)', 'matchmaker'); ?>
                                             </option>
+                                            <option value="service" <?php selected($assigned, 'service'); ?>>
+                                                <?php esc_html_e('Service / Add-on (Group 3)', 'matchmaker'); ?>
+                                            </option>
                                         </select>
                                     </td>
                                     <td>

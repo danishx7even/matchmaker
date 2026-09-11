@@ -1175,7 +1175,29 @@ This document maintains a chronological, step-by-step history of all features, a
   - `src/Admin/AdminPortal.php`: Updated `enqueue_admin_assets()` to ensure styles and scripts are loaded across all screen hook variants.
   - `tests/Unit/PortalAndEventsTest.php`: Updated test assertions to match the clean services grid markup.
 - **Verification**:
-  - Ran automated test runner (`tests/run_tests.php`) — all 97 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+---
+
+### Task 67: Comprehensive Dynamic PMPro Service Levels Discovery & Multi-Source Group Retrieval
+- **Objective**:
+  - Ensure all PMPro membership levels in the Services Group (Group ID: 3 or configured group) and add-on levels are dynamically retrieved and presented in the Member Portal Services tab.
+- **Implemented**:
+  - `src/Core/PMProSync.php`:
+    - Completely overhauled `get_services_levels()` with multi-source discovery:
+      1. PMPro 3.0+ & MMPU functions (`pmpro_getLevelsForGroup`, `pmpro_getMembershipLevelsForGroup`, `pmpro_get_levels_for_group`, `pmprommpu_get_levels_for_group`).
+      2. PMPro 3.0+ Level Group objects (`pmpro_get_level_groups()`).
+      3. Registered level properties (`group_id`, `group`, `membership_group_id`, `groups`) and level meta (`pmpro_get_level_meta` with `group_id`, `group`, `pmprommpu_group`).
+      4. PMPro options (`pmpro_groups`, `pmpro_level_groups`, `pmprommpu_groups`).
+      5. Direct database inspection across `wp_pmpro_membership_levels` and all junction tables (`wp_pmpro_membership_levels_groups`, `wp_pmpro_membership_level_groups`, `wp_pmpro_groups_levels`, `wp_pmpro_group_levels`, `wp_pmpro_levels_groups`).
+      6. Plugin tier mapping (`mm_pmpro_tier_mapping`) explicit `service` assignments.
+      7. Dynamic hydration of complete `PMPro_Level` objects with names, prices, descriptions, and checkout URLs.
+    - Updated `is_service_level()` to verify all dynamic discovery sources.
+  - `src/View/admin/settings/settings.php`:
+    - Added `<option value="service">Service / Add-on (Group 3)</option>` into the PMPro Plan Connector table so admins can also explicitly map levels to Services if needed.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_dynamic_services_levels_discovery()` verifying multi-source level discovery.
+- **Verification**:
+  - Ran automated test runner (`tests/run_tests.php`) — all 98 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
 ---
+
 

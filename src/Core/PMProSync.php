@@ -156,88 +156,263 @@ class PMProSync {
 
     /**
      * Returns all registered PMPro levels belonging to the Services Group.
+     * Searches PMPro 3.0+ functions, Level Group APIs, level metadata, options,
+     * and database junction tables dynamically.
      *
      * @return array<int, object> Array of level objects.
      */
     public function get_services_levels(): array
     {
-        $group_id = $this->get_services_group_id();
-        $levels   = [];
+        $group_id        = $this->get_services_group_id();
+        $found_level_ids = [];
 
-        // 1. PMPro core function if available
-        if (function_exists('pmpro_getLevelsForGroup')) {
-            $grp_levels = pmpro_getLevelsForGroup($group_id);
-            if (is_array($grp_levels) && !empty($grp_levels)) {
-                return $grp_levels;
+        // 1. PMPro core & MMPU functions
+        $functions_to_check = [
+            'pmpro_getLevelsForGroup',
+            'pmpro_getMembershipLevelsForGroup',
+            'pmpro_get_levels_for_group',
+            'pmprommpu_get_levels_for_group',
+        ];
+        foreach ($functions_to_check as $fn) {
+            if (function_exists($fn)) {
+                $grp_levels = @call_user_func($fn, $group_id);
+                if (is_array($grp_levels) && !empty($grp_levels)) {
+                    foreach ($grp_levels as $gl) {
+                        $lid = is_object($gl) ? (int) ($gl->id ?? 0) : (int) $gl;
+                        if ($lid > 0) {
+                            $found_level_ids[] = $lid;
+                        }
+                    }
+                }
             }
         }
-        if (function_exists('pmpro_getMembershipLevelsForGroup')) {
-            $grp_levels = pmpro_getMembershipLevelsForGroup($group_id);
-            if (is_array($grp_levels) && !empty($grp_levels)) {
-                return $grp_levels;
+
+        // 2. PMPro 3.0+ Level Group objects API
+        if (function_exists('pmpro_get_level_groups')) {
+            $groups = pmpro_get_level_groups();
+            if (is_array($groups)) {
+                foreach ($groups as $grp) {
+                    $gid = is_object($grp) ? (int) ($grp->id ?? 0) : (int) ($grp['id'] ?? 0);
+                    if ($gid === $group_id) {
+                        $g_levels = is_object($grp) ? ($grp->levels ?? $grp->level_ids ?? []) : ($grp['levels'] ?? $grp['level_ids'] ?? []);
+                        if (is_array($g_levels)) {
+                            foreach ($g_levels as $gl) {
+                                $lid = is_object($gl) ? (int) ($gl->id ?? 0) : (int) $gl;
+                                if ($lid > 0) {
+                                    $found_level_ids[] = $lid;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // 2. Check all levels and filter by group_id if property exists
+        // 3. Inspect all registered levels and their metadata / properties
         if (function_exists('pmpro_getAllLevels')) {
             $all = pmpro_getAllLevels(true, true);
             if (is_array($all) && !empty($all)) {
                 foreach ($all as $lvl) {
-                    if (is_object($lvl) && isset($lvl->group_id) && (int) $lvl->group_id === $group_id) {
-                        $levels[] = $lvl;
+                    if (!is_object($lvl) || empty($lvl->id)) {
+                        continue;
                     }
-                }
-                if (!empty($levels)) {
-                    return $levels;
+                    $lid = (int) $lvl->id;
+
+                    // Direct object property checks
+                    if (isset($lvl->group_id) && (int) $lvl->group_id === $group_id) {
+                        $found_level_ids[] = $lid;
+                        continue;
+                    }
+                    if (isset($lvl->group) && (int) $lvl->group === $group_id) {
+                        $found_level_ids[] = $lid;
+                        continue;
+                    }
+                    if (isset($lvl->membership_group_id) && (int) $lvl->membership_group_id === $group_id) {
+                        $found_level_ids[] = $lid;
+                        continue;
+                    }
+                    if (isset($lvl->groups) && is_array($lvl->groups)) {
+                        foreach ($lvl->groups as $g) {
+                            $gid = is_object($g) ? (int) ($g->id ?? 0) : (int) $g;
+                            if ($gid === $group_id) {
+                                $found_level_ids[] = $lid;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Level meta checks
+                    if (function_exists('pmpro_get_level_meta')) {
+                        $meta_gid = pmpro_get_level_meta($lid, 'group_id', true);
+                        if ($meta_gid !== '' && (int) $meta_gid === $group_id) {
+                            $found_level_ids[] = $lid;
+                            continue;
+                        }
+                        $meta_grp = pmpro_get_level_meta($lid, 'group', true);
+                        if ($meta_grp !== '' && (int) $meta_grp === $group_id) {
+                            $found_level_ids[] = $lid;
+                            continue;
+                        }
+                        $meta_mmpu = pmpro_get_level_meta($lid, 'pmprommpu_group', true);
+                        if ($meta_mmpu !== '' && (int) $meta_mmpu === $group_id) {
+                            $found_level_ids[] = $lid;
+                            continue;
+                        }
+                    }
                 }
             }
         }
 
-        // 3. Direct DB query fallback
+        // 4. Options storage checks (pmpro_groups, pmpro_level_groups, pmprommpu_groups)
+        $opt_mmpu = get_option('pmprommpu_groups', null);
+        if (is_array($opt_mmpu)) {
+            foreach ($opt_mmpu as $k => $v) {
+                if ((int) $k === $group_id && is_array($v)) {
+                    foreach ($v as $lvl_id) {
+                        if (is_numeric($lvl_id) && (int) $lvl_id > 0) {
+                            $found_level_ids[] = (int) $lvl_id;
+                        }
+                    }
+                } elseif (is_numeric($v) && (int) $v === $group_id && is_numeric($k)) {
+                    $found_level_ids[] = (int) $k;
+                }
+            }
+        }
+
+        $opt_groups = get_option('pmpro_groups', null) ?: get_option('pmpro_level_groups', null);
+        if (is_array($opt_groups)) {
+            foreach ($opt_groups as $k => $v) {
+                $gid = is_array($v) ? (int) ($v['id'] ?? $k) : (int) $k;
+                if ($gid === $group_id) {
+                    $glvls = is_array($v) ? ($v['levels'] ?? $v['level_ids'] ?? []) : [];
+                    if (is_array($glvls)) {
+                        foreach ($glvls as $lvl_id) {
+                            if (is_numeric($lvl_id) && (int) $lvl_id > 0) {
+                                $found_level_ids[] = (int) $lvl_id;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Direct Database queries across all potential PMPro tables
         global $wpdb;
         if (!empty($wpdb) && isset($wpdb->prefix)) {
+            // Check wp_pmpro_membership_levels table for group_id column
             $table_levels = $wpdb->prefix . 'pmpro_membership_levels';
-            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_levels));
-            if ($table_exists === $table_levels) {
-                // Check if group_id column exists
-                $col_check = $wpdb->get_results("SHOW COLUMNS FROM `{$table_levels}` LIKE 'group_id'");
-                if (!empty($col_check)) {
-                    $db_levels = $wpdb->get_results($wpdb->prepare("SELECT * FROM `{$table_levels}` WHERE `group_id` = %d AND `id` > 0 ORDER BY `id` ASC", $group_id));
-                    if (!empty($db_levels)) {
-                        return $db_levels;
+            $t_exists     = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_levels));
+            if ($t_exists === $table_levels) {
+                $cols = $wpdb->get_col("SHOW COLUMNS FROM `{$table_levels}`");
+                if (is_array($cols)) {
+                    if (in_array('group_id', $cols, true)) {
+                        $col_lids = $wpdb->get_col($wpdb->prepare("SELECT id FROM `{$table_levels}` WHERE group_id = %d AND id > 0", $group_id));
+                        if (!empty($col_lids)) {
+                            foreach ($col_lids as $lid) {
+                                $found_level_ids[] = (int) $lid;
+                            }
+                        }
+                    }
+                    if (in_array('group', $cols, true)) {
+                        $col_lids = $wpdb->get_col($wpdb->prepare("SELECT id FROM `{$table_levels}` WHERE `group` = %d AND id > 0", $group_id));
+                        if (!empty($col_lids)) {
+                            foreach ($col_lids as $lid) {
+                                $found_level_ids[] = (int) $lid;
+                            }
+                        }
                     }
                 }
+            }
 
-                // Check wp_pmpro_membership_level_groups or wp_pmpro_group_levels table
-                $table_gl  = $wpdb->prefix . 'pmpro_membership_level_groups';
-                $gl_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_gl));
-                if ($gl_exists === $table_gl) {
-                    $db_levels = $wpdb->get_results($wpdb->prepare(
-                        "SELECT l.* FROM `{$table_levels}` l INNER JOIN `{$table_gl}` g ON l.id = g.level_id WHERE g.group_id = %d ORDER BY l.id ASC",
-                        $group_id
-                    ));
-                    if (!empty($db_levels)) {
-                        return $db_levels;
+            // Check junction tables (including plural levels_groups and singular level_groups)
+            $junction_candidates = [
+                $wpdb->prefix . 'pmpro_membership_levels_groups',
+                $wpdb->prefix . 'pmpro_membership_level_groups',
+                $wpdb->prefix . 'pmpro_groups_levels',
+                $wpdb->prefix . 'pmpro_group_levels',
+                $wpdb->prefix . 'pmpro_levels_groups',
+            ];
+
+            foreach ($junction_candidates as $j_table) {
+                $jt_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $j_table));
+                if ($jt_exists === $j_table) {
+                    $j_cols = $wpdb->get_col("SHOW COLUMNS FROM `{$j_table}`");
+                    if (is_array($j_cols) && in_array('level_id', $j_cols, true)) {
+                        if (in_array('group_id', $j_cols, true)) {
+                            $j_lids = $wpdb->get_col($wpdb->prepare("SELECT level_id FROM `{$j_table}` WHERE group_id = %d", $group_id));
+                            if (!empty($j_lids)) {
+                                foreach ($j_lids as $lid) {
+                                    $found_level_ids[] = (int) $lid;
+                                }
+                            }
+                        } elseif (in_array('id', $j_cols, true)) {
+                            $j_lids = $wpdb->get_col($wpdb->prepare("SELECT level_id FROM `{$j_table}` WHERE id = %d", $group_id));
+                            if (!empty($j_lids)) {
+                                foreach ($j_lids as $lid) {
+                                    $found_level_ids[] = (int) $lid;
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // 4. Default fallback mock service levels (Levels 4, 5) if available or mapped
-        if (function_exists('pmpro_getLevel')) {
-            foreach ([4, 5] as $lid) {
-                $l = pmpro_getLevel($lid);
-                if ($l && is_object($l)) {
-                    $levels[] = $l;
-                }
+        // 6. Check custom level mapping in plugin options (explicit 'service' / 'one_on_one' mappings)
+        $mapping = $this->get_tier_mapping();
+        foreach ($mapping as $lid => $tier) {
+            if (in_array($tier, ['service', 'services', 'one_on_one'], true)) {
+                $found_level_ids[] = (int) $lid;
             }
         }
-        if (empty($levels) && function_exists('pmpro_getAllLevels')) {
-            $all = pmpro_getAllLevels(true, true);
-            if (is_array($all)) {
-                foreach ($all as $lvl) {
-                    if (is_object($lvl) && in_array((int) $lvl->id, [4, 5], true)) {
-                        $levels[] = $lvl;
+
+        $found_level_ids = array_values(array_unique(array_filter($found_level_ids, static fn($id) => (int)$id > 0)));
+
+        // 7. Hydrate full PMPro level objects
+        $levels = [];
+        foreach ($found_level_ids as $lid) {
+            $obj = null;
+            if (function_exists('pmpro_getLevel')) {
+                $obj = pmpro_getLevel($lid);
+            }
+            if (!$obj && function_exists('pmpro_getAllLevels')) {
+                $all = pmpro_getAllLevels(true, true);
+                if (is_array($all)) {
+                    foreach ($all as $lvl) {
+                        if (is_object($lvl) && (int) ($lvl->id ?? 0) === $lid) {
+                            $obj = $lvl;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!$obj) {
+                $obj = (object) [
+                    'id'          => $lid,
+                    'name'        => sprintf(__('Service Package #%d', 'matchmaker'), $lid),
+                    'description' => '',
+                ];
+            }
+            $levels[] = $obj;
+        }
+
+        // 8. Fallback for mock/test environments if no PMPro groups are configured
+        if (empty($levels)) {
+            if (function_exists('pmpro_getLevel')) {
+                foreach ([4, 5] as $lid) {
+                    $l = pmpro_getLevel($lid);
+                    if ($l && is_object($l)) {
+                        $levels[] = $l;
+                    }
+                }
+            }
+            if (empty($levels) && function_exists('pmpro_getAllLevels')) {
+                $all = pmpro_getAllLevels(true, true);
+                if (is_array($all)) {
+                    foreach ($all as $lvl) {
+                        if (is_object($lvl) && in_array((int) ($lvl->id ?? 0), [4, 5], true)) {
+                            $levels[] = $lvl;
+                        }
                     }
                 }
             }
@@ -264,6 +439,11 @@ class PMProSync {
             if ($sid === $level_id) {
                 return true;
             }
+        }
+
+        $tier = $this->get_user_type_by_level_id($level_id);
+        if (in_array($tier, ['service', 'services', 'one_on_one'], true)) {
+            return true;
         }
 
         return in_array($level_id, [4, 5], true);
