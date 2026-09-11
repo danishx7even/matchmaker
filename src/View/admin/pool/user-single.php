@@ -39,7 +39,7 @@ $photo3 = $meta['user_photo3'] ?? '';
                 <?php echo esc_html($repo->format_tier_label($pool['user_type'])); ?>
             </span>
             <?php if (!empty($pool['is_parent_applying']) || !empty($meta['is_parent_applying'])) : ?>
-                <span class="mm-badge" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; font-weight:600; font-size:11px;">
+                <span class="mm-badge mm-badge-parent" style="font-size:11px; padding:3px 9px;">
                     👨‍👩‍👧 <?php esc_html_e('Parent Applying on Behalf of Child', 'matchmaker'); ?>
                 </span>
             <?php endif; ?>
@@ -48,7 +48,7 @@ $photo3 = $meta['user_photo3'] ?? '';
             if (!empty($user_services)) :
                 foreach ($user_services as $usrv) :
             ?>
-                <span class="mm-badge" style="background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); font-weight:700; font-size:11px; letter-spacing:0.03em;">
+                <span class="mm-badge mm-badge-service" style="font-size:11px; padding:3px 9px;">
                     ★ <?php echo esc_html($usrv['tag']); ?>
                 </span>
             <?php 

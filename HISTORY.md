@@ -1313,3 +1313,25 @@ This document maintains a chronological, step-by-step history of all features, a
   - Executed automated test runner (`tests/run_tests.php`) — all 103 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
 ---
+
+## 2026-09-11 — Task 72: Pool Browser Badges Design Refinement
+
+- **Objective**:
+  1. Fix stretched badge layout in the Admin Candidate Pool Browser (`admin.php?page=matchmaking-pool`).
+  2. Replace hardcoded inline flex column with compact inline chip badges wrapping cleanly (`.mm-tier-badges-cell` and `.mm-service-badges-group`).
+  3. Introduce dedicated `.mm-badge-service` and `.mm-badge-parent` styling in `admin-matchmaker.css` with clean borders, modern padding, and sharp typography.
+- **Changes**:
+  - `assets/css/admin-matchmaker.css`:
+    - Updated `.mm-badge` with `display: inline-flex; align-items: center; width: fit-content;`.
+    - Added `.mm-badge-service` with brand terracotta styling (`#FFF7ED`, `#C2410C`, `#FDBA74`).
+    - Added `.mm-badge-parent` with clean slate styling (`#F1F5F9`, `#334155`, `#CBD5E1`).
+    - Added `.mm-tier-badges-cell` and `.mm-service-badges-group` flex layout classes preventing stretching.
+  - `src/View/admin/pool/pool-list.php`:
+    - Refactored Tier & Services table cell to use `.mm-tier-badges-cell` and `.mm-service-badges-group`.
+    - Updated parent applying badge to use `.mm-badge-parent`.
+  - `src/View/admin/pool/user-single.php`:
+    - Updated single user profile header badges to use `.mm-badge-parent` and `.mm-badge-service`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 103 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---

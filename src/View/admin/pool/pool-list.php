@@ -94,7 +94,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                         <strong><a href="<?php echo esc_url($view_url); ?>"><?php echo esc_html($user_obj ? $user_obj->display_name : 'User #' . $uid); ?></a></strong><br>
                         <small style="color:#666;"><?php echo esc_html($user_obj ? $user_obj->user_email : ''); ?></small>
                         <?php if (!empty($c['is_parent_applying'])) : ?>
-                            <br><span class="mm-badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:10px; margin-top:3px; display:inline-block;">👨‍👩‍👧 <?php esc_html_e('Parent Applying', 'matchmaker'); ?></span>
+                            <div style="margin-top:4px;">
+                                <span class="mm-badge mm-badge-parent">👨‍👩‍👧 <?php esc_html_e('Parent Applying', 'matchmaker'); ?></span>
+                            </div>
                         <?php endif; ?>
                     </td>
                     <td><?php echo esc_html(ucfirst($c['gender'] ?? '')); ?></td>
@@ -105,21 +107,23 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     ?>
                     <td><?php echo esc_html($c_loc); ?></td>
                     <td>
-                        <span class="mm-badge mm-badge-<?php echo esc_attr($c['user_type'] ?? 'free'); ?>">
-                            <?php echo esc_html($repo->format_tier_label($c['user_type'] ?? 'free')); ?>
-                        </span>
-                        <?php 
-                        $user_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($uid);
-                        if (!empty($user_services)) : 
-                        ?>
-                            <div style="margin-top:4px; display:flex; flex-direction:column; gap:2px;">
-                                <?php foreach ($user_services as $usrv) : ?>
-                                    <span class="mm-badge" style="background:linear-gradient(135deg, #FAF5F0 0%, #F5EFEB 100%); color:#CC723F; border:1px solid rgba(204,114,63,0.35); font-weight:700; font-size:10px; letter-spacing:0.03em;">
-                                        ★ <?php echo esc_html($usrv['tag']); ?>
-                                    </span>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
+                        <div class="mm-tier-badges-cell">
+                            <span class="mm-badge mm-badge-<?php echo esc_attr($c['user_type'] ?? 'free'); ?>">
+                                <?php echo esc_html($repo->format_tier_label($c['user_type'] ?? 'free')); ?>
+                            </span>
+                            <?php 
+                            $user_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($uid);
+                            if (!empty($user_services)) : 
+                            ?>
+                                <div class="mm-service-badges-group">
+                                    <?php foreach ($user_services as $usrv) : ?>
+                                        <span class="mm-badge mm-badge-service">
+                                            ★ <?php echo esc_html($usrv['tag']); ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     </td>
                     <td>
                         <span class="mm-count-approved"><?php echo $approved_cnt; ?> <?php esc_html_e('approved', 'matchmaker'); ?></span> / 
