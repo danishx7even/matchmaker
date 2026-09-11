@@ -66,6 +66,8 @@ class PMProSync {
         add_filter('pmpro_has_membership_level', [$this, 'filter_pmpro_has_membership_level_for_checkout'], 10, 3);
         add_filter('pmpro_allow_duplicate_level_checkouts', '__return_true');
         add_filter('pmprommpu_checkout_level', [$this, 'filter_pmprommpu_checkout_level'], 10, 2);
+        add_filter('pmpro_cancel_membership_level', [$this, 'block_base_membership_cancellation_with_active_services'], 10, 3);
+        add_action('template_redirect', [$this, 'maybe_block_cancel_page_for_active_services']);
     }
 
     /**
@@ -576,6 +578,89 @@ class PMProSync {
     }
 
     /**
+     * Prevents cancellation of base membership levels (Free, Monthly, Event) if the user has active add-on services.
+     *
+     * @param bool $okay
+     * @param int  $level_id
+     * @param int  $user_id
+     * @return bool
+     */
+    public function block_base_membership_cancellation_with_active_services(bool $okay, int $level_id, int $user_id): bool
+    {
+        if (!$okay) {
+            return false;
+        }
+
+        if ($user_id <= 0) {
+            return $okay;
+        }
+
+        // If level being cancelled is an add-on service level, permit cancelling the service
+        if ($level_id > 0 && $this->is_service_level($level_id)) {
+            return $okay;
+        }
+
+        // If user has active services, check if cancelling this level leaves them with NO base membership
+        if ($this->has_active_one_on_one_service($user_id)) {
+            $remaining_base_levels = 0;
+            if (function_exists('pmpro_getMembershipLevelsForUser')) {
+                $user_levels = pmpro_getMembershipLevelsForUser($user_id);
+                if (is_array($user_levels)) {
+                    foreach ($user_levels as $ulvl) {
+                        $ulid = is_object($ulvl) ? (int) ($ulvl->id ?? 0) : (int) $ulvl;
+                        if ($ulid > 0 && $ulid !== $level_id && !$this->is_service_level($ulid)) {
+                            $remaining_base_levels++;
+                        }
+                    }
+                }
+            }
+
+            if ($remaining_base_levels === 0) {
+                global $pmpro_msg, $pmpro_msgt;
+                $pmpro_msg  = __('You cannot cancel your base membership while you have active add-on services. Please contact support.', 'matchmaker');
+                $pmpro_msgt = 'pmpro_error';
+                return false;
+            }
+        }
+
+        return $okay;
+    }
+
+    /**
+     * Redirects users away from the PMPro cancellation page if they try to cancel a base tier while holding active services.
+     *
+     * @return void
+     */
+    public function maybe_block_cancel_page_for_active_services(): void
+    {
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        $is_cancel_page = false;
+        if (function_exists('pmpro_is_cancel_page') && pmpro_is_cancel_page()) {
+            $is_cancel_page = true;
+        } elseif (is_page('cancel') || isset($_REQUEST['membership_cancel']) || (isset($_REQUEST['action']) && $_REQUEST['action'] === 'cancel')) {
+            $is_cancel_page = true;
+        }
+
+        if (!$is_cancel_page) {
+            return;
+        }
+
+        $user_id = get_current_user_id();
+        if ($user_id > 0 && $this->has_active_one_on_one_service($user_id)) {
+            $cancel_level = isset($_REQUEST['level']) ? (int) $_REQUEST['level'] : 0;
+            if ($cancel_level === 0 || !$this->is_service_level($cancel_level)) {
+                $account_url  = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
+                $redirect_url = add_query_arg('msg', 'cannot_cancel_base_with_services', $account_url);
+                wp_safe_redirect($redirect_url);
+                exit;
+            }
+        }
+    }
+
+    /**
      * Retrieves all active service levels and their display tags for a user.
      *
      * @param int $user_id
@@ -699,7 +784,7 @@ class PMProSync {
         $int_level_id = is_numeric($level_id) ? (int) $level_id : 0;
 
         // If user changed/upgraded to a paid base tier (Monthly or Event), cancel lingering Free tier (Group 1)
-        if ($int_level_id > 0) {
+        if ($int_level_id > 0 && !$this->is_service_level($int_level_id)) {
             $new_tier = $this->get_user_type_by_level_id($int_level_id);
             if (in_array($new_tier, ['monthly', 'event'], true)) {
                 $this->maybe_cancel_free_levels($user_id);
@@ -711,14 +796,18 @@ class PMProSync {
 
         // If a specific level > 0 was passed and PMPro internal cache hasn't flushed yet
         if ($int_level_id > 0) {
-            $direct_tier = $this->get_user_type_by_level_id($int_level_id);
-            if ($direct_tier === 'one_on_one') {
+            if ($this->is_service_level($int_level_id)) {
                 $has_one_on_one = true;
-            } elseif (isset(self::BASE_TIER_PRIORITY[$direct_tier])) {
-                $direct_rank   = self::BASE_TIER_PRIORITY[$direct_tier];
-                $resolved_rank = self::BASE_TIER_PRIORITY[$resolved_user_type] ?? 1;
-                if ($direct_rank > $resolved_rank) {
-                    $resolved_user_type = $direct_tier;
+            } else {
+                $direct_tier = $this->get_user_type_by_level_id($int_level_id);
+                if ($direct_tier === 'one_on_one') {
+                    $has_one_on_one = true;
+                } elseif (isset(self::BASE_TIER_PRIORITY[$direct_tier])) {
+                    $direct_rank   = self::BASE_TIER_PRIORITY[$direct_tier];
+                    $resolved_rank = self::BASE_TIER_PRIORITY[$resolved_user_type] ?? 1;
+                    if ($direct_rank > $resolved_rank) {
+                        $resolved_user_type = $direct_tier;
+                    }
                 }
             }
         }
@@ -894,7 +983,7 @@ class PMProSync {
 
                 foreach ($levels as $level_obj) {
                     $lvl_id = is_object($level_obj) ? (int) ($level_obj->id ?? 0) : (int) $level_obj;
-                    if ($lvl_id > 0) {
+                    if ($lvl_id > 0 && !$this->is_service_level($lvl_id)) {
                         $tier = $this->get_user_type_by_level_id($lvl_id);
                         if (isset(self::BASE_TIER_PRIORITY[$tier])) {
                             $rank = self::BASE_TIER_PRIORITY[$tier];

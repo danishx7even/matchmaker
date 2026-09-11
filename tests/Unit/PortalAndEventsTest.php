@@ -224,26 +224,26 @@ final class PortalAndEventsTest extends TestCase
         $dashboard_url = 'https://example.com/dashboard/';
         $matches = [];
 
-        // 1. Test portal header badge renders dynamic service tag
+        // 1. Test portal header does NOT contain service badges (removed from header)
         ob_start();
         include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/portal.php';
         $portal_html = (string) ob_get_clean();
 
-        $this->assertStringContainsString('mm-vip-header-badge', $portal_html);
-        $this->assertStringContainsString('Social Media Post', $portal_html);
+        $this->assertStringNotContainsString('mm-vip-header-badge', $portal_html);
 
-        // 2. Test profile tab does NOT contain hardcoded VIP card, DOES contain dynamic service badge, and DOES contain contact notice
+        // 2. Test profile tab contains the Purchased Service notice card with message and embedded service badges
         ob_start();
         include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-profile.php';
         $profile_html = (string) ob_get_clean();
 
         $this->assertStringNotContainsString('mm-vip-service-card', $profile_html);
         $this->assertStringNotContainsString('1-on-1 VIP Matchmaking Active', $profile_html);
+        $this->assertStringContainsString('mm-service-notice-card', $profile_html);
+        $this->assertStringContainsString('Purchased Service', $profile_html);
+        $this->assertStringContainsString('You will be contacted by our team by your email or phone number regarding your service.', $profile_html);
+        $this->assertStringContainsString('mm-service-badges-wrap', $profile_html);
         $this->assertStringContainsString('az-badge-service', $profile_html);
         $this->assertStringContainsString('Social Media Post', $profile_html);
-        $this->assertStringContainsString('mm-service-notice-card', $profile_html);
-        $this->assertStringContainsString('You will be contacted by our team by your email or phone number', $profile_html);
-        $this->assertStringContainsString('Purchased Service: Social Media Post', $profile_html);
 
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }

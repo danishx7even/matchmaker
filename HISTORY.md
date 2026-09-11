@@ -1250,6 +1250,37 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-11 — Task 70: Service Badges Placement, Base Membership Retention & Cancellation Blocking with Active Services
+
+- **Objective**:
+  1. Relocate service badges: remove service badges from Portal header (`portal.php`) and from beside the basic membership badge (`tab-profile.php`), displaying them exclusively inside the Purchased Service notice card on `tab-profile.php`.
+  2. Format the Purchased Service card layout:
+     - Title: "Purchased Service"
+     - Message: "You will be contacted by our team by your email or phone number regarding your service."
+     - Badges: Dynamic service badges (`{{badges}}`) displayed inside the notice card.
+  3. Ensure base membership (Free / Monthly / Event) remains intact and is never removed when a user purchases an add-on service.
+  4. Block cancellation of base membership plans if the user has any active add-on service(s).
+- **Changes**:
+  - `src/View/frontend/portal/portal.php`:
+    - Removed service badges from `.header-actions`.
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Restructured `.mm-service-notice-card` with exact heading "Purchased Service", message text, and `.mm-service-badges-wrap` containing the service badges.
+    - Cleaned `.az-mm-header` to only render the base tier badge (`● Monthly Member`, etc.).
+  - `src/Core/PMProSync.php`:
+    - Updated `get_current_user_type()` and `sync_pmpro_level_to_user_type()` to ensure add-on service levels never overwrite or cancel base memberships (Free tier remains completely intact upon purchasing any service).
+    - Added `block_base_membership_cancellation_with_active_services()` and `maybe_block_cancel_page_for_active_services()` hooked to `pmpro_cancel_membership_level` and `template_redirect`, preventing users from cancelling their base membership while they have active services.
+  - `tests/bootstrap.php`:
+    - Updated `pmpro_cancelMembershipLevel` stub to apply `pmpro_cancel_membership_level` filter.
+  - `tests/Unit/PortalAndEventsTest.php` & `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Updated assertions verifying no header service badges and verifying exact Purchased Service card format.
+    - Added unit test `test_service_purchase_keeps_free_membership_intact()`.
+    - Added unit test `test_active_services_block_base_membership_cancellation()`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 103 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
 
 

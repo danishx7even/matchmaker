@@ -802,6 +802,10 @@ function pmpro_getMembershipLevelsForUser(int $user_id) {
 }
 
 function pmpro_cancelMembershipLevel(int $level_id, int $user_id): bool {
+    $okay = apply_filters('pmpro_cancel_membership_level', true, $level_id, $user_id);
+    if (!$okay) {
+        return false;
+    }
     if (isset($GLOBALS['__mm_user_pmpro_levels'][$user_id])) {
         $GLOBALS['__mm_user_pmpro_levels'][$user_id] = array_values(array_filter(
             $GLOBALS['__mm_user_pmpro_levels'][$user_id],

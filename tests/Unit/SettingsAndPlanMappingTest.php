@@ -328,5 +328,62 @@ final class SettingsAndPlanMappingTest extends TestCase
         $filtered_non_checkout = $sync->filter_pmpro_has_membership_level_for_checkout($has_level, $user_id, 2);
         $this->assertTrue($filtered_non_checkout);
     }
+
+    public function test_service_purchase_keeps_free_membership_intact(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 112;
+
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [6],
+        ]);
+
+        // User has Free membership (level 2) and purchases service (level 6)
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(2, 'Free Membership'),
+            new \FakePMProLevel(6, 'Social Media Post'),
+        ];
+
+        $sync->sync_pmpro_level_to_user_type(6, $user_id);
+
+        $this->assertEquals('free', $sync->get_current_user_type($user_id));
+        $this->assertTrue($sync->has_active_one_on_one_service($user_id));
+        $this->assertTrue(pmpro_hasMembershipLevel(2, $user_id), 'Free membership must remain intact when service is purchased');
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
+
+    public function test_active_services_block_base_membership_cancellation(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 113;
+
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [6],
+        ]);
+
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(3, 'Monthly Matchmaking'),
+            new \FakePMProLevel(6, 'Social Media Post'),
+        ];
+
+        // Attempt to cancel base tier (level 3) while service (level 6) is active
+        $cancel_base_result = pmpro_cancelMembershipLevel(3, $user_id);
+        $this->assertFalse($cancel_base_result, 'Base membership cancellation must be blocked while services are active');
+        $this->assertTrue(pmpro_hasMembershipLevel(3, $user_id), 'Base membership must still be present');
+
+        // Cancelling the service level (level 6) itself is permitted
+        $cancel_service_result = pmpro_cancelMembershipLevel(6, $user_id);
+        $this->assertTrue($cancel_service_result, 'Service level cancellation should be allowed');
+        $this->assertFalse(pmpro_hasMembershipLevel(6, $user_id), 'Service level should now be cancelled');
+
+        // Now that no services remain, base membership cancellation is permitted
+        $cancel_base_now = pmpro_cancelMembershipLevel(3, $user_id);
+        $this->assertTrue($cancel_base_now, 'Base membership cancellation allowed once services are gone');
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
 }
 
