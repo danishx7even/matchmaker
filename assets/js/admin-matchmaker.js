@@ -123,6 +123,10 @@
             if (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.ajax_url) {
                 return matchmakerAdmin.ajax_url;
             }
+            var $btn = $('#mm-export-pool-csv-btn');
+            if ($btn.length && $btn.attr('data-ajax-url')) {
+                return $btn.attr('data-ajax-url');
+            }
             if (typeof ajaxurl !== 'undefined') {
                 return ajaxurl;
             }
@@ -132,6 +136,10 @@
         function getAdminNonce() {
             if (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.nonce) {
                 return matchmakerAdmin.nonce;
+            }
+            var $btn = $('#mm-export-pool-csv-btn');
+            if ($btn.length && $btn.attr('data-nonce')) {
+                return $btn.attr('data-nonce');
             }
             var $wpnonce = $('#_wpnonce, input[name="_wpnonce"]');
             if ($wpnonce.length) {
@@ -192,10 +200,12 @@
         /* =============================================================
            Candidate Pool CSV Export
            ============================================================= */
-        $(document).on('click', '#mm-export-pool-csv-btn', function (e) {
-            e.preventDefault();
+        function doExportPoolCsv(e) {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
 
-            var $btn     = $(this);
+            var $btn     = $('#mm-export-pool-csv-btn');
             var $spinner = $('#mm-export-csv-spinner');
             var $form    = $('form.mm-filter-bar');
 
@@ -254,7 +264,10 @@
                     $spinner.removeClass('is-active');
                 }
             });
-        });
+        }
+
+        $(document).on('click', '#mm-export-pool-csv-btn', doExportPoolCsv);
+        window.mmTriggerPoolExport = doExportPoolCsv;
 
         /* =============================================================
            Bulk Email Campaign Dispatcher
@@ -292,9 +305,9 @@
             }, 250);
         }
 
-        // Toggle audience targeting mode
-        $(document).on('change', 'input[name="mm_target_mode"]', function () {
-            var mode = $(this).val();
+        window.mmUpdateRecipientCount = updateRecipientCount;
+
+        window.mmToggleTargetMode = function (mode) {
             if (mode === 'members') {
                 $('#mm-audience-criteria-wrap').hide();
                 $('#mm-audience-members-wrap').show();
@@ -303,6 +316,12 @@
                 $('#mm-audience-criteria-wrap').show();
             }
             updateRecipientCount();
+        };
+
+        // Toggle audience targeting mode
+        $(document).on('change click', 'input[name="mm_target_mode"]', function () {
+            var mode = $(this).val();
+            window.mmToggleTargetMode(mode);
         });
 
         // Trigger count when criteria change

@@ -1415,3 +1415,34 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-12 — Task 75: Redefine CSV Export, Audience Selection Toggle, and 2-Column Left-Aligned Services Grid
+
+- **Objective**:
+  1. Redefine and fix Candidate Pool CSV Export trigger with direct data attributes, inline fetch fallback (`window.mmFallbackExportPoolCsv`), and GET download streaming support (`download=1`).
+  2. Fix Bulk Email Audience Selection radio toggle: ensure clicking "Specific Members (Search & Select)" or "Segment by Criteria" immediately switches visibility between the search box/chips and filter selects without delay.
+  3. Format the Member Portal Services Grid as exactly 2 columns per row with left-aligned (start-aligned) content and the action button pinned to the bottom.
+  4. Bump `MM_VERSION` to `2.9.0` to force cache invalidation of all admin and frontend scripts and styles.
+- **Changes**:
+  - `matchmaker.php`:
+    - Bumped `MM_VERSION` to `'2.9.0'` for immediate browser cache busting of `admin-matchmaker.js`, `admin-matchmaker.css`, and `member-portal.css`.
+  - `src/Admin/AdminPortal.php`:
+    - Added direct file download headers to `ajax_export_pool_csv()` when accessed with `download=1`.
+  - `src/View/admin/pool/pool-list.php`:
+    - Added `data-ajax-url` and `data-nonce` attributes directly to `#mm-export-pool-csv-btn`.
+    - Added standalone `window.mmFallbackExportPoolCsv` inline script to ensure export works even if script loading is delayed.
+  - `src/View/admin/settings/tab-bulk-email.php`:
+    - Added distinct IDs (`mm_target_mode_criteria`, `mm_target_mode_members`) and inline `onclick`/`onchange` handlers (`window.mmToggleTargetMode`).
+    - Added inline `window.mmToggleTargetMode` helper ensuring instant audience mode display toggling.
+  - `assets/js/admin-matchmaker.js`:
+    - Updated `getAjaxUrl()` and `getAdminNonce()` to read fallback values from button data attributes.
+    - Exposed `window.mmTriggerPoolExport`, `window.mmToggleTargetMode`, and `window.mmUpdateRecipientCount` globally.
+    - Bound `change` and `click` events to `input[name="mm_target_mode"]`.
+  - `src/View/frontend/portal/tab-services.php` & `assets/css/member-portal.css`:
+    - Configured `.mm-services-grid` with `grid-template-columns: repeat(2, minmax(0, 1fr)) !important;` (2 columns per row).
+    - Enforced `align-items: flex-start !important; text-align: left !important;` on `.mm-service-card`, `.mm-service-card-header`, `.mm-service-title`, `.mm-service-price-pill`, and `.mm-service-card-body`.
+    - Pinned `.mm-service-card-footer` and button to the bottom using `margin-top: auto !important; width: 100% !important; align-self: stretch !important;`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 112 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+

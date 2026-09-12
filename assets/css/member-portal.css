@@ -1175,9 +1175,10 @@ a.az-edit-btn:hover {
 
 .mm-services-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px;
     align-items: stretch;
+    width: 100%;
 }
 
 .mm-service-card {
@@ -1188,8 +1189,12 @@ a.az-edit-btn:hover {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    align-items: flex-start;
+    text-align: left;
     transition: transform 0.2s, box-shadow 0.2s;
     box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    height: 100%;
+    box-sizing: border-box;
 }
 
 .mm-service-card:hover {
@@ -1204,6 +1209,11 @@ a.az-edit-btn:hover {
 }
 
 .mm-service-card-header {
+    width: 100%;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     margin-bottom: 14px;
 }
 
@@ -1221,6 +1231,7 @@ a.az-edit-btn:hover {
     letter-spacing: 0.04em;
     text-transform: uppercase;
     margin-bottom: 12px;
+    align-self: flex-start;
 }
 
 .mm-service-title {
@@ -1230,6 +1241,8 @@ a.az-edit-btn:hover {
     color: #1e293b;
     margin: 0 0 8px;
     line-height: 1.25;
+    text-align: left;
+    width: 100%;
 }
 
 .mm-service-price-pill {
@@ -1237,10 +1250,14 @@ a.az-edit-btn:hover {
     font-weight: 700;
     color: #CC723F;
     margin-bottom: 14px;
+    text-align: left;
+    align-self: flex-start;
 }
 
 .mm-service-card-body {
     flex: 1 1 auto;
+    width: 100%;
+    text-align: left;
     margin-bottom: 24px;
 }
 
@@ -1249,10 +1266,13 @@ a.az-edit-btn:hover {
     color: #64748b;
     line-height: 1.6;
     margin: 0;
+    text-align: left;
 }
 
 .mm-service-card-footer {
     margin-top: auto;
+    width: 100%;
+    align-self: stretch;
 }
 
 .mm-service-cta-btn {

@@ -50,11 +50,76 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     </select>
 
     <input type="submit" class="button" value="<?php esc_attr_e('Filter', 'matchmaker'); ?>">
-    <button type="button" id="mm-export-pool-csv-btn" class="button button-secondary" style="margin-left: 8px;">
+    <button type="button" 
+            id="mm-export-pool-csv-btn" 
+            class="button button-secondary" 
+            data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>"
+            data-nonce="<?php echo esc_attr(wp_create_nonce('mm_admin_nonce')); ?>"
+            onclick="if(window.mmTriggerPoolExport){window.mmTriggerPoolExport(event);}else{window.mmFallbackExportPoolCsv && window.mmFallbackExportPoolCsv(this, event);}" 
+            style="margin-left: 8px;">
         📥 <?php esc_html_e('Export to CSV', 'matchmaker'); ?>
     </button>
     <span id="mm-export-csv-spinner" class="spinner" style="float:none; margin:0 0 0 6px; vertical-align:middle;"></span>
 </form>
+
+<script>
+window.mmFallbackExportPoolCsv = function(btn, e) {
+    if (e) e.preventDefault();
+    var form = btn.closest('form') || document.querySelector('form.mm-filter-bar');
+    var s = form ? (form.querySelector('input[name="s"]') ? form.querySelector('input[name="s"]').value : '') : '';
+    var gender = form ? (form.querySelector('select[name="filter_gender"]') ? form.querySelector('select[name="filter_gender"]').value : '') : '';
+    var tier = form ? (form.querySelector('select[name="filter_tier"]') ? form.querySelector('select[name="filter_tier"]').value : '') : '';
+    var oneOnOne = form ? (form.querySelector('select[name="filter_one_on_one"]') ? form.querySelector('select[name="filter_one_on_one"]').value : '') : '';
+    var parentApplying = form ? (form.querySelector('select[name="filter_parent_applying"]') ? form.querySelector('select[name="filter_parent_applying"]').value : '') : '';
+    
+    var ajaxUrl = btn.getAttribute('data-ajax-url') || '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
+    var nonce   = btn.getAttribute('data-nonce') || '<?php echo esc_js(wp_create_nonce('mm_admin_nonce')); ?>';
+    var spinner = document.getElementById('mm-export-csv-spinner');
+
+    btn.disabled = true;
+    if (spinner) spinner.classList.add('is-active');
+
+    var params = new URLSearchParams({
+        action: 'mm_export_pool_csv',
+        nonce: nonce,
+        s: s,
+        filter_gender: gender,
+        filter_tier: tier,
+        filter_one_on_one: oneOnOne,
+        filter_parent_applying: parentApplying
+    });
+
+    fetch(ajaxUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success && res.data && res.data.csv) {
+            var blob = new Blob([res.data.csv], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a');
+            var url  = URL.createObjectURL(blob);
+            link.href = url;
+            link.download = res.data.filename || 'candidates-export.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else {
+            var msg = (res && res.data && res.data.message) ? res.data.message : 'Export failed.';
+            alert(msg);
+        }
+    })
+    .catch(function(err) {
+        alert('Export error: ' + err.message);
+    })
+    .finally(function() {
+        btn.disabled = false;
+        if (spinner) spinner.classList.remove('is-active');
+    });
+};
+</script>
 
 <table class="wp-list-table widefat fixed striped">
     <thead>

@@ -48,11 +48,11 @@ $services     = class_exists('\Matchmaker\Core\PMProSync') ? \Matchmaker\Core\PM
         
         <div style="display:flex; gap:24px; margin-bottom:14px; flex-wrap:wrap;">
             <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#334155;">
-                <input type="radio" name="mm_target_mode" value="criteria" checked>
+                <input type="radio" id="mm_target_mode_criteria" name="mm_target_mode" value="criteria" checked onchange="window.mmToggleTargetMode('criteria')" onclick="window.mmToggleTargetMode('criteria')">
                 <?php esc_html_e('Segment by Criteria (Tier, Services, Application Type)', 'matchmaker'); ?>
             </label>
             <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:13px; color:#334155;">
-                <input type="radio" name="mm_target_mode" value="members">
+                <input type="radio" id="mm_target_mode_members" name="mm_target_mode" value="members" onchange="window.mmToggleTargetMode('members')" onclick="window.mmToggleTargetMode('members')">
                 <?php esc_html_e('Specific Members (Search & Select)', 'matchmaker'); ?>
             </label>
         </div>
@@ -174,3 +174,20 @@ $services     = class_exists('\Matchmaker\Core\PMProSync') ? \Matchmaker\Core\PM
         </div>
     </div>
 </div>
+
+<script>
+window.mmToggleTargetMode = function(mode) {
+    var criteriaWrap = document.getElementById('mm-audience-criteria-wrap');
+    var membersWrap  = document.getElementById('mm-audience-members-wrap');
+    if (mode === 'members') {
+        if (criteriaWrap) criteriaWrap.style.setProperty('display', 'none', 'important');
+        if (membersWrap)  membersWrap.style.setProperty('display', 'block', 'important');
+    } else {
+        if (membersWrap)  membersWrap.style.setProperty('display', 'none', 'important');
+        if (criteriaWrap) criteriaWrap.style.setProperty('display', 'flex', 'important');
+    }
+    if (typeof window.mmUpdateRecipientCount === 'function') {
+        window.mmUpdateRecipientCount();
+    }
+};
+</script>

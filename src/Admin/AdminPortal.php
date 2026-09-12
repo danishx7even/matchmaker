@@ -991,6 +991,15 @@ class AdminPortal
         $csv = \Matchmaker\Service\ExportService::instance()->generate_csv($filters);
         $filename = 'arabzawaj-candidates-export-' . gmdate('Y-m-d-His') . '.csv';
 
+        if (isset($_GET['download']) && $_GET['download'] === '1') {
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+            echo $csv;
+            exit;
+        }
+
         wp_send_json_success([
             'csv'      => $csv,
             'filename' => $filename,
