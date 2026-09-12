@@ -1387,3 +1387,31 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-12 — Task 74: Debug CSV Export, Fix Admin Settings Tabs, Format Services as Grid, and Verify Bulk Email
+
+- **Objective**:
+  1. Debug and fix Candidate Pool CSV Export: ensure filter data (search query, gender, tier, services, parent application) passes reliably via AJAX, nonces and URLs resolve smoothly, and CSV files download cleanly with UTF-8 BOM encoding.
+  2. Fix Admin Settings tabs switching: resolved fatal error in `tab-bulk-email.php` (`PMProSync::get_services_levels()`), cleaned tab switching JavaScript, and ensured smooth tab navigation across all 6 settings sections.
+  3. Format Services tab in Member Portal as a multi-column responsive CSS grid instead of a single-column list.
+  4. Verify and test the asynchronous Bulk Email system, Action Scheduler batch queueing, placeholder interpolation, and default template persistence.
+  5. Run the full automated test suite to confirm 100% test pass rate with zero regressions.
+- **Changes**:
+  - `src/View/admin/settings/tab-bulk-email.php`:
+    - Fixed undefined method call to `PMProSync::instance()->get_services_levels()` (resolving fatal error that broke tab rendering on the Settings screen).
+  - `matchmaker.php`:
+    - Bootstrapped `ExportService::instance()` and `BulkEmailService::instance()` singletons in `plugins_loaded` hook to ensure Action Scheduler background batch worker (`mm_process_bulk_email_batch`) is registered across all WordPress boots.
+  - `src/Admin/AdminPortal.php`:
+    - Updated `ajax_export_pool_csv()` to handle both POST and GET parameter structures for pool filtering (`s`, `filter_gender`, `filter_tier`, `filter_one_on_one`, `filter_parent_applying`).
+    - Localized `mm-admin-script` with complete AJAX credentials and feedback strings.
+  - `assets/js/admin-matchmaker.js`:
+    - Added resilient `getAjaxUrl()` and `getAdminNonce()` helper functions with multiple fallbacks.
+    - Updated `#mm-export-pool-csv-btn` handler with enhanced Blob generation, MS Blob support (`msSaveOrOpenBlob`), and programmatic link click triggers.
+    - Unified tab switching in `switchAdminSettingsTab()` and cleaned duplicate handlers.
+    - Updated all bulk email AJAX actions (`mm_count_email_recipients`, `mm_search_members_for_email`, `mm_send_bulk_email`, `mm_save_bulk_email_default`) to use `getAjaxUrl()` and `getAdminNonce()`.
+  - `src/View/frontend/portal/tab-services.php` & `assets/css/member-portal.css`:
+    - Added inline CSS grid layout to `.mm-services-grid` (`display: grid !important; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important; gap: 24px !important; width: 100% !important;`) and `.mm-service-card` (`display: flex !important; flex-direction: column !important; justify-content: space-between !important; height: 100% !important; margin: 0 !important;`) to ensure service cards render in an aesthetic multi-column grid across desktop and tablet views.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 112 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+

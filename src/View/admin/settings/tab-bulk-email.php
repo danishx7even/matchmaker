@@ -19,7 +19,7 @@ $bulk_service = \Matchmaker\Service\BulkEmailService::instance();
 $placeholders = $bulk_service->get_placeholders_guide();
 $default_sub  = $bulk_service->get_default_subject();
 $default_tpl  = $bulk_service->get_default_template();
-$services     = class_exists('\Matchmaker\Core\PMProSync') ? \Matchmaker\Core\PMProSync::instance()->get_all_services_levels() : [];
+$services     = class_exists('\Matchmaker\Core\PMProSync') ? \Matchmaker\Core\PMProSync::instance()->get_services_levels() : [];
 ?>
 
 <div class="mm-card" style="margin-bottom:24px; padding:24px; background:#fff; border:1px solid #ccd0d4; border-radius:8px;">

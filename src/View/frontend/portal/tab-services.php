@@ -29,7 +29,7 @@ $level_tags      = $sync->get_level_tags();
             </p>
         </div>
     <?php else : ?>
-        <div class="mm-services-grid">
+        <div class="mm-services-grid" style="display:grid !important; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)) !important; gap:24px !important; width:100% !important;">
             <?php foreach ($services as $srv) : 
                 $lvl_id = is_object($srv) ? (int) ($srv->id ?? 0) : (int) $srv;
                 if ($lvl_id <= 0) {
@@ -77,7 +77,7 @@ $level_tags      = $sync->get_level_tags();
                     ? pmpro_url('checkout', '?level=' . $lvl_id)
                     : add_query_arg('level', $lvl_id, $checkout_base);
             ?>
-                <div class="az-card mm-service-card <?php echo $is_active_for_user ? 'mm-service-active' : ''; ?>">
+                <div class="az-card mm-service-card <?php echo $is_active_for_user ? 'mm-service-active' : ''; ?>" style="display:flex !important; flex-direction:column !important; justify-content:space-between !important; height:100% !important; margin:0 !important;">
                     <div class="mm-service-card-header">
                         <?php if (!empty($custom_tag)) : ?>
                             <span class="mm-service-tag-badge">★ <?php echo esc_html($custom_tag); ?></span>

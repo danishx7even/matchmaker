@@ -981,11 +981,11 @@ class AdminPortal
         check_ajax_referer('mm_admin_nonce', 'nonce');
 
         $filters = [
-            'search'             => sanitize_text_field(wp_unslash($_POST['s'] ?? '')),
-            'gender'             => sanitize_text_field(wp_unslash($_POST['filter_gender'] ?? '')),
-            'user_type'          => sanitize_text_field(wp_unslash($_POST['filter_tier'] ?? '')),
-            'has_one_on_one'     => isset($_POST['filter_one_on_one']) && $_POST['filter_one_on_one'] !== '' ? sanitize_text_field(wp_unslash($_POST['filter_one_on_one'])) : '',
-            'is_parent_applying' => isset($_POST['filter_parent_applying']) && $_POST['filter_parent_applying'] !== '' ? sanitize_text_field(wp_unslash($_POST['filter_parent_applying'])) : '',
+            'search'             => sanitize_text_field(wp_unslash($_POST['s'] ?? $_GET['s'] ?? '')),
+            'gender'             => sanitize_text_field(wp_unslash($_POST['filter_gender'] ?? $_GET['filter_gender'] ?? '')),
+            'user_type'          => sanitize_text_field(wp_unslash($_POST['filter_tier'] ?? $_GET['filter_tier'] ?? '')),
+            'has_one_on_one'     => isset($_POST['filter_one_on_one']) && $_POST['filter_one_on_one'] !== '' ? sanitize_text_field(wp_unslash($_POST['filter_one_on_one'])) : (isset($_GET['filter_one_on_one']) && $_GET['filter_one_on_one'] !== '' ? sanitize_text_field(wp_unslash($_GET['filter_one_on_one'])) : ''),
+            'is_parent_applying' => isset($_POST['filter_parent_applying']) && $_POST['filter_parent_applying'] !== '' ? sanitize_text_field(wp_unslash($_POST['filter_parent_applying'])) : (isset($_GET['filter_parent_applying']) && $_GET['filter_parent_applying'] !== '' ? sanitize_text_field(wp_unslash($_GET['filter_parent_applying'])) : ''),
         ];
 
         $csv = \Matchmaker\Service\ExportService::instance()->generate_csv($filters);

@@ -136,7 +136,13 @@ add_action('plugins_loaded', static function (): void {
     // 9. Async matching engine (Action Scheduler hooks + weekly cron)
     \Matchmaker\Core\MatchingEngine::instance();
 
-    // 10. Admin portal (only needed in admin context, but safe to always init)
+    // 10. Candidate pool export service
+    \Matchmaker\Service\ExportService::instance();
+
+    // 11. Bulk email service (Action Scheduler batch worker)
+    \Matchmaker\Service\BulkEmailService::instance();
+
+    // 12. Admin portal (only needed in admin context, but safe to always init)
     if (is_admin()) {
         \Matchmaker\Admin\AdminPortal::instance();
     }

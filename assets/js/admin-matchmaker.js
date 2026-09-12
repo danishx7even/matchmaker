@@ -119,6 +119,27 @@
             openModal();
         });
 
+        function getAjaxUrl() {
+            if (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.ajax_url) {
+                return matchmakerAdmin.ajax_url;
+            }
+            if (typeof ajaxurl !== 'undefined') {
+                return ajaxurl;
+            }
+            return '/wp-admin/admin-ajax.php';
+        }
+
+        function getAdminNonce() {
+            if (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.nonce) {
+                return matchmakerAdmin.nonce;
+            }
+            var $wpnonce = $('#_wpnonce, input[name="_wpnonce"]');
+            if ($wpnonce.length) {
+                return $wpnonce.val();
+            }
+            return '';
+        }
+
         /* Settings Page Tab Switching */
         function switchAdminSettingsTab(tabKey) {
             if (!tabKey) return;
@@ -187,7 +208,7 @@
 
             var postData = {
                 action: 'mm_export_pool_csv',
-                nonce: (typeof matchmakerAdmin !== 'undefined' ? matchmakerAdmin.nonce : ''),
+                nonce: getAdminNonce(),
                 s: $form.find('input[name="s"]').val() || '',
                 filter_gender: $form.find('select[name="filter_gender"]').val() || '',
                 filter_tier: $form.find('select[name="filter_tier"]').val() || '',
@@ -195,12 +216,8 @@
                 filter_parent_applying: $form.find('select[name="filter_parent_applying"]').val() || ''
             };
 
-            var ajaxUrl = (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.ajax_url)
-                ? matchmakerAdmin.ajax_url
-                : (ajaxurl || '/wp-admin/admin-ajax.php');
-
             $.ajax({
-                url: ajaxUrl,
+                url: getAjaxUrl(),
                 type: 'POST',
                 data: postData,
                 dataType: 'json',
@@ -208,15 +225,19 @@
                     if (res && res.success && res.data && res.data.csv) {
                         try {
                             var blob = new Blob([res.data.csv], { type: 'text/csv;charset=utf-8;' });
-                            var link = document.createElement('a');
-                            var url  = URL.createObjectURL(blob);
-                            link.setAttribute('href', url);
-                            link.setAttribute('download', res.data.filename || 'candidates-export.csv');
-                            link.style.visibility = 'hidden';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
+                            if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                                window.navigator.msSaveOrOpenBlob(blob, res.data.filename || 'candidates-export.csv');
+                            } else {
+                                var link = document.createElement('a');
+                                var url  = URL.createObjectURL(blob);
+                                link.setAttribute('href', url);
+                                link.setAttribute('download', res.data.filename || 'candidates-export.csv');
+                                link.style.visibility = 'hidden';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                            }
                         } catch (err) {
                             alert('Export generation error: ' + err.message);
                         }
@@ -252,13 +273,10 @@
             clearTimeout(countDebounceTimer);
             countDebounceTimer = setTimeout(function () {
                 var targetMode = $('input[name="mm_target_mode"]:checked').val() || 'criteria';
-                var ajaxUrl = (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.ajax_url)
-                    ? matchmakerAdmin.ajax_url
-                    : (ajaxurl || '/wp-admin/admin-ajax.php');
 
                 var postData = {
                     action: 'mm_count_email_recipients',
-                    nonce: (typeof matchmakerAdmin !== 'undefined' ? matchmakerAdmin.nonce : ''),
+                    nonce: getAdminNonce(),
                     target_mode: targetMode,
                     tier: $('#mm_bulk_tier').val() || '',
                     service: $('#mm_bulk_service').val() || '',
@@ -266,7 +284,7 @@
                     member_ids: selectedMemberIds
                 };
 
-                $.post(ajaxUrl, postData, function (res) {
+                $.post(getAjaxUrl(), postData, function (res) {
                     if (res && res.success && typeof res.data.count !== 'undefined') {
                         $('#mm-recipient-count').text(res.data.count);
                     }
@@ -309,13 +327,9 @@
             }
 
             memberSearchTimer = setTimeout(function () {
-                var ajaxUrl = (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.ajax_url)
-                    ? matchmakerAdmin.ajax_url
-                    : (ajaxurl || '/wp-admin/admin-ajax.php');
-
-                $.post(ajaxUrl, {
+                $.post(getAjaxUrl(), {
                     action: 'mm_search_members_for_email',
-                    nonce: (typeof matchmakerAdmin !== 'undefined' ? matchmakerAdmin.nonce : ''),
+                    nonce: getAdminNonce(),
                     term: term
                 }, function (res) {
                     var $resultsBox = $('#mm-member-search-results');
@@ -433,13 +447,9 @@
             var subject    = $('#mm_bulk_subject').val() || '';
             var body       = getEmailBodyContent();
 
-            var ajaxUrl = (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.ajax_url)
-                ? matchmakerAdmin.ajax_url
-                : (ajaxurl || '/wp-admin/admin-ajax.php');
-
             var postData = {
                 action: 'mm_send_bulk_email',
-                nonce: (typeof matchmakerAdmin !== 'undefined' ? matchmakerAdmin.nonce : ''),
+                nonce: getAdminNonce(),
                 target_mode: targetMode,
                 tier: $('#mm_bulk_tier').val() || '',
                 service: $('#mm_bulk_service').val() || '',
@@ -450,7 +460,7 @@
             };
 
             $.ajax({
-                url: ajaxUrl,
+                url: getAjaxUrl(),
                 type: 'POST',
                 data: postData,
                 dataType: 'json',
@@ -487,16 +497,12 @@
             var subject = $('#mm_bulk_subject').val() || '';
             var body    = getEmailBodyContent();
 
-            var ajaxUrl = (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.ajax_url)
-                ? matchmakerAdmin.ajax_url
-                : (ajaxurl || '/wp-admin/admin-ajax.php');
-
             $.ajax({
-                url: ajaxUrl,
+                url: getAjaxUrl(),
                 type: 'POST',
                 data: {
                     action: 'mm_save_bulk_email_default',
-                    nonce: (typeof matchmakerAdmin !== 'undefined' ? matchmakerAdmin.nonce : ''),
+                    nonce: getAdminNonce(),
                     subject: subject,
                     template: body
                 },
