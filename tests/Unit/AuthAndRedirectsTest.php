@@ -120,5 +120,118 @@ class AuthAndRedirectsTest
             throw new \RuntimeException("Expected service checkout to redirect to /dashboard/, got: " . $srv_redirect);
         }
     }
+
+    public function test_pmpro_profile_fields_includes_username(): void
+    {
+        $fields = [
+            'first_name'   => 'First Name',
+            'last_name'    => 'Last Name',
+            'display_name' => 'Display Name',
+            'user_email'   => 'Email',
+        ];
+
+        $filtered = $this->auth->add_username_to_pmpro_profile_fields($fields);
+
+        if (!isset($filtered['user_login']) || $filtered['user_login'] !== 'Username') {
+            throw new \RuntimeException("Expected 'user_login' field with label 'Username' in PMPro profile fields");
+        }
+    }
+
+    public function test_username_change_rejects_spaces(): void
+    {
+        $user_id = 105;
+        $GLOBALS['__mm_users'][$user_id] = new FakeWP_User($user_id, 'Old User', 'user105@example.com', 'olduser');
+
+        $_POST['user_login'] = 'new username with space';
+        $errors = [];
+        $std_user = new \stdClass();
+        $std_user->ID = $user_id;
+
+        $this->auth->validate_and_save_pmpro_username_update($errors, true, $std_user);
+
+        if (empty($errors) || !str_contains($errors[0], 'spaces')) {
+            throw new \RuntimeException("Expected error rejecting spaces in username, got: " . json_encode($errors));
+        }
+
+        unset($_POST['user_login']);
+    }
+
+    public function test_username_change_rejects_duplicates(): void
+    {
+        $user_id_1 = 106;
+        $user_id_2 = 107;
+        $GLOBALS['__mm_users'][$user_id_1] = new FakeWP_User($user_id_1, 'Existing User', 'user106@example.com', 'existinguser');
+        $GLOBALS['__mm_users'][$user_id_2] = new FakeWP_User($user_id_2, 'Current User', 'user107@example.com', 'currentuser');
+
+        $_POST['user_login'] = 'existinguser';
+        $errors = [];
+        $std_user = new \stdClass();
+        $std_user->ID = $user_id_2;
+
+        $this->auth->validate_and_save_pmpro_username_update($errors, true, $std_user);
+
+        if (empty($errors) || !str_contains($errors[0], 'taken')) {
+            throw new \RuntimeException("Expected error rejecting taken username, got: " . json_encode($errors));
+        }
+
+        unset($_POST['user_login']);
+    }
+
+    public function test_username_change_rejects_short_or_invalid(): void
+    {
+        $user_id = 108;
+        $GLOBALS['__mm_users'][$user_id] = new FakeWP_User($user_id, 'Valid User', 'user108@example.com', 'validuser');
+
+        // Test < 3 chars
+        $_POST['user_login'] = 'ab';
+        $errors = [];
+        $std_user = new \stdClass();
+        $std_user->ID = $user_id;
+
+        $this->auth->validate_and_save_pmpro_username_update($errors, true, $std_user);
+        if (empty($errors) || !str_contains($errors[0], 'between 3 and 60')) {
+            throw new \RuntimeException("Expected error for short username, got: " . json_encode($errors));
+        }
+
+        // Test invalid chars (e.g. #$%)
+        $_POST['user_login'] = 'invalid#user%';
+        $errors = [];
+        $this->auth->validate_and_save_pmpro_username_update($errors, true, $std_user);
+        if (empty($errors) || !str_contains($errors[0], 'invalid characters')) {
+            throw new \RuntimeException("Expected error for invalid username characters, got: " . json_encode($errors));
+        }
+
+        unset($_POST['user_login']);
+    }
+
+    public function test_username_change_updates_login_and_nicename_safely(): void
+    {
+        $user_id = 109;
+        $GLOBALS['__mm_users'][$user_id] = new FakeWP_User($user_id, 'Old Username', 'user109@example.com', 'oldusername');
+        $GLOBALS['__mm_current_user_id'] = $user_id;
+
+        $_POST['user_login'] = 'new-awesome-username';
+        $errors = [];
+        $std_user = new \stdClass();
+        $std_user->ID = $user_id;
+
+        $this->auth->validate_and_save_pmpro_username_update($errors, true, $std_user);
+
+        if (!empty($errors)) {
+            throw new \RuntimeException("Expected no errors on valid username update, got: " . json_encode($errors));
+        }
+
+        $updated_user = $GLOBALS['__mm_users'][$user_id];
+        if ($updated_user->user_login !== 'new-awesome-username') {
+            throw new \RuntimeException("Expected user_login to be 'new-awesome-username', got: " . $updated_user->user_login);
+        }
+
+        if ($updated_user->user_nicename !== 'new-awesome-username') {
+            throw new \RuntimeException("Expected user_nicename to be 'new-awesome-username', got: " . ($updated_user->user_nicename ?? ''));
+        }
+
+        unset($_POST['user_login']);
+    }
 }
+
 

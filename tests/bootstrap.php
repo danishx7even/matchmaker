@@ -106,16 +106,21 @@ function delete_user_meta($user_id, $key) {
 
 class FakeWP_User {
     public int $ID = 0;
+    public string $user_login = '';
+    public string $user_nicename = '';
     public string $display_name = '';
     public string $first_name = '';
+    public string $last_name = '';
     public string $user_email = '';
     public string $user_registered = '';
     public array $roles = ['subscriber'];
 
-    public function __construct(int $id = 0, string $name = 'Test User', string $email = 'test@example.com') {
+    public function __construct(int $id = 0, string $name = 'Test User', string $email = 'test@example.com', string $login = '') {
         $this->ID = $id;
         $this->display_name = $name;
         $this->user_email = $email;
+        $this->user_login = $login ?: ($id > 0 ? "user_{$id}" : 'testuser');
+        $this->user_nicename = $this->user_login;
     }
 
     public function exists(): bool {
@@ -244,7 +249,39 @@ function email_exists($email) {
 }
 
 function username_exists($username) {
+    if (empty($username)) return false;
+    foreach ($GLOBALS['__mm_users'] as $u) {
+        if (isset($u->user_login) && strcasecmp((string)$u->user_login, (string)$username) === 0) {
+            return (int) $u->ID;
+        }
+    }
     return false;
+}
+
+function validate_username($username) {
+    return !empty($username) && preg_match('/^[a-zA-Z0-9_\-\.@]+$/', (string)$username);
+}
+
+function sanitize_user($username, $strict = false) {
+    $raw = is_string($username) ? trim($username) : '';
+    return preg_replace('/[^a-zA-Z0-9_\-\.@]/', '', $raw);
+}
+
+function sanitize_title($title, $fallback_title = '', $context = 'save') {
+    return strtolower(trim(preg_replace('/[^a-zA-Z0-9_\-]+/', '-', (string)$title), '-'));
+}
+
+function clean_user_cache($user_id) {
+    return true;
+}
+
+function wp_set_auth_cookie($user_id, $remember = false, $secure = '', $token = '') {
+    return true;
+}
+
+function wp_set_current_user($id, $name = '') {
+    $GLOBALS['__mm_current_user_id'] = (int) $id;
+    return get_userdata($id);
 }
 
 function is_email($email) {
@@ -924,6 +961,15 @@ class Fakewpdb {
 
     public function update($table, $data, $where, $format = null, $where_format = null): int {
         $this->queries[] = "UPDATE {$table}";
+        if ($table === $this->users && isset($where['ID']) && isset($GLOBALS['__mm_users'][$where['ID']])) {
+            $u = $GLOBALS['__mm_users'][$where['ID']];
+            if (isset($data['user_login'])) {
+                $u->user_login = $data['user_login'];
+            }
+            if (isset($data['user_nicename'])) {
+                $u->user_nicename = $data['user_nicename'];
+            }
+        }
         return 1;
     }
 

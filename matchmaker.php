@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
 // Plugin constants
 // =============================================================================
 
-define('MM_VERSION',  '2.9.0');
+define('MM_VERSION',  '2.10.0');
 define('MM_PATH',     plugin_dir_path(__FILE__));
 define('MM_URL',      plugin_dir_url(__FILE__));
 define('MM_SRC_PATH', MM_PATH . 'src/');

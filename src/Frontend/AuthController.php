@@ -58,6 +58,9 @@ class AuthController
         add_filter('show_admin_bar',                       [$this, 'custom_hide_admin_bar_for_subscribers']);
         add_action('wp_footer',                            [$this, 'custom_pmpro_login_page_design']);
         add_action('profile_update',                       [$this, 'redirect_after_pmpro_profile_update'], 99, 3);
+        add_filter('pmpro_member_profile_edit_user_object_fields', [$this, 'add_username_to_pmpro_profile_fields'], 10, 1);
+        add_action('pmpro_user_profile_update_errors',             [$this, 'validate_and_save_pmpro_username_update'], 10, 3);
+        add_action('user_profile_update_errors',                   [$this, 'validate_and_save_wp_username_update'], 10, 3);
     }
 
     /**
@@ -371,9 +374,233 @@ class AuthController
             if (forgotLink) {
                 forgotLink.textContent = '<?php echo esc_js(__('Forget password', 'matchmaker')); ?>';
             }
+
+            /* PMPro Profile Edit Username Field Enhancements */
+            var usernameInput = document.querySelector('#member-profile-edit input[name="user_login"], #pmpro_member_profile_edit input[name="user_login"], input#user_login');
+            if (usernameInput) {
+                usernameInput.setAttribute('pattern', '^[a-zA-Z0-9_\\-\\.]+$');
+                usernameInput.setAttribute('minlength', '3');
+                usernameInput.setAttribute('maxlength', '60');
+                usernameInput.setAttribute('placeholder', '<?php echo esc_js(__('Enter username', 'matchmaker')); ?>');
+                
+                var parentField = usernameInput.closest('.pmpro_form_field') || usernameInput.parentElement;
+                if (parentField && !parentField.querySelector('.mm-username-hint')) {
+                    var hint = document.createElement('p');
+                    hint.className = 'pmpro_form_hint mm-username-hint';
+                    hint.style.cssText = 'font-size: 12px; color: #6B7280; margin-top: 4px;';
+                    hint.textContent = '<?php echo esc_js(__('No spaces allowed. Use letters, numbers, underscores, dashes, and periods.', 'matchmaker')); ?>';
+                    parentField.appendChild(hint);
+                }
+
+                usernameInput.addEventListener('keydown', function (e) {
+                    if (e.key === ' ' || e.keyCode === 32) {
+                        e.preventDefault();
+                    }
+                });
+
+                usernameInput.addEventListener('input', function () {
+                    this.value = this.value.replace(/\s+/g, '');
+                });
+            }
         });
         </script>
         <?php
+    }
+
+    /**
+     * Add Username field to PMPro frontend member profile edit fields list.
+     *
+     * @param array<string, string> $fields
+     * @return array<string, string>
+     */
+    public function add_username_to_pmpro_profile_fields(array $fields): array
+    {
+        $ordered = [];
+        foreach ($fields as $key => $label) {
+            if ($key === 'display_name') {
+                $ordered['user_login'] = __('Username', 'matchmaker');
+            }
+            $ordered[$key] = $label;
+        }
+        if (!isset($ordered['user_login'])) {
+            $ordered['user_login'] = __('Username', 'matchmaker');
+        }
+        return $ordered;
+    }
+
+    /**
+     * Validate and safely save username updates on PMPro member profile edit form.
+     *
+     * @param mixed     $errors Array or WP_Error object passed by reference.
+     * @param bool      $update Whether this is an update.
+     * @param \stdClass $user   User object passed by reference.
+     * @return void
+     */
+    public function validate_and_save_pmpro_username_update(mixed &$errors, bool $update, \stdClass &$user): void
+    {
+        if (!$update || empty($user->ID)) {
+            return;
+        }
+
+        $user_id = (int) $user->ID;
+        $current_user_data = get_userdata($user_id);
+        if (!$current_user_data) {
+            return;
+        }
+
+        // Retrieve submitted username
+        $submitted_username = '';
+        if (isset($_POST['user_login'])) {
+            $submitted_username = (string) wp_unslash($_POST['user_login']);
+        } elseif (isset($_POST['username'])) {
+            $submitted_username = (string) wp_unslash($_POST['username']);
+        } elseif (isset($user->user_login)) {
+            $submitted_username = (string) $user->user_login;
+        }
+
+        $submitted_username = trim($submitted_username);
+        if ($submitted_username === '') {
+            return;
+        }
+
+        $current_login = (string) $current_user_data->user_login;
+        if (strcasecmp($submitted_username, $current_login) === 0 && $submitted_username === $current_login) {
+            return; // No change
+        }
+
+        // 1. Check for spaces
+        if (preg_match('/\s/', $submitted_username)) {
+            $msg = __('Username cannot contain spaces.', 'matchmaker');
+            $this->add_profile_error($errors, 'username_spaces', $msg);
+            return;
+        }
+
+        // 2. Check length (min 3, max 60)
+        if (mb_strlen($submitted_username) < 3 || mb_strlen($submitted_username) > 60) {
+            $msg = __('Username must be between 3 and 60 characters long.', 'matchmaker');
+            $this->add_profile_error($errors, 'username_length', $msg);
+            return;
+        }
+
+        // 3. Check format validity
+        if (!validate_username($submitted_username)) {
+            $msg = __('Username contains invalid characters.', 'matchmaker');
+            $this->add_profile_error($errors, 'username_invalid', $msg);
+            return;
+        }
+
+        // 4. Check database for existing username
+        $existing_user_id = username_exists($submitted_username);
+        if ($existing_user_id && (int) $existing_user_id !== $user_id) {
+            $msg = __('This username is already taken. Please choose another.', 'matchmaker');
+            $this->add_profile_error($errors, 'username_exists', $msg);
+            return;
+        }
+
+        // 5. If there are other errors already accumulated, don't execute update yet
+        $has_errors = is_array($errors) ? !empty($errors) : (is_object($errors) && method_exists($errors, 'has_errors') && $errors->has_errors());
+        if ($has_errors) {
+            return;
+        }
+
+        // 6. Safe database update of user_login and user_nicename on wp_users
+        global $wpdb;
+        $sanitized_login    = sanitize_user($submitted_username, true);
+        $sanitized_nicename = sanitize_title($sanitized_login);
+
+        if (empty($sanitized_login)) {
+            $msg = __('Username contains invalid characters.', 'matchmaker');
+            $this->add_profile_error($errors, 'username_invalid', $msg);
+            return;
+        }
+
+        $updated = $wpdb->update(
+            $wpdb->users,
+            [
+                'user_login'    => $sanitized_login,
+                'user_nicename' => $sanitized_nicename,
+            ],
+            ['ID' => $user_id],
+            ['%s', '%s'],
+            ['%d']
+        );
+
+        if ($updated === false) {
+            $msg = __('Could not update username. Please try again.', 'matchmaker');
+            $this->add_profile_error($errors, 'username_db_error', $msg);
+            return;
+        }
+
+        // Clear user cache in WordPress core
+        clean_user_cache($user_id);
+
+        // Update $user object reference
+        $user->user_login = $sanitized_login;
+
+        // If updating the currently logged-in user, refresh auth cookie and session
+        if ($user_id === get_current_user_id()) {
+            if (function_exists('wp_set_auth_cookie')) {
+                wp_set_auth_cookie($user_id, true);
+            }
+            if (function_exists('wp_set_current_user')) {
+                wp_set_current_user($user_id);
+            }
+        }
+
+        // Log the change
+        \Matchmaker\Repository\MatchRepository::instance()->log_event(
+            'profile',
+            'username_updated',
+            sprintf(__('Username updated to %s', 'matchmaker'), $sanitized_login),
+            sprintf(__('User #%d changed username from "%s" to "%s".', 'matchmaker'), $user_id, $current_login, $sanitized_login),
+            [
+                'user_id'      => $user_id,
+                'old_username' => $current_login,
+                'new_username' => $sanitized_login,
+            ],
+            null,
+            $user_id,
+            $current_user_data->user_email,
+            'info'
+        );
+    }
+
+    /**
+     * Intercept standard WordPress profile update errors.
+     *
+     * @param mixed $errors
+     * @param bool  $update
+     * @param mixed $user
+     * @return void
+     */
+    public function validate_and_save_wp_username_update(mixed &$errors, bool $update, mixed &$user): void
+    {
+        if (is_object($user) && isset($user->ID)) {
+            $std_user = new \stdClass();
+            $std_user->ID = (int) $user->ID;
+            $std_user->user_login = isset($user->user_login) ? (string) $user->user_login : '';
+            $this->validate_and_save_pmpro_username_update($errors, $update, $std_user);
+            if (isset($std_user->user_login)) {
+                $user->user_login = $std_user->user_login;
+            }
+        }
+    }
+
+    /**
+     * Helper to append error messages to array or WP_Error.
+     *
+     * @param mixed  $errors
+     * @param string $code
+     * @param string $message
+     * @return void
+     */
+    private function add_profile_error(mixed &$errors, string $code, string $message): void
+    {
+        if (is_array($errors)) {
+            $errors[] = $message;
+        } elseif (is_object($errors) && method_exists($errors, 'add')) {
+            $errors->add($code, $message);
+        }
     }
 
     /**

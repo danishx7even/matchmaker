@@ -1446,3 +1446,40 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-12 — Task 76: Searchable Select Dropdowns (Location / Origin) & PMPro Username Change Field
+
+- **Objective**:
+  1. Convert select fields into searchable dropdowns wherever Country, State, City, Citizenship, and Origin (Ethnicity) are loaded across questionnaire forms and wizards with instant client-side search filtering.
+  2. Add a new "Username" field to the PMPro member profile edit form (`[pmpro_member_profile_edit]`) allowing members to change their username.
+  3. Enforce frontend validation (no spaces, pattern `^[a-zA-Z0-9_\-\.]+$`, min length 3, max length 60, real-time space blocking).
+  4. Enforce strict backend validation: verify no spaces, length constraints, character format, and duplicate check against the database (`username_exists()`).
+  5. Perform safe database updates on `$wpdb->users` (`user_login` and `user_nicename`), clear user cache (`clean_user_cache()`), refresh authentication cookies for the current session without corrupting user IDs or meta, and log profile events.
+- **Changes**:
+  - `matchmaker.php`:
+    - Bumped `MM_VERSION` to `'2.10.0'` for instant browser cache busting of form styles and scripts.
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `select()`, `multiselect()`, and `range_select()` to automatically inject `.custom-select-search-wrap` with `.custom-select-search-input` when option lists exceed 5 options (or when flagged as searchable).
+  - `assets/js/matchmaking-form.js`:
+    - Enhanced `initSingleSelect()` to filter `.custom-select-option` items in real-time as users type into `.custom-select-search-input` (with case-insensitive substring matching and empty-state messaging).
+    - Updated `updateCustomSelect()` to dynamically recreate search containers and rebind search handlers when cascading updates (Country -> State -> City) take place.
+    - Enhanced multiselect handler (`.custom-multiselect-wrapper`) to filter `.custom-select-checkbox-option` items in real-time.
+    - Managed focus, keydown events (`Escape`), and stopped event propagation to prevent dropdown dismissal during typing.
+  - `assets/css/matchmaking-form.css`:
+    - Added styles for `.custom-select-search-wrap` (sticky at top, `#ffffff` background, border `#e8ded0`), `.custom-select-search-input` (brand focused styling `#CC723F`), and `.custom-select-no-results`.
+  - `src/Frontend/AuthController.php`:
+    - Hooked `pmpro_member_profile_edit_user_object_fields` via `add_username_to_pmpro_profile_fields()` to insert the `user_login` field into the PMPro edit profile form.
+    - Hooked `pmpro_user_profile_update_errors` and `user_profile_update_errors` via `validate_and_save_pmpro_username_update()` and `validate_and_save_wp_username_update()`.
+    - Implemented whitespace checks, length checks, format checks (`validate_username()`), database duplicate validation (`username_exists()`), safe DB updates on `$wpdb->users` (`user_login`, `user_nicename`), `clean_user_cache()`, session cookie refresh (`wp_set_auth_cookie()`, `wp_set_current_user()`), and audit logging (`MatchRepository::log_event()`).
+    - Added frontend script and CSS hints in `custom_pmpro_login_page_design()` enforcing pattern validation and preventing space input.
+  - `tests/bootstrap.php`:
+    - Added user authentication and sanitization stubs (`validate_username()`, `sanitize_user()`, `sanitize_title()`, `clean_user_cache()`, `wp_set_auth_cookie()`, `wp_set_current_user()`, updated `username_exists()` and `FakeWP_User`).
+  - `tests/Unit/LocationCascadeTest.php`:
+    - Added `test_searchable_select_markup_rendering()` verifying search wrapper markup for country, origin, and citizenship fields.
+  - `tests/Unit/AuthAndRedirectsTest.php`:
+    - Added tests for PMPro profile field inclusion, whitespace rejection, duplicate username rejection, short/invalid username rejection, and safe `user_login` & `user_nicename` updates.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 118 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+

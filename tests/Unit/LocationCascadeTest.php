@@ -122,5 +122,27 @@ final class LocationCascadeTest extends TestCase
         $this->assertContains('Moroccan', $pref_origins);
         $this->assertGreaterThan(50, count($pref_origins));
     }
+
+    public function test_searchable_select_markup_rendering(): void
+    {
+        $fg = FieldGenerator::instance();
+
+        // 1. Country field (user_country) has >5 items, should render search input
+        $country_html = $fg->render_single_field('user_country', ['user_country' => 'United States']);
+        $this->assertStringContainsString('custom-select-search-wrap', $country_html);
+        $this->assertStringContainsString('custom-select-search-input', $country_html);
+        $this->assertStringContainsString('has-search', $country_html);
+
+        // 2. Origin field (user_origin) has ethnicity items, should render search input
+        $origin_html = $fg->render_single_field('user_origin', ['user_origin' => 'Egyptian']);
+        $this->assertStringContainsString('custom-select-search-wrap', $origin_html);
+        $this->assertStringContainsString('custom-select-search-input', $origin_html);
+
+        // 3. Citizenship multiselect (pref_citizenship) should render search input
+        $pref_cit_html = $fg->render_single_field('pref_citizenship', ['pref_citizenship' => 'Saudi Arabia']);
+        $this->assertStringContainsString('custom-select-search-wrap', $pref_cit_html);
+        $this->assertStringContainsString('custom-select-search-input', $pref_cit_html);
+    }
 }
+
 

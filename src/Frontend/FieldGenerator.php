@@ -490,9 +490,10 @@ class FieldGenerator {
     private function date(string $name, $value = ''): string { return '<input type="date" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-field-textual" value="' . esc_attr((string)$value) . '" required>'; }
     private function textarea(string $name, string $placeholder = '', int $rows = 2, $value = ''): string { return '<textarea class="elementor-field-textual elementor-field elementor-size-sm" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" rows="' . (int)$rows . '" placeholder="' . esc_attr($placeholder) . '" required>' . esc_textarea((string)$value) . '</textarea>'; }
 
-    private function select(string $name, array $options, $selected_val = ''): string {
+    private function select(string $name, array $options, $selected_val = '', bool $searchable = false): string {
         $field_id = 'form-field-' . $name;
         $current  = (string) $selected_val !== '' ? (string) $selected_val : ($options[0] ?? '');
+        $is_searchable = $searchable || count($options) > 5;
         $html = '<div class="elementor-field elementor-select-wrapper remove-before">';
         $html .= '<div class="custom-select-wrapper">';
         $html .= '<select name="form_fields[' . esc_attr($name) . ']" id="' . esc_attr($field_id) . '" class="elementor-field-textual elementor-size-sm" required>';
@@ -506,7 +507,10 @@ class FieldGenerator {
         $html .= '</select>';
         $is_placeholder_display = (preg_match('/^select\b/i', trim($current)) === 1 || empty($current));
         $html .= '<div class="custom-select-display' . ($is_placeholder_display ? ' placeholder' : '') . '">' . esc_html($current) . '</div>';
-        $html .= '<div class="custom-select-options">';
+        $html .= '<div class="custom-select-options' . ($is_searchable ? ' has-search' : '') . '">';
+        if ($is_searchable) {
+            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" /></div>';
+        }
         foreach ($options as $i => $opt) {
             $is_ph = (preg_match('/^select\b/i', trim($opt)) === 1);
             $sel_class = ($opt === $current) ? ' selected' : '';
@@ -517,9 +521,10 @@ class FieldGenerator {
         return $html;
     }
 
-    private function multiselect(string $name, array $options, string $placeholder, $selected_values = []): string {
+    private function multiselect(string $name, array $options, string $placeholder, $selected_values = [], bool $searchable = false): string {
         $field_id = 'form-field-' . $name;
         $selected_arr = is_array($selected_values) ? $selected_values : array_filter(array_map('trim', explode(',', (string)$selected_values)));
+        $is_searchable = $searchable || count($options) > 5;
         $html = '<div class="elementor-field elementor-select-wrapper remove-before">';
         $html .= '<div class="custom-select-wrapper custom-multiselect-wrapper">';
         $html .= '<select name="form_fields[' . esc_attr($name) . '][]" id="' . esc_attr($field_id) . '" multiple class="elementor-field-textual elementor-size-sm" required>';
@@ -532,7 +537,10 @@ class FieldGenerator {
         $display_text = $count > 0 ? implode(', ', $selected_arr) : $placeholder;
         $has_val = $count > 0;
         $html .= '<div class="custom-select-display' . ($has_val ? '' : ' placeholder') . '" data-placeholder="' . esc_attr($placeholder) . '" title="' . esc_attr($display_text) . '">' . esc_html($display_text) . '</div>';
-        $html .= '<div class="custom-select-options">';
+        $html .= '<div class="custom-select-options' . ($is_searchable ? ' has-search' : '') . '">';
+        if ($is_searchable) {
+            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" /></div>';
+        }
         foreach ($options as $i => $opt) {
             $checked = in_array($opt, $selected_arr, true) ? ' checked' : '';
             $html .= '<label class="custom-select-checkbox-option"><input type="checkbox" data-index="' . (int)$i . '"' . $checked . '> ' . esc_html($opt) . '</label>';
@@ -568,6 +576,7 @@ class FieldGenerator {
     }
 
     private function range_select(string $name, array $options, string $placeholder, $selected_val = ''): string {
+        $is_searchable = count($options) > 10;
         $html = '<div class="custom-select-wrapper">';
         $html .= '<select name="form_fields[' . esc_attr($name) . ']" class="elementor-field-textual elementor-size-sm" required>';
         $html .= '<option value="">' . esc_html($placeholder) . '</option>';
@@ -579,7 +588,10 @@ class FieldGenerator {
         $is_set = !empty($selected_val);
         $display = $is_set ? (string)$selected_val : $placeholder;
         $html .= '<div class="custom-select-display' . ($is_set ? '' : ' placeholder') . '">' . esc_html($display) . '</div>';
-        $html .= '<div class="custom-select-options">';
+        $html .= '<div class="custom-select-options' . ($is_searchable ? ' has-search' : '') . '">';
+        if ($is_searchable) {
+            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" /></div>';
+        }
         $html .= '<div class="custom-select-option' . (!$is_set ? ' selected' : '') . '" data-index="0">' . esc_html($placeholder) . '</div>';
         foreach ($options as $i => $opt) {
             $sel = ((string)$opt === (string)$selected_val) ? ' selected' : '';

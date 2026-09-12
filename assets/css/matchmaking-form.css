@@ -29,6 +29,10 @@
 #matchmaking_form .custom-select-wrapper.open .custom-select-display{border-bottom-color:#a8895a;}
 #matchmaking_form .custom-select-options{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #e0d8c8;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:50;display:none;padding:4px 0;}
 #matchmaking_form .custom-select-wrapper.open .custom-select-options{display:block;}
+#matchmaking_form .custom-select-search-wrap{position:sticky;top:0;background:#ffffff;z-index:10;padding:6px 8px;border-bottom:1px solid #e8ded0;}
+#matchmaking_form .custom-select-search-input{width:100% !important;box-sizing:border-box !important;padding:7px 10px !important;font-size:13px !important;color:#1D1E20 !important;background:#FAF8F5 !important;border:1px solid #ddd3c2 !important;border-radius:6px !important;outline:none !important;transition:border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;}
+#matchmaking_form .custom-select-search-input:focus{border-color:#CC723F !important;background:#ffffff !important;box-shadow:0 0 0 2px rgba(204, 114, 63, 0.15) !important;}
+#matchmaking_form .custom-select-no-results{padding:10px 14px;font-size:13px;color:#888;text-align:center;font-style:italic;}
 #matchmaking_form .custom-select-option{padding:8px 14px;font-size:14px;color:#333;cursor:pointer;}
 #matchmaking_form .custom-select-option:hover,
 #matchmaking_form .custom-select-option.selected{background:#CC723F;color:#fff;}
