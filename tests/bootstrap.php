@@ -107,6 +107,7 @@ function delete_user_meta($user_id, $key) {
 class FakeWP_User {
     public int $ID = 0;
     public string $display_name = '';
+    public string $first_name = '';
     public string $user_email = '';
     public string $user_registered = '';
     public array $roles = ['subscriber'];
@@ -189,6 +190,10 @@ function is_user_logged_in(): bool {
 function current_user_can($cap): bool {
     $uid = get_current_user_id();
     return user_can($uid, $cap);
+}
+
+function wp_generate_password(int $length = 12, bool $special_chars = true, bool $extra_special_chars = false): string {
+    return substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, $length);
 }
 
 function wp_create_user($username, $password, $email) {
@@ -764,7 +769,8 @@ function pmpro_hasMembershipLevel($levels = null, $user_id = null): bool {
 
 function pmpro_getMembershipLevelForUser(int $user_id) {
     if (isset($GLOBALS['__mm_user_pmpro_level'][$user_id])) {
-        $lvl_id = (int) $GLOBALS['__mm_user_pmpro_level'][$user_id];
+        $val = $GLOBALS['__mm_user_pmpro_level'][$user_id];
+        $lvl_id = is_object($val) ? (int) ($val->id ?? 0) : (int) $val;
         return $lvl_id > 0 ? new FakePMProLevel($lvl_id, 'Level ' . $lvl_id) : null;
     }
     if (isset($GLOBALS['__mm_pmpro_levels'][$user_id])) {
@@ -794,7 +800,8 @@ function pmpro_getMembershipLevelsForUser(int $user_id) {
         return $GLOBALS['__mm_user_pmpro_levels'][$user_id];
     }
     if (isset($GLOBALS['__mm_user_pmpro_level'][$user_id])) {
-        $lvl_id = (int) $GLOBALS['__mm_user_pmpro_level'][$user_id];
+        $val = $GLOBALS['__mm_user_pmpro_level'][$user_id];
+        $lvl_id = is_object($val) ? (int) ($val->id ?? 0) : (int) $val;
         return $lvl_id > 0 ? [new FakePMProLevel($lvl_id, 'Level ' . $lvl_id)] : [];
     }
     $single = pmpro_getMembershipLevelForUser($user_id);

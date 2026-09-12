@@ -57,6 +57,13 @@ class AdminPortal
         add_action('admin_init',            [$this, 'enforce_matchmaker_admin_screen_restrictions']);
         add_action('admin_init',            [$this, 'handle_admin_actions']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
+
+        // AJAX handlers for Candidate Export & Bulk Email System
+        add_action('wp_ajax_mm_export_pool_csv',          [$this, 'ajax_export_pool_csv']);
+        add_action('wp_ajax_mm_search_members_for_email', [$this, 'ajax_search_members_for_email']);
+        add_action('wp_ajax_mm_count_email_recipients',   [$this, 'ajax_count_email_recipients']);
+        add_action('wp_ajax_mm_send_bulk_email',          [$this, 'ajax_send_bulk_email']);
+        add_action('wp_ajax_mm_save_bulk_email_default',  [$this, 'ajax_save_bulk_email_default']);
     }
 
     /**
@@ -215,6 +222,24 @@ class AdminPortal
             ['jquery'],
             $version,
             true
+        );
+
+        wp_localize_script(
+            'mm-admin-script',
+            'matchmakerAdmin',
+            [
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce'    => wp_create_nonce('mm_admin_nonce'),
+                'strings'  => [
+                    'exporting'      => __('Generating CSV export...', 'matchmaker'),
+                    'export_success' => __('CSV downloaded successfully.', 'matchmaker'),
+                    'export_error'   => __('Failed to export CSV. Please try again.', 'matchmaker'),
+                    'sending'        => __('Queueing campaign...', 'matchmaker'),
+                    'saving'         => __('Saving default template...', 'matchmaker'),
+                    'confirm_send'   => __('Are you sure you want to queue this bulk email campaign?', 'matchmaker'),
+                    'no_recipients'  => __('No recipients matched the selected criteria.', 'matchmaker'),
+                ],
+            ]
         );
     }
 
@@ -941,5 +966,198 @@ class AdminPortal
         }
 
         require dirname(__DIR__) . '/View/admin/logs/logs.php';
+    }
+
+    /**
+     * AJAX: Export Candidate Pool to CSV.
+     *
+     * @return void
+     */
+    public function ajax_export_pool_csv(): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'matchmaker')], 403);
+        }
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        $filters = [
+            'search'             => sanitize_text_field(wp_unslash($_POST['s'] ?? '')),
+            'gender'             => sanitize_text_field(wp_unslash($_POST['filter_gender'] ?? '')),
+            'user_type'          => sanitize_text_field(wp_unslash($_POST['filter_tier'] ?? '')),
+            'has_one_on_one'     => isset($_POST['filter_one_on_one']) && $_POST['filter_one_on_one'] !== '' ? sanitize_text_field(wp_unslash($_POST['filter_one_on_one'])) : '',
+            'is_parent_applying' => isset($_POST['filter_parent_applying']) && $_POST['filter_parent_applying'] !== '' ? sanitize_text_field(wp_unslash($_POST['filter_parent_applying'])) : '',
+        ];
+
+        $csv = \Matchmaker\Service\ExportService::instance()->generate_csv($filters);
+        $filename = 'arabzawaj-candidates-export-' . gmdate('Y-m-d-His') . '.csv';
+
+        wp_send_json_success([
+            'csv'      => $csv,
+            'filename' => $filename,
+        ]);
+    }
+
+    /**
+     * AJAX: Search members for bulk email recipient tag autocomplete.
+     *
+     * @return void
+     */
+    public function ajax_search_members_for_email(): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'matchmaker')], 403);
+        }
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        $term = sanitize_text_field(wp_unslash($_POST['term'] ?? ''));
+        if (strlen($term) < 1) {
+            wp_send_json_success(['results' => []]);
+        }
+
+        global $wpdb;
+        $users_table = $wpdb->users;
+        $like = '%' . $wpdb->esc_like($term) . '%';
+
+        $results = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT ID, display_name, user_email, user_login 
+                 FROM {$users_table} 
+                 WHERE ID = %d 
+                    OR display_name LIKE %s 
+                    OR user_email LIKE %s 
+                    OR user_login LIKE %s 
+                 LIMIT 20",
+                is_numeric($term) ? (int) $term : 0,
+                $like,
+                $like,
+                $like
+            )
+        );
+
+        $repo = MatchRepository::instance();
+        $items = [];
+        if (!empty($results)) {
+            foreach ($results as $u) {
+                $uid = (int) $u->ID;
+                $user_type = ProfileService::instance()->get_user_type($uid);
+                $tier_label = $repo->format_tier_label($user_type);
+                $items[] = [
+                    'id'        => $uid,
+                    'name'      => $u->display_name ?: $u->user_login,
+                    'email'     => $u->user_email,
+                    'user_type' => $tier_label,
+                ];
+            }
+        }
+
+        wp_send_json_success(['results' => $items]);
+    }
+
+    /**
+     * AJAX: Count recipients matching current bulk email criteria.
+     *
+     * @return void
+     */
+    public function ajax_count_email_recipients(): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'matchmaker')], 403);
+        }
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        $bulk_service = \Matchmaker\Service\BulkEmailService::instance();
+        $target_mode  = sanitize_key($_POST['target_mode'] ?? 'criteria');
+
+        $raw_member_ids = $_POST['member_ids'] ?? [];
+        if (is_string($raw_member_ids)) {
+            $raw_member_ids = array_filter(array_map('intval', explode(',', $raw_member_ids)));
+        }
+
+        $args = [
+            'mode'            => $target_mode,
+            'tier'            => sanitize_key($_POST['tier'] ?? ''),
+            'service'         => sanitize_text_field(wp_unslash($_POST['service'] ?? '')),
+            'parent_applying' => isset($_POST['parent_applying']) ? sanitize_text_field(wp_unslash($_POST['parent_applying'])) : '',
+            'member_ids'      => is_array($raw_member_ids) ? $raw_member_ids : [],
+        ];
+
+        $recipients = $bulk_service->resolve_recipients($args);
+        wp_send_json_success(['count' => count($recipients)]);
+    }
+
+    /**
+     * AJAX: Dispatch/Queue bulk email campaign.
+     *
+     * @return void
+     */
+    public function ajax_send_bulk_email(): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'matchmaker')], 403);
+        }
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        $bulk_service = \Matchmaker\Service\BulkEmailService::instance();
+        $target_mode  = sanitize_key($_POST['target_mode'] ?? 'criteria');
+        $subject      = sanitize_text_field(wp_unslash($_POST['subject'] ?? ''));
+        $template     = wp_kses_post(wp_unslash($_POST['template'] ?? ''));
+
+        if (empty(trim($subject))) {
+            wp_send_json_error(['message' => __('Please enter an email subject.', 'matchmaker')]);
+        }
+        if (empty(trim($template))) {
+            wp_send_json_error(['message' => __('Please enter email content.', 'matchmaker')]);
+        }
+
+        $raw_member_ids = $_POST['member_ids'] ?? [];
+        if (is_string($raw_member_ids)) {
+            $raw_member_ids = array_filter(array_map('intval', explode(',', $raw_member_ids)));
+        }
+
+        $args = [
+            'mode'            => $target_mode,
+            'tier'            => sanitize_key($_POST['tier'] ?? ''),
+            'service'         => sanitize_text_field(wp_unslash($_POST['service'] ?? '')),
+            'parent_applying' => isset($_POST['parent_applying']) ? sanitize_text_field(wp_unslash($_POST['parent_applying'])) : '',
+            'member_ids'      => is_array($raw_member_ids) ? $raw_member_ids : [],
+        ];
+
+        $recipients = $bulk_service->resolve_recipients($args);
+        if (empty($recipients)) {
+            wp_send_json_error(['message' => __('No recipients matched the selected criteria.', 'matchmaker')]);
+        }
+
+        $result = $bulk_service->queue_bulk_email($recipients, $subject, $template);
+        if (!empty($result['success'])) {
+            wp_send_json_success($result);
+        } else {
+            wp_send_json_error(['message' => $result['message'] ?? __('Failed to queue bulk emails.', 'matchmaker')]);
+        }
+    }
+
+    /**
+     * AJAX: Save custom template as persistent default.
+     *
+     * @return void
+     */
+    public function ajax_save_bulk_email_default(): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'matchmaker')], 403);
+        }
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        $subject  = sanitize_text_field(wp_unslash($_POST['subject'] ?? ''));
+        $template = wp_kses_post(wp_unslash($_POST['template'] ?? ''));
+
+        if (empty(trim($subject))) {
+            wp_send_json_error(['message' => __('Subject line cannot be empty.', 'matchmaker')]);
+        }
+        if (empty(trim($template))) {
+            wp_send_json_error(['message' => __('Template content cannot be empty.', 'matchmaker')]);
+        }
+
+        \Matchmaker\Service\BulkEmailService::instance()->save_default_template($subject, $template);
+        wp_send_json_success(['message' => __('Default bulk email template saved successfully.', 'matchmaker')]);
     }
 }

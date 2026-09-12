@@ -16,6 +16,7 @@ final class PortalAndEventsTest extends TestCase
         unset($_POST['tab'], $_POST['nonce'], $_POST['page']);
         $GLOBALS['__mm_options'] = [];
         $GLOBALS['__mm_user_pmpro_level'] = [];
+        $GLOBALS['__mm_user_pmpro_levels'] = [];
         $GLOBALS['__mm_pmpro_levels'] = [];
     }
 
@@ -106,6 +107,12 @@ final class PortalAndEventsTest extends TestCase
         $_POST['tab']   = 'events';
         $_POST['page']  = 1;
 
+        $event_level = new \FakePMProLevel(2, 'Event Pass');
+        $GLOBALS['__mm_pmpro_levels'][2] = $event_level;
+        $GLOBALS['__mm_user_pmpro_level'][1] = 2;
+        $GLOBALS['__mm_user_pmpro_levels'][1] = [$event_level];
+        update_option('mm_pmpro_tier_mapping', [2 => 'event']);
+
         update_user_meta(1, 'user_type', 'event');
         update_user_meta(1, 'az_user_type', 'event');
 
@@ -123,6 +130,55 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('mm-events-container', $response['data']['html'] ?? '');
         $this->assertStringContainsString('mm-events-grid', $response['data']['html'] ?? '');
         $this->assertStringContainsString('Upcoming Events &amp; Mixers', $response['data']['html'] ?? '');
+    }
+
+    public function test_ajax_reload_tab_events_blocked_for_free_members(): void
+    {
+        $controller = PortalController::instance();
+        $_POST['nonce'] = wp_create_nonce('mm_portal_nonce');
+        $_POST['tab']   = 'events';
+        $_POST['page']  = 1;
+
+        // Ensure user 1 is free tier
+        unset($GLOBALS['__mm_user_pmpro_level'][1]);
+        update_user_meta(1, 'user_type', 'free');
+        update_user_meta(1, 'az_user_type', 'free');
+
+        ob_start();
+        try {
+            $controller->handle_ajax_reload_tab();
+        } catch (\Exception $e) {
+            // wp_send_json_error throws in mock
+        }
+        $output = ob_get_clean();
+        $response = json_decode($output, true);
+
+        $this->assertFalse($response['success'] ?? true);
+        $this->assertStringContainsString('reserved', $response['data']['message'] ?? '');
+    }
+
+    public function test_free_tier_portal_hides_events_tab(): void
+    {
+        $user_id = 902;
+        $user_type = 'free';
+        $is_premium = false;
+        $user = new \FakeWP_User($user_id, 'Free Member', 'free@example.com');
+        $unread_count = 0;
+        $photos = [];
+        $meta = [];
+        $stats = [];
+        $pool = null;
+        $repo = MatchRepository::instance();
+        $dashboard_url = 'https://example.com/dashboard/';
+        $matches = [];
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/portal.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-tab="profile"', $html);
+        $this->assertStringNotContainsString('data-tab="events"', $html);
+        $this->assertStringNotContainsString('id="mm-tab-events"', $html);
     }
 
     public function test_events_settings_options_save_and_retrieve(): void

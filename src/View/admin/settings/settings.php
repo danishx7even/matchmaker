@@ -77,6 +77,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <a href="#tab-emails" class="nav-tab" data-tab="emails">
             ✉️ <?php esc_html_e('Email Templates', 'matchmaker'); ?>
         </a>
+        <a href="#tab-bulk-email" class="nav-tab" data-tab="bulk-email">
+            📨 <?php esc_html_e('Bulk Email', 'matchmaker'); ?>
+        </a>
         <a href="#tab-shortcodes" class="nav-tab" data-tab="shortcodes">
             📖 <?php esc_html_e('Shortcodes & System', 'matchmaker'); ?>
         </a>
@@ -529,7 +532,14 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         </div>
 
         <!-- ==========================================
-             TAB 5: SHORTCODES & SYSTEM REFERENCE
+             TAB 5: BULK EMAIL CAMPAIGN
+             ========================================== -->
+        <div class="mm-settings-tab-panel" id="mm-panel-bulk-email" style="display:none;">
+            <?php require __DIR__ . '/tab-bulk-email.php'; ?>
+        </div>
+
+        <!-- ==========================================
+             TAB 6: SHORTCODES & SYSTEM REFERENCE
              ========================================== -->
         <div class="mm-settings-tab-panel" id="mm-panel-shortcodes" style="display:none;">
             <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
@@ -547,23 +557,28 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     <tbody>
                         <tr>
                             <td><code>[matchmaker_member_portal]</code></td>
-                            <td><?php esc_html_e('Primary Member Portal dashboard with Profile, Matches, Events, and Services tabs.', 'matchmaker'); ?></td>
-                            <td><code>/dashboard/</code></td>
+                            <td><?php esc_html_e('Member matchmaking portal with Profile & Matches tabs.', 'matchmaker'); ?></td>
+                            <td>Member Dashboard Page</td>
                         </tr>
                         <tr>
                             <td><code>[az_profile]</code></td>
-                            <td><?php esc_html_e('Backward-compatibility alias for member portal dashboard.', 'matchmaker'); ?></td>
-                            <td><code>/dashboard/</code></td>
+                            <td><?php esc_html_e('Alias shortcode for the member matchmaking portal.', 'matchmaker'); ?></td>
+                            <td>Member Dashboard Page</td>
                         </tr>
                         <tr>
                             <td><code>[matchmaking_form]</code></td>
-                            <td><?php esc_html_e('Full 37-field matchmaking questionnaire wizard with step navigation and photo uploads.', 'matchmaker'); ?></td>
-                            <td><code>/personal-matchmaking-questionnaire/</code></td>
+                            <td><?php esc_html_e('Interactive 37-field multi-step matchmaking questionnaire wizard.', 'matchmaker'); ?></td>
+                            <td>Questionnaire Page</td>
                         </tr>
                         <tr>
                             <td><code>[matchmaking_field field="..."]</code></td>
-                            <td><?php esc_html_e('Renders a single standalone matchmaking field input.', 'matchmaker'); ?></td>
-                            <td>Any page / Elementor block</td>
+                            <td><?php esc_html_e('Renders a single standalone profile questionnaire field.', 'matchmaker'); ?></td>
+                            <td>Any page or Elementor block</td>
+                        </tr>
+                        <tr>
+                            <td><code>[az_email_verification]</code></td>
+                            <td><?php esc_html_e('Renders the 6-digit email confirmation code submission form.', 'matchmaker'); ?></td>
+                            <td>Email Verification Page</td>
                         </tr>
                         <tr>
                             <td><code>[logout_url]</code></td>
@@ -575,7 +590,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             </div>
         </div>
 
-        <p class="submit" style="margin-top: 24px;">
+        <p class="submit" id="mm-main-submit-row" style="margin-top: 24px;">
             <input type="submit" name="mm_save_settings" class="button button-primary button-large" value="<?php esc_attr_e('Save All Settings', 'matchmaker'); ?>">
         </p>
     </form>
@@ -594,6 +609,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     function initSettingsTabs() {
         var tabLinks = document.querySelectorAll('.mm-settings-tab-wrapper a.nav-tab');
         var panels   = document.querySelectorAll('.mm-settings-tab-panel');
+        var submitRow = document.getElementById('mm-main-submit-row');
 
         if (!tabLinks.length || !panels.length) {
             return;
@@ -623,6 +639,10 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 
             targetPanel.style.display = 'block';
             targetPanel.classList.add('active');
+
+            if (submitRow) {
+                submitRow.style.display = (cleanKey === 'bulk-email') ? 'none' : 'block';
+            }
 
             if (window.history && window.history.replaceState) {
                 window.history.replaceState(null, null, '#tab-' + cleanKey);

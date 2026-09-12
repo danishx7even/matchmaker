@@ -1,11 +1,11 @@
 # Matchmaker Plugin — Active Task Plan
 
-**Task**: None (System Idle)
+**Task**: None
 
 **Status**: `IDLE`
 
 ## Objectives
-- Awaiting next user instruction or feature request.
+No active task currently running. Ready for new instructions.
 
 ## Checklist
-- [ ] No active tasks currently running.
+- [ ] Awaiting new user instruction

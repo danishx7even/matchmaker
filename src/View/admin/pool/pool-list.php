@@ -50,6 +50,10 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     </select>
 
     <input type="submit" class="button" value="<?php esc_attr_e('Filter', 'matchmaker'); ?>">
+    <button type="button" id="mm-export-pool-csv-btn" class="button button-secondary" style="margin-left: 8px;">
+        📥 <?php esc_html_e('Export to CSV', 'matchmaker'); ?>
+    </button>
+    <span id="mm-export-csv-spinner" class="spinner" style="float:none; margin:0 0 0 6px; vertical-align:middle;"></span>
 </form>
 
 <table class="wp-list-table widefat fixed striped">

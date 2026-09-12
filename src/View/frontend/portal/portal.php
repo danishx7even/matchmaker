@@ -53,9 +53,11 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
                 <?php esc_html_e('Matches', 'matchmaker'); ?>
                 <span class="mm-tab-badge <?php echo $unread_count > 0 ? '' : 'mm-hidden'; ?>" <?php echo $unread_count > 0 ? '' : 'style="display:none;"'; ?>><?php echo (int) $unread_count; ?></span>
             </button>
-            <button type="button" class="nav-tab" data-tab="events" role="tab">
-                <?php esc_html_e('Events', 'matchmaker'); ?>
-            </button>
+            <?php if ($user_type !== 'free') : ?>
+                <button type="button" class="nav-tab" data-tab="events" role="tab">
+                    <?php esc_html_e('Events', 'matchmaker'); ?>
+                </button>
+            <?php endif; ?>
             <button type="button" class="nav-tab" data-tab="services" role="tab">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px;">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
@@ -95,10 +97,12 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
         <?php include __DIR__ . '/tab-matches.php'; ?>
     </div>
 
-    <!-- TAB 3: EVENTS VIEW -->
-    <div class="portal-tab-panel" id="mm-tab-events" style="display:none;">
-        <?php include __DIR__ . '/tab-events.php'; ?>
-    </div>
+    <?php if ($user_type !== 'free') : ?>
+        <!-- TAB 3: EVENTS VIEW -->
+        <div class="portal-tab-panel" id="mm-tab-events" style="display:none;">
+            <?php include __DIR__ . '/tab-events.php'; ?>
+        </div>
+    <?php endif; ?>
 
     <!-- TAB 4: SERVICES VIEW -->
     <div class="portal-tab-panel" id="mm-tab-services" style="display:none;">

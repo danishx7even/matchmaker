@@ -233,6 +233,9 @@ class PortalController
         if ($tab === 'matches') {
             $html = $this->render_matches_html($user_id, $user_type);
         } elseif ($tab === 'events') {
+            if ($user_type === 'free') {
+                wp_send_json_error(['message' => __('Events are reserved for Event and Monthly members.', 'matchmaker')]);
+            }
             $html = $this->render_events_html($user_id, $user_type, $page);
         } elseif ($tab === 'services') {
             $html = $this->render_services_html($user_id, $user_type);

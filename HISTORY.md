@@ -1332,6 +1332,58 @@ This document maintains a chronological, step-by-step history of all features, a
   - `src/View/admin/pool/user-single.php`:
     - Updated single user profile header badges to use `.mm-badge-parent` and `.mm-badge-service`.
 - **Verification**:
-  - Executed automated test runner (`tests/run_tests.php`) — all 103 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+---
+
+## 2026-09-12 — Task 73: Candidate Pool CSV Member Export, Asynchronous Bulk Email System, and Free Tier Events Gating
+
+- **Objective**:
+  1. **Candidate Pool CSV Member Export**:
+     - Allow administrators to export member profile data in CSV format from the Candidate Pool Browser (`admin.php?page=matchmaking-pool`).
+     - Include full profile information: personal details (name, email, phone, gender, age, birth date, location, origin, religion, modesty, job, smoking, drinking, prayer, marital status, children, education, income, social links), partner preferences (gender, age, location, citizenship, origin, religion, modesty, height, smoking, drinking, marital status, children, education, income, additional info), base membership tier, active purchased services, and match statistics.
+     - Human-readable column headers and UTF-8 BOM encoding for seamless Excel compatibility.
+     - Respect active pool filters (search keyword, gender, tier, services, parent applying) or export all candidate profiles.
+     - Non-blocking asynchronous browser download via AJAX Blob generation without page freezing.
+  2. **Asynchronous Bulk Email System in Settings**:
+     - Add a dedicated "📨 Bulk Email" tab to the Admin Settings page (`admin.php?page=matchmaking-settings`).
+     - Dual audience targeting modes: Criteria segmentation (by membership tier, active services, application type) vs. Individual member selection (autocomplete search chips).
+     - Dynamic recipient count badge recalculation in real-time.
+     - Subject line input and HTML email content editor (`wp_editor`).
+     - Clickable dynamic personalization placeholder pills (`{name}`, `{first_name}`, `{email}`, `{user_type}`, `{services}`, `{dashboard_url}`, `{login_url}`, `{site_name}`, `{site_url}`).
+     - Asynchronous batch dispatching using Action Scheduler (`mm_process_bulk_email_batch`, chunk size: 20, 20s staggered intervals) with comprehensive audit logging in `wp_matchmaker_logs`.
+     - "Save as Default Template" feature to persist customized default subject and body for future campaigns.
+  3. **Strict Free Tier Events Gating**:
+     - Gate the Events tab on the Member Portal so it is completely hidden from Free tier members (even if they have purchased an add-on service).
+     - Reject direct AJAX tab reload requests for `events` when the user's tier is `free`.
+- **Changes**:
+  - `src/Service/ExportService.php` (New):
+    - Singleton service handling candidate pool queries with active filters, human-readable column definitions (46 columns), formatted row mapping, and UTF-8 BOM CSV generation (`\xEF\xBB\xBF`).
+  - `src/Service/BulkEmailService.php` (New):
+    - Singleton service handling targeted recipient resolution (by criteria or explicit member IDs), dynamic template placeholder interpolation, persistent default subject & template management, and chunked batch scheduling via Action Scheduler with audit logging to `wp_matchmaker_logs`.
+  - `src/View/admin/settings/tab-bulk-email.php` (New):
+    - Pure PHP view template providing audience segmentation controls, member chip search, placeholder cheat sheet pills, `wp_editor` for HTML content, recipient counter badge, and AJAX action buttons.
+  - `src/Admin/AdminPortal.php`:
+    - Registered 5 new AJAX endpoints: `mm_export_pool_csv`, `mm_search_members_for_email`, `mm_count_email_recipients`, `mm_send_bulk_email`, and `mm_save_bulk_email_default`.
+    - Localized `mm-admin-script` with `ajax_url`, `nonce`, and UI notification strings.
+  - `src/View/admin/pool/pool-list.php`:
+    - Added "📥 Export to CSV" button and spinner alongside the filter controls.
+  - `src/View/admin/settings/settings.php`:
+    - Added "📨 Bulk Email" tab to the navigation bar and rendered `tab-bulk-email.php` inside `#mm-panel-bulk-email`.
+    - Configured tab switching logic to hide the general "Save All Settings" button on the bulk email tab to prevent user confusion.
+  - `src/View/frontend/portal/portal.php` & `src/Frontend/PortalController.php`:
+    - Wrapped Events tab button and tab container in `<?php if ($user_type !== 'free') : ?>`.
+    - Gated `handle_ajax_reload_tab()` to reject `events` requests with a localized error message if `$user_type === 'free'`.
+  - `assets/js/admin-matchmaker.js` & `assets/css/admin-matchmaker.css`:
+    - Implemented client-side CSV export download via dynamic Blob link creation.
+    - Implemented audience mode radio toggle, debounced recipient counter calculation, autocomplete member search dropdown, chip add/remove tags, placeholder insertion into TinyMCE/textarea, and AJAX dispatchers for sending bulk email and saving default templates.
+    - Added styling for member chip badges, search dropdown results, placeholder pill hover states, and active spinners.
+  - `tests/Unit/ExportAndBulkEmailTest.php` (New):
+    - Comprehensive unit test suite for `ExportService` (headers, row formatting, BOM) and `BulkEmailService` (defaults, placeholders, interpolation, recipient resolution, queueing, and batch logging).
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added unit tests verifying Free tier members are blocked from AJAX reloading the events tab and the events tab is omitted from their member portal canvas.
+  - `tests/bootstrap.php` & `tests/run_tests.php`:
+    - Added `wp_generate_password()` stub, `FakeWP_User::$first_name`, enhanced PMPro level mock handling, and registered `ExportAndBulkEmailTest`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 112 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
 ---
+

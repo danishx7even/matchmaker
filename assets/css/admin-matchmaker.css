@@ -310,3 +310,72 @@ a {
     from { opacity: 0; transform: translateY(3px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* =============================================================
+   Bulk Email & Export UI Components
+   ============================================================= */
+.mm-member-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.mm-remove-chip {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #0284c7;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+}
+.mm-remove-chip:hover {
+    color: #dc2626;
+}
+
+.mm-search-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+    transition: background 0.15s ease;
+}
+.mm-search-item:last-child {
+    border-bottom: none;
+}
+.mm-search-item:hover {
+    background: #f8fafc;
+}
+.mm-search-item .mm-search-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+.mm-search-item .mm-search-meta {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.mm-placeholder-pill:hover {
+    background: #FAF5F0 !important;
+    border-color: #CC723F !important;
+    color: #CC723F !important;
+}
+
+#mm-export-csv-spinner.is-active,
+#mm-bulk-email-spinner.is-active {
+    visibility: visible;
+}
+
