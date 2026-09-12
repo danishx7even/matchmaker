@@ -202,4 +202,26 @@ class ProfileService {
 
         return home_url('/membership-checkout/?pmpro_level=' . $level_id);
     }
+
+    /**
+     * Get pricing / levels URL for membership selection.
+     *
+     * @return string
+     */
+    public function get_pricing_url(): string {
+        $page_id = (int) get_option('mm_page_pricing_id', 0);
+        if ($page_id > 0) {
+            $link = get_permalink($page_id);
+            if (!empty($link)) {
+                return $link;
+            }
+        }
+        if (function_exists('pmpro_url')) {
+            $pmpro_levels = pmpro_url('levels');
+            if (!empty($pmpro_levels)) {
+                return $pmpro_levels;
+            }
+        }
+        return home_url('/membership-levels/');
+    }
 }

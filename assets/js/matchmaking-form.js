@@ -581,7 +581,19 @@
         var requiredInputs = step.querySelectorAll('input[type="text"], input[type="email"], input[type="date"], select, textarea');
         for (var i = 0; i < requiredInputs.length; i++) {
             var input = requiredInputs[i];
-            if (input.type === 'file') continue;
+            if (input.type === 'file' || input.classList.contains('custom-select-search-input') || input.hasAttribute('data-ignore-validation') || !input.name || input.disabled) {
+                continue;
+            }
+            if (input.tagName && input.tagName.toLowerCase() === 'select' && input.multiple) {
+                if ((!input.selectedOptions || input.selectedOptions.length === 0) && !input.value) {
+                    input.focus();
+                    var label = input.closest('.elementor-field-group') ? input.closest('.elementor-field-group').querySelector('.elementor-field-label') : null;
+                    var fieldName = label ? label.textContent.replace('*', '').trim() : 'field';
+                    showMessage('Please provide your ' + fieldName + ' before proceeding.', 'error');
+                    return false;
+                }
+                continue;
+            }
             var val = input.value ? input.value.trim() : '';
             if (!val || val === '' || /^select\b/i.test(val)) {
                 input.focus();

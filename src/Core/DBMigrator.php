@@ -32,6 +32,7 @@ class DBMigrator {
     {
         $self = self::instance();
         $self->maybe_migrate();
+        \Matchmaker\Core\PMProSync::instance()->sync_all_users_user_types();
         \Matchmaker\Admin\AdminPortal::register_role_and_caps();
     }
 
@@ -40,7 +41,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.7.0';
+        $new_version = '2.8.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -211,6 +212,9 @@ class DBMigrator {
             // Auto backfill has_one_on_one from user_type = 'one_on_one'
             $wpdb->query("UPDATE {$pool_table} SET has_one_on_one = 1 WHERE user_type = 'one_on_one'");
         }
+
+        // Synchronize all user types strictly to base tiers ('free', 'monthly', 'event')
+        \Matchmaker\Core\PMProSync::instance()->sync_all_users_user_types();
 
         update_option($option_name, $new_version);
         // Maintain legacy numeric option for older code/tests expecting this.

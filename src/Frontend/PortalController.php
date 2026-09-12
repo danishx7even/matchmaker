@@ -116,6 +116,12 @@ class PortalController
         $user_id  = get_current_user_id();
         $user_obj = wp_get_current_user();
 
+        // Gating: If user has active services but NO base membership, show locked profile screen
+        $pmpro_sync = \Matchmaker\Core\PMProSync::instance();
+        if ($pmpro_sync->has_active_one_on_one_service($user_id) && !$pmpro_sync->has_active_base_membership($user_id)) {
+            return $this->render_locked_profile_screen($user_id);
+        }
+
         // Email Verification Gating: Unverified members must enter 6-digit code
         if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
             $verify_service = \Matchmaker\Service\EmailVerificationService::instance();
@@ -351,5 +357,34 @@ class PortalController
         ob_start();
         include __DIR__ . '/../View/frontend/portal/tab-services.php';
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the locked profile screen when a user has active services but no base membership.
+     *
+     * @param int $user_id
+     * @return string
+     */
+    public function render_locked_profile_screen(int $user_id): string
+    {
+        $levels_url      = \Matchmaker\Service\ProfileService::instance()->get_pricing_url();
+        $active_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($user_id);
+        $service_names   = !empty($active_services) ? array_column($active_services, 'name') : ['Service'];
+        $service_str     = implode(', ', $service_names);
+
+        $html = '<div class="mm-portal-wrap mm-profile-locked-wrap" style="max-width:680px; margin:40px auto; font-family:-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;">';
+        $html .= '<div class="az-card" style="background:#ffffff; border-radius:16px; border:2px solid #F59E0B; padding:48px 32px; text-align:center; box-shadow:0 10px 25px rgba(245, 158, 11, 0.1);">';
+        $html .= '<div style="width:72px; height:72px; background:#FEF3C7; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; font-size:32px; color:#D97706;">🔒</div>';
+        $html .= '<h2 style="font-family:\'Cormorant SC\', serif; font-size:26px; font-weight:700; color:#1e293b; margin:0 0 12px 0;">' . esc_html__('Base Membership Required', 'matchmaker') . '</h2>';
+        $html .= '<div style="background:#FFFBEB; border-left:4px solid #F59E0B; border-radius:8px; padding:14px 18px; margin:0 auto 24px; max-width:540px; text-align:left;">';
+        $html .= '<p style="margin:0; font-size:14px; line-height:1.5; color:#92400E;"><strong>' . esc_html__('Active Add-on Service:', 'matchmaker') . '</strong> ' . esc_html($service_str) . '</p>';
+        $html .= '</div>';
+        $html .= '<p style="max-width:520px; margin:0 auto 24px; color:#64748b; font-size:15px; line-height:1.6;">' . esc_html__('You have an active add-on service, but an active base membership plan (Free, Monthly, or Event) is required to access your matchmaking profile, matches, and questionnaire.', 'matchmaker') . '</p>';
+        $html .= '<div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">';
+        $html .= '<a href="' . esc_url($levels_url) . '" class="btn btn-primary" style="display:inline-block; padding:12px 28px; background:#CC723F; color:#ffffff; text-decoration:none; border-radius:8px; font-weight:600; font-size:15px; transition:background 0.2s;">' . esc_html__('Select a Membership Plan →', 'matchmaker') . '</a>';
+        $html .= '</div>';
+        $html .= '</div></div>';
+
+        return $html;
     }
 }

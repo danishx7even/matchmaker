@@ -600,7 +600,7 @@ class PMProSync {
             return $okay;
         }
 
-        // If user has active services, check if cancelling this level leaves them with NO base membership
+        // If user has active services, strictly block cancelling if it leaves them with no base membership
         if ($this->has_active_one_on_one_service($user_id)) {
             $remaining_base_levels = 0;
             if (function_exists('pmpro_getMembershipLevelsForUser')) {
@@ -624,6 +624,43 @@ class PMProSync {
         }
 
         return $okay;
+    }
+
+    /**
+     * Checks whether the user has an active base membership level (Free, Monthly, or Event).
+     *
+     * @param int $user_id
+     * @return bool
+     */
+    public function has_active_base_membership(int $user_id): bool
+    {
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        if (function_exists('pmpro_getMembershipLevelsForUser')) {
+            $levels = pmpro_getMembershipLevelsForUser($user_id);
+            if (is_array($levels) && !empty($levels)) {
+                foreach ($levels as $lvl) {
+                    $lid = is_object($lvl) ? (int) ($lvl->id ?? 0) : (int) $lvl;
+                    if ($lid > 0 && !$this->is_service_level($lid)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        if (function_exists('pmpro_getMembershipLevelForUser')) {
+            $membership = pmpro_getMembershipLevelForUser($user_id);
+            if (is_object($membership) && !empty($membership->id)) {
+                return !$this->is_service_level((int) $membership->id);
+            }
+        }
+
+        // Fallback for non-PMPro environment
+        $meta_type = (string) get_user_meta($user_id, 'user_type', true);
+        return in_array($meta_type, ['free', 'monthly', 'event'], true);
     }
 
     /**
@@ -1045,5 +1082,54 @@ class PMProSync {
             update_user_meta($user_id, 'cycle_matches_count', 0);
             update_user_meta($user_id, 'mm_cycle_month', gmdate('Y-m'));
         }
+    }
+
+    /**
+     * Synchronizes all users in the system to ensure their user_type is strictly 'free', 'monthly', or 'event',
+     * and their mm_has_one_on_one meta is accurately set based on active PMPro services.
+     *
+     * @return int Number of users synchronized.
+     */
+    public function sync_all_users_user_types(): int
+    {
+        global $wpdb;
+
+        $user_ids = [];
+
+        if (!empty($wpdb->users)) {
+            $user_ids = $wpdb->get_col("SELECT ID FROM {$wpdb->users}");
+        }
+
+        if (empty($user_ids) && function_exists('get_users')) {
+            $users = get_users(['fields' => 'ID']);
+            if (is_array($users)) {
+                $user_ids = array_map('intval', $users);
+            }
+        }
+
+        $count = 0;
+        foreach ($user_ids as $uid) {
+            $user_id = (int) $uid;
+            if ($user_id <= 0) {
+                continue;
+            }
+
+            $resolved_user_type = $this->get_current_user_type($user_id);
+            if (!in_array($resolved_user_type, ['free', 'monthly', 'event'], true)) {
+                $resolved_user_type = 'free';
+            }
+
+            $has_one_on_one = $this->has_active_one_on_one_service($user_id);
+
+            \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
+            update_user_meta($user_id, 'mm_has_one_on_one', $has_one_on_one ? 1 : 0);
+
+            \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
+            \Matchmaker\Repository\MatchRepository::instance()->update_pool_one_on_one($user_id, $has_one_on_one);
+
+            $count++;
+        }
+
+        return $count;
     }
 }

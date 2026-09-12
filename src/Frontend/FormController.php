@@ -216,6 +216,12 @@ class FormController {
 
         $user_id = get_current_user_id();
 
+        // Gating: If user has active services but NO base membership, show locked profile screen
+        $pmpro_sync = \Matchmaker\Core\PMProSync::instance();
+        if ($pmpro_sync->has_active_one_on_one_service($user_id) && !$pmpro_sync->has_active_base_membership($user_id)) {
+            return \Matchmaker\Frontend\PortalController::instance()->render_locked_profile_screen($user_id);
+        }
+
         // Email Verification Gating: Unverified members must enter 6-digit code
         if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
             $verify_service = \Matchmaker\Service\EmailVerificationService::instance();

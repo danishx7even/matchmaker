@@ -61,6 +61,11 @@ class AuthController
         add_filter('pmpro_member_profile_edit_user_object_fields', [$this, 'add_username_to_pmpro_profile_fields'], 10, 1);
         add_action('pmpro_user_profile_update_errors',             [$this, 'validate_and_save_pmpro_username_update'], 10, 3);
         add_action('user_profile_update_errors',                   [$this, 'validate_and_save_wp_username_update'], 10, 3);
+        add_action('pmpro_checkout_after_email',                   [$this, 'render_checkout_privacy_policy_checkbox']);
+        add_action('pmpro_checkout_after_user_fields',              [$this, 'render_checkout_privacy_policy_checkbox']);
+        add_filter('pmpro_registration_checks',                    [$this, 'check_privacy_policy_consent'], 20, 1);
+        add_action('pmpro_after_checkout',                         [$this, 'save_privacy_policy_consent_on_checkout'], 10, 2);
+        add_action('user_register',                                [$this, 'save_privacy_policy_consent_on_user_register'], 10, 1);
     }
 
     /**
@@ -631,6 +636,159 @@ class AuthController
                     exit;
                 }
             }
+        }
+    }
+
+    /**
+     * Render the Privacy Policy consent checkbox on the PMPro checkout page.
+     *
+     * @return void
+     */
+    public function render_checkout_privacy_policy_checkbox(): void
+    {
+        static $rendered = false;
+        if ($rendered) {
+            return;
+        }
+        $rendered = true;
+
+        $checked = (!empty($_REQUEST['privacy_policy_consent']) || !empty($_POST['privacy_policy_consent'])) ? ' checked="checked"' : '';
+        $privacy_url = 'https://arabzawaj.org/privacy-policy/';
+
+        ?>
+        <div id="pmpro_privacy_policy_wrapper" class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-privacy-policy" style="margin: 16px 0 20px 0; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
+            <div class="pmpro_checkout-field-inner" style="display: flex; align-items: flex-start; gap: 10px;">
+                <input type="checkbox" id="privacy_policy_consent" name="privacy_policy_consent" value="1" <?php echo $checked; ?> required="required" style="margin-top: 3px; accent-color: #CC723F; width: 18px; height: 18px; cursor: pointer;" />
+                <label for="privacy_policy_consent" class="pmpro_label" style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0; cursor: pointer; display: inline;">
+                    <?php
+                    printf(
+                        /* translators: %s: Privacy Policy link */
+                        __('I have read and agree to the %s <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span>', 'matchmaker'),
+                        '<a href="' . esc_url($privacy_url) . '" target="_blank" rel="noopener noreferrer" style="color: #CC723F; font-weight: 600; text-decoration: underline;">' . esc_html__('Privacy Policy', 'matchmaker') . '</a>'
+                    );
+                    ?>
+                </label>
+            </div>
+        </div>
+        <script>
+        (function() {
+            function placePrivacyCheckbox() {
+                var wrapper = document.getElementById('pmpro_privacy_policy_wrapper');
+                if (!wrapper) return;
+                
+                // Target confirm email row or field
+                var confirmEmail = document.getElementById('bconfirmemail') 
+                    || document.querySelector('input[name="bconfirmemail"]')
+                    || document.getElementById('bemail')
+                    || document.querySelector('input[name="bemail"]');
+                    
+                if (confirmEmail) {
+                    var container = confirmEmail.closest('.pmpro_checkout-field') 
+                        || confirmEmail.closest('tr') 
+                        || confirmEmail.closest('div.pmpro_form_field')
+                        || confirmEmail.closest('.form-group')
+                        || confirmEmail.parentElement;
+                    
+                    if (container && container.parentNode && container.nextSibling !== wrapper) {
+                        container.parentNode.insertBefore(wrapper, container.nextSibling);
+                    }
+                }
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', placePrivacyCheckbox);
+            } else {
+                placePrivacyCheckbox();
+            }
+            setTimeout(placePrivacyCheckbox, 300);
+        })();
+        </script>
+        <?php
+    }
+
+    /**
+     * Validates Privacy Policy consent during PMPro checkout registration.
+     *
+     * @param bool $okay
+     * @return bool
+     */
+    public function check_privacy_policy_consent(bool $okay): bool
+    {
+        if (!$okay) {
+            return false;
+        }
+
+        $is_checkout = !empty($_REQUEST['submit-checkout']) 
+            || isset($_POST['submit-checkout']) 
+            || isset($_POST['bemail']) 
+            || isset($_POST['pmpro_level'])
+            || (function_exists('pmpro_is_checkout') && pmpro_is_checkout());
+
+        if (!$is_checkout) {
+            return $okay;
+        }
+
+        $consent = !empty($_REQUEST['privacy_policy_consent']) 
+            || !empty($_POST['privacy_policy_consent']) 
+            || !empty($_REQUEST['mm_privacy_policy_consent']) 
+            || !empty($_POST['mm_privacy_policy_consent']);
+
+        if (!$consent) {
+            $user_id = get_current_user_id();
+            if ($user_id > 0 && get_user_meta($user_id, 'mm_privacy_policy_consent', true)) {
+                return true;
+            }
+
+            global $pmpro_msg, $pmpro_msgt;
+            $pmpro_msg  = __('You must agree to the Privacy Policy to complete your registration.', 'matchmaker');
+            $pmpro_msgt = 'pmpro_error';
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Save Privacy Policy consent timestamp on successful checkout.
+     *
+     * @param int   $user_id
+     * @param mixed $morder
+     * @return void
+     */
+    public function save_privacy_policy_consent_on_checkout(int $user_id, mixed $morder = null): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $consent = !empty($_REQUEST['privacy_policy_consent']) 
+            || !empty($_POST['privacy_policy_consent']) 
+            || !empty($_REQUEST['mm_privacy_policy_consent']) 
+            || !empty($_POST['mm_privacy_policy_consent']);
+
+        if ($consent) {
+            update_user_meta($user_id, 'mm_privacy_policy_consent', current_time('mysql'));
+        }
+    }
+
+    /**
+     * Save Privacy Policy consent timestamp on standard user registration.
+     *
+     * @param int $user_id
+     * @return void
+     */
+    public function save_privacy_policy_consent_on_user_register(int $user_id): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $consent = !empty($_REQUEST['privacy_policy_consent']) 
+            || !empty($_POST['privacy_policy_consent']) 
+            || !empty($_REQUEST['mm_privacy_policy_consent']) 
+            || !empty($_POST['mm_privacy_policy_consent']);
+
+        if ($consent) {
+            update_user_meta($user_id, 'mm_privacy_policy_consent', current_time('mysql'));
         }
     }
 }

@@ -385,5 +385,65 @@ final class SettingsAndPlanMappingTest extends TestCase
 
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
+
+    public function test_sync_all_users_user_types_consolidates_strictly_to_three_base_tiers(): void
+    {
+        global $wpdb;
+        $sync = PMProSync::instance();
+
+        $u1 = 801; // User with Monthly membership
+        $u2 = 802; // User with Event membership
+        $u3 = 803; // User with Free membership + 1-on-1 Service
+        $u4 = 804; // User with legacy 'one_on_one' user_type meta
+
+        $wpdb->users = 'wp_users';
+        $GLOBALS['__mm_user_pmpro_levels'][$u1] = [new \FakePMProLevel(3, 'Monthly Matchmaking')];
+        $GLOBALS['__mm_user_pmpro_levels'][$u2] = [new \FakePMProLevel(6, 'Event Access')];
+        $GLOBALS['__mm_user_pmpro_levels'][$u3] = [new \FakePMProLevel(2, 'Free Membership'), new \FakePMProLevel(4, '1-on-1 VIP Matchmaking')];
+        
+        $wpdb->mock_cols['SELECT ID FROM wp_users'] = [$u1, $u2, $u3, $u4];
+
+        update_user_meta($u4, 'user_type', 'one_on_one');
+        update_user_meta($u4, 'mm_has_one_on_one', 1);
+
+        $synced_count = $sync->sync_all_users_user_types();
+        $this->assertEquals(4, $synced_count);
+
+        // Verify all 4 users are strictly 'monthly', 'event', or 'free'
+        $this->assertEquals('monthly', get_user_meta($u1, 'user_type', true));
+        $this->assertEquals('event', get_user_meta($u2, 'user_type', true));
+        $this->assertEquals('free', get_user_meta($u3, 'user_type', true));
+        $this->assertEquals('free', get_user_meta($u4, 'user_type', true));
+
+        $this->assertEquals(1, get_user_meta($u3, 'mm_has_one_on_one', true));
+        $this->assertEquals(1, get_user_meta($u4, 'mm_has_one_on_one', true));
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$u1], $GLOBALS['__mm_user_pmpro_levels'][$u2], $GLOBALS['__mm_user_pmpro_levels'][$u3]);
+    }
+
+    public function test_locked_profile_when_user_has_only_service_without_base_membership(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 901;
+
+        // User has only service (level 4) and NO base membership (level 1, 2, 3)
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(4, '1-on-1 VIP Matchmaking'),
+        ];
+
+        $this->assertTrue($sync->has_active_one_on_one_service($user_id));
+        $this->assertFalse($sync->has_active_base_membership($user_id));
+
+        // Test locked profile screen rendering
+        $portal_ctrl = \Matchmaker\Frontend\PortalController::instance();
+        $locked_html = $portal_ctrl->render_locked_profile_screen($user_id);
+
+        $this->assertStringContainsString('Base Membership Required', $locked_html);
+        $this->assertStringContainsString('Active Add-on Service:', $locked_html);
+        $this->assertStringContainsString('1-on-1 VIP Matchmaking', $locked_html);
+        $this->assertStringContainsString('Select a Membership Plan', $locked_html);
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
 }
 

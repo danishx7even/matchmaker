@@ -1482,4 +1482,62 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-13 — Task 77: Profile Edit Validation Fix, Base Membership Cancellation Lockdown with Active Services, Profile Lock for Service-Only Users, and 3-User-Type Consolidation with Auto-Sync Script
+
+- **Objective**:
+  1. **Fix Profile Edit Validation for Searchable Selects**: In `assets/js/matchmaking-form.js`, exclude `.custom-select-search-input`, `data-ignore-validation="1"`, unnamed inputs, and disabled inputs from the required field validator in `validateStep()`. This resolves the issue where users editing their profile via the questionnaire were falsely blocked when clicking "Next" due to empty search input elements.
+  2. **Strictly Restrict Cancellation of Any Base Membership with Active Services**: In `src/Core/PMProSync.php`, block cancellation of any base membership (Free, Monthly, Event) if the user has active add-on services and cancelling would leave them with zero active base memberships.
+  3. **Lock Profile for Service-Only Members**: If a user possesses active add-on services but does not have an active base membership (e.g. Free, Monthly, Event), lock access to the Member Portal (`[matchmaker_member_portal]`) and Form Wizard (`[matchmaking_form]`), displaying a high-touch branded card prompting them to select a base membership plan.
+  4. **Consolidate 3 User Types (`free`, `monthly`, `event`) & Auto-Sync Script**: Consolidate user types strictly to the 3 base membership tiers. Add `PMProSync::sync_all_users_user_types()` and integrate it into `DBMigrator::maybe_migrate()` (bumped schema to `v2.8.0`) and `DBMigrator::activate()` so that all users are automatically synchronized on plugin update or activation.
+- **Changes**:
+  - `matchmaker.php`:
+    - Bumped `MM_VERSION` to `'2.11.0'` for instant client-side cache busting.
+  - `assets/js/matchmaking-form.js`:
+    - Updated `validateStep()` to explicitly ignore `.custom-select-search-input`, `data-ignore-validation="1"`, inputs without `name`, and disabled inputs. Added specific handling for `select[multiple]` validation.
+  - `src/Frontend/FieldGenerator.php`:
+    - Rendered `data-ignore-validation="1"` on `.custom-select-search-input` in `select()`, `multiselect()`, and `range_select()`.
+  - `src/Core/PMProSync.php`:
+    - Updated `block_base_membership_cancellation_with_active_services()` to check remaining active base memberships and block cancellation with a user-friendly error notice if user has active services.
+    - Added `has_active_base_membership(int $user_id): bool` to accurately verify active base tier levels.
+    - Added `sync_all_users_user_types(): int` to synchronize all users in the database to `'free'`, `'monthly'`, or `'event'`, updating `wp_usermeta` (`user_type`, `mm_has_one_on_one`) and `wp_matchmaking_pool`.
+  - `src/Core/DBMigrator.php`:
+    - Bumped migration version to `'2.8.0'`.
+    - Integrated `PMProSync::instance()->sync_all_users_user_types()` into `maybe_migrate()` and `activate()`.
+  - `src/Service/ProfileService.php`:
+    - Added `get_pricing_url(): string` resolving dynamic membership level URLs.
+  - `src/Frontend/PortalController.php` & `src/Frontend/FormController.php`:
+    - Added gating check: if `$pmpro_sync->has_active_one_on_one_service($user_id) && !$pmpro_sync->has_active_base_membership($user_id)`, display locked profile UI (`render_locked_profile_screen()`).
+  - `tests/DBMigratorTest.php`:
+    - Updated schema migration version assertion to `'2.8.0'`.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_sync_all_users_user_types_consolidates_strictly_to_three_base_tiers()`.
+    - Added `test_locked_profile_when_user_has_only_service_without_base_membership()`.
+  - `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Added `test_searchable_select_inputs_have_data_ignore_validation()`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 121 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+## 2026-09-13 — Task 78: Privacy Policy Consent Checkbox in PMPro Checkout Account Information Form
+
+- **Objective**:
+  1. Add a mandatory Privacy Policy consent checkbox field to the PMPro checkout page in the Account Information form positioned directly after the Confirm Email field.
+  2. Embed a clear link to the official Privacy Policy (`https://arabzawaj.org/privacy-policy/`) opening in a new tab.
+  3. Enforce strict server-side validation during PMPro checkout registration via `pmpro_registration_checks`, blocking submission if consent is not granted.
+  4. Store the timestamp of consent in `wp_usermeta` under `mm_privacy_policy_consent` upon successful checkout and user registration.
+- **Changes**:
+  - `src/Frontend/AuthController.php`:
+    - Registered `render_checkout_privacy_policy_checkbox()` on `pmpro_checkout_after_email` and `pmpro_checkout_after_user_fields` with DOM alignment placing `#pmpro_privacy_policy_wrapper` right after the confirm email row (`#bconfirmemail`).
+    - Added `check_privacy_policy_consent()` hooked into `pmpro_registration_checks` (priority 20) with error message *"You must agree to the Privacy Policy to complete your registration."*
+    - Added `save_privacy_policy_consent_on_checkout()` and `save_privacy_policy_consent_on_user_register()` updating `mm_privacy_policy_consent` with `current_time('mysql')`.
+  - `tests/Unit/AuthAndRedirectsTest.php`:
+    - Added `test_privacy_policy_checkbox_rendering_markup()` verifying HTML structure, input name, URL link, and asterisk.
+    - Added `test_privacy_policy_consent_validation_on_checkout()` verifying rejection without consent and approval with consent.
+    - Added `test_privacy_policy_consent_saved_on_checkout()` verifying meta persistence.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 124 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
 

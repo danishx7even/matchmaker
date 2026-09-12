@@ -232,6 +232,65 @@ class AuthAndRedirectsTest
 
         unset($_POST['user_login']);
     }
+
+    public function test_privacy_policy_checkbox_rendering_markup(): void
+    {
+        ob_start();
+        $this->auth->render_checkout_privacy_policy_checkbox();
+        $html = (string) ob_get_clean();
+
+        if (!str_contains($html, 'id="pmpro_privacy_policy_wrapper"')) {
+            throw new \RuntimeException("Expected privacy policy wrapper in HTML: " . $html);
+        }
+
+        if (!str_contains($html, 'name="privacy_policy_consent"')) {
+            throw new \RuntimeException("Expected privacy_policy_consent input name in HTML: " . $html);
+        }
+
+        if (!str_contains($html, 'https://arabzawaj.org/privacy-policy/')) {
+            throw new \RuntimeException("Expected privacy policy URL 'https://arabzawaj.org/privacy-policy/' in HTML: " . $html);
+        }
+
+        if (!str_contains($html, 'pmpro_asterisk') || !str_contains($html, '*')) {
+            throw new \RuntimeException("Expected required asterisk in privacy policy checkbox: " . $html);
+        }
+    }
+
+    public function test_privacy_policy_consent_validation_on_checkout(): void
+    {
+        $_POST['submit-checkout'] = '1';
+        unset($_POST['privacy_policy_consent'], $_REQUEST['privacy_policy_consent']);
+
+        // Check without consent - must fail
+        $valid = $this->auth->check_privacy_policy_consent(true);
+        if ($valid !== false) {
+            throw new \RuntimeException("Expected checkout without privacy policy consent to fail validation.");
+        }
+
+        // Check with consent - must pass
+        $_POST['privacy_policy_consent'] = '1';
+        $valid_with_consent = $this->auth->check_privacy_policy_consent(true);
+        if ($valid_with_consent !== true) {
+            throw new \RuntimeException("Expected checkout with privacy policy consent to pass validation.");
+        }
+
+        unset($_POST['submit-checkout'], $_POST['privacy_policy_consent']);
+    }
+
+    public function test_privacy_policy_consent_saved_on_checkout(): void
+    {
+        $user_id = 110;
+        $_POST['privacy_policy_consent'] = '1';
+
+        $this->auth->save_privacy_policy_consent_on_checkout($user_id);
+        $consent_meta = get_user_meta($user_id, 'mm_privacy_policy_consent', true);
+
+        if (empty($consent_meta)) {
+            throw new \RuntimeException("Expected mm_privacy_policy_consent meta to be saved for user #{$user_id}.");
+        }
+
+        unset($_POST['privacy_policy_consent']);
+    }
 }
 
 

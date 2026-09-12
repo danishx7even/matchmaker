@@ -509,7 +509,7 @@ class FieldGenerator {
         $html .= '<div class="custom-select-display' . ($is_placeholder_display ? ' placeholder' : '') . '">' . esc_html($current) . '</div>';
         $html .= '<div class="custom-select-options' . ($is_searchable ? ' has-search' : '') . '">';
         if ($is_searchable) {
-            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" /></div>';
+            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" data-ignore-validation="1" /></div>';
         }
         foreach ($options as $i => $opt) {
             $is_ph = (preg_match('/^select\b/i', trim($opt)) === 1);
@@ -539,7 +539,7 @@ class FieldGenerator {
         $html .= '<div class="custom-select-display' . ($has_val ? '' : ' placeholder') . '" data-placeholder="' . esc_attr($placeholder) . '" title="' . esc_attr($display_text) . '">' . esc_html($display_text) . '</div>';
         $html .= '<div class="custom-select-options' . ($is_searchable ? ' has-search' : '') . '">';
         if ($is_searchable) {
-            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" /></div>';
+            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" data-ignore-validation="1" /></div>';
         }
         foreach ($options as $i => $opt) {
             $checked = in_array($opt, $selected_arr, true) ? ' checked' : '';
@@ -590,7 +590,7 @@ class FieldGenerator {
         $html .= '<div class="custom-select-display' . ($is_set ? '' : ' placeholder') . '">' . esc_html($display) . '</div>';
         $html .= '<div class="custom-select-options' . ($is_searchable ? ' has-search' : '') . '">';
         if ($is_searchable) {
-            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" /></div>';
+            $html .= '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="' . esc_attr__('Search...', 'matchmaker') . '" autocomplete="off" data-ignore-validation="1" /></div>';
         }
         $html .= '<div class="custom-select-option' . (!$is_set ? ' selected' : '') . '" data-index="0">' . esc_html($placeholder) . '</div>';
         foreach ($options as $i => $opt) {

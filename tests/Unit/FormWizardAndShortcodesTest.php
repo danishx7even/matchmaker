@@ -163,6 +163,21 @@ class FormWizardAndShortcodesTest
             throw new \RuntimeException("Expected pref_income to have label 'Preferred Yearly Income Range': " . $pref_income_html);
         }
     }
+
+    public function test_searchable_select_inputs_have_data_ignore_validation(): void
+    {
+        // 1. Country select (single select searchable)
+        $country_html = $this->field_generator->render_single_field('user_country', ['user_country' => 'Saudi Arabia']);
+        if (!str_contains($country_html, 'custom-select-search-input') || !str_contains($country_html, 'data-ignore-validation="1"')) {
+            throw new \RuntimeException("Expected user_country search input to have data-ignore-validation='1': " . $country_html);
+        }
+
+        // 2. Multiselect origin (multiselect searchable)
+        $origin_html = $this->field_generator->render_single_field('pref_origin', ['pref_origin' => 'Arab, Gulf']);
+        if (!str_contains($origin_html, 'custom-select-search-input') || !str_contains($origin_html, 'data-ignore-validation="1"')) {
+            throw new \RuntimeException("Expected pref_origin search input to have data-ignore-validation='1': " . $origin_html);
+        }
+    }
 }
 
 
