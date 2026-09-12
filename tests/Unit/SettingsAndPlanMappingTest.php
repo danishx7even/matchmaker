@@ -15,6 +15,18 @@ final class SettingsAndPlanMappingTest extends TestCase
         $GLOBALS['__mm_options'] = [];
         $GLOBALS['__mm_usermeta'] = [];
         $GLOBALS['__mm_users'] = [];
+        $GLOBALS['__mm_current_user_id'] = 1;
+        $_GET = [];
+        $_POST = [];
+        $_REQUEST = [];
+    }
+
+    protected function tearDown(): void
+    {
+        $GLOBALS['__mm_current_user_id'] = 1;
+        $_GET = [];
+        $_POST = [];
+        $_REQUEST = [];
     }
 
     public function test_default_tier_mapping_fallback(): void
@@ -546,5 +558,143 @@ final class SettingsAndPlanMappingTest extends TestCase
 
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id], $GLOBALS['__mm_user_pmpro_level'][$user_id]);
     }
+
+    public function test_sync_all_users_detailed_metrics_and_service_free_assignment(): void
+    {
+        global $wpdb;
+        $sync = PMProSync::instance();
+
+        $u1 = 910; // Monthly user
+        $u2 = 911; // Event user
+        $u3 = 912; // Free user
+        $u4 = 913; // Service-only user (VIP 1-on-1, level 4) with NO base membership
+
+        $wpdb->users = 'wp_users';
+        $GLOBALS['__mm_user_pmpro_levels'][$u1] = [new \FakePMProLevel(3, 'Monthly Matchmaking')];
+        $GLOBALS['__mm_user_pmpro_levels'][$u2] = [new \FakePMProLevel(6, 'Event Access')];
+        $GLOBALS['__mm_user_pmpro_levels'][$u3] = [new \FakePMProLevel(2, 'Free Membership')];
+        $GLOBALS['__mm_user_pmpro_levels'][$u4] = [new \FakePMProLevel(4, 'VIP 1-on-1 Matchmaking')];
+
+        $wpdb->mock_cols['SELECT ID FROM wp_users'] = [$u1, $u2, $u3, $u4];
+
+        // Run sync with detailed = true
+        $stats = $sync->sync_all_users_user_types(true);
+
+        $this->assertIsArray($stats);
+        $this->assertEquals(4, $stats['total_users']);
+        $this->assertEquals(4, $stats['synced_users']);
+        $this->assertEquals(1, $stats['monthly_users']);
+        $this->assertEquals(1, $stats['event_users']);
+        $this->assertEquals(2, $stats['free_users']); // u3 and u4
+        $this->assertEquals(1, $stats['service_only_assigned_free']); // u4
+        $this->assertEquals(1, $stats['has_active_services']); // u4
+
+        // Check user 913: has user_type = free, mm_has_one_on_one = 1, and Free membership level (2) assigned
+        $this->assertEquals('free', get_user_meta($u4, 'user_type', true));
+        $this->assertEquals(1, get_user_meta($u4, 'mm_has_one_on_one', true));
+        $this->assertTrue(pmpro_hasMembershipLevel(2, $u4), 'User 913 must have Free level 2 assigned');
+        $this->assertTrue(pmpro_hasMembershipLevel(4, $u4), 'User 913 must still retain active service level 4');
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$u1], $GLOBALS['__mm_user_pmpro_levels'][$u2], $GLOBALS['__mm_user_pmpro_levels'][$u3], $GLOBALS['__mm_user_pmpro_levels'][$u4]);
+    }
+
+    public function test_special_sync_url_and_secret_key(): void
+    {
+        $sync = PMProSync::instance();
+
+        $key = $sync->get_sync_secret_key();
+        $this->assertNotEmpty($key);
+        $this->assertEquals(32, strlen($key));
+
+        // Subsequent call returns same persisted key
+        $this->assertEquals($key, $sync->get_sync_secret_key());
+
+        $url = $sync->get_special_sync_url();
+        $this->assertStringContainsString('mm_sync_user_types=1', $url);
+        $this->assertStringContainsString('key=' . $key, $url);
+
+        $json_url = $sync->get_special_sync_url('json');
+        $this->assertStringContainsString('format=json', $json_url);
+    }
+
+    public function test_handle_special_link_sync_trigger_unauthorized(): void
+    {
+        $sync = PMProSync::instance();
+
+        $_GET['mm_sync_user_types'] = '1';
+        $_GET['key'] = 'wrong_invalid_key';
+        $GLOBALS['__mm_current_user_id'] = 0; // Guest
+
+        $caught = false;
+        try {
+            $sync->handle_special_link_sync_trigger();
+        } catch (\RuntimeException $e) {
+            $caught = true;
+            $this->assertStringContainsString('Unauthorized access', $e->getMessage());
+        } finally {
+            $this->assertEquals(403, $GLOBALS['__mm_last_status_header']);
+            unset($_GET['mm_sync_user_types'], $_GET['key'], $GLOBALS['__mm_current_user_id']);
+        }
+        $this->assertTrue($caught, 'Should throw RuntimeException on unauthorized sync access');
+    }
+
+    public function test_handle_special_link_sync_trigger_authorized_with_key(): void
+    {
+        global $wpdb;
+        $sync = PMProSync::instance();
+
+        $key = $sync->get_sync_secret_key();
+        $_GET['mm_sync_user_types'] = '1';
+        $_GET['key'] = $key;
+        $GLOBALS['__mm_current_user_id'] = 0; // Guest with secret key
+
+        $u1 = 920;
+        $wpdb->users = 'wp_users';
+        $GLOBALS['__mm_user_pmpro_levels'][$u1] = [new \FakePMProLevel(3, 'Monthly Matchmaking')];
+        $wpdb->mock_cols['SELECT ID FROM wp_users'] = [$u1];
+
+        ob_start();
+        $sync->handle_special_link_sync_trigger();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('Synchronization Complete', $output);
+        $this->assertStringContainsString('Total Users Processed', $output);
+        $this->assertEquals('monthly', get_user_meta($u1, 'user_type', true));
+
+        unset($_GET['mm_sync_user_types'], $_GET['key'], $GLOBALS['__mm_user_pmpro_levels'][$u1]);
+    }
+
+    public function test_handle_special_link_sync_trigger_authorized_json_format(): void
+    {
+        global $wpdb;
+        $sync = PMProSync::instance();
+
+        $key = $sync->get_sync_secret_key();
+        $_GET['mm_sync_user_types'] = '1';
+        $_GET['key'] = $key;
+        $_GET['format'] = 'json';
+
+        $u1 = 921;
+        $wpdb->users = 'wp_users';
+        $GLOBALS['__mm_user_pmpro_levels'][$u1] = [new \FakePMProLevel(6, 'Event Access')];
+        $wpdb->mock_cols['SELECT ID FROM wp_users'] = [$u1];
+
+        $caught = false;
+        ob_start();
+        try {
+            $sync->handle_special_link_sync_trigger();
+        } catch (\RuntimeException $e) {
+            $caught = true;
+        } finally {
+            $json_output = ob_get_clean();
+            $data = json_decode($json_output, true);
+            $this->assertTrue($data['success']);
+            $this->assertEquals(1, $data['data']['stats']['total_users']);
+            $this->assertEquals(1, $data['data']['stats']['event_users']);
+            unset($_GET['mm_sync_user_types'], $_GET['key'], $_GET['format'], $GLOBALS['__mm_user_pmpro_levels'][$u1]);
+        }
+        $this->assertTrue($caught, 'wp_send_json_success should throw RuntimeException');
+    }
 }
+
 

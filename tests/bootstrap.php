@@ -360,6 +360,16 @@ function wp_redirect(string $location, int $status = 302, string $x_redirect_by 
     return true;
 }
 
+function status_header(int $code, string $description = ''): void {
+    $GLOBALS['__mm_last_status_header'] = $code;
+}
+
+function wp_die($message = '', $title = '', $args = []): void {
+    $GLOBALS['__mm_last_wp_die'] = ['message' => $message, 'title' => $title, 'args' => $args];
+    throw new \RuntimeException(is_string($message) ? $message : 'wp_die');
+}
+
+
 
 function esc_html($text) {
     return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
@@ -648,9 +658,32 @@ function wp_doing_ajax(): bool {
     return defined('DOING_AJAX') && DOING_AJAX;
 }
 
-function add_query_arg($key, $val, $url = '') {
-    $sep = str_contains($url, '?') ? '&' : '?';
-    return $url . $sep . urlencode((string)$key) . '=' . urlencode((string)$val);
+function add_query_arg(...$args) {
+    if (count($args) === 1 && is_array($args[0])) {
+        $query = $args[0];
+        $url   = '';
+    } elseif (count($args) === 2 && is_array($args[0])) {
+        $query = $args[0];
+        $url   = (string) $args[1];
+    } elseif (count($args) === 2) {
+        $query = [(string) $args[0] => (string) $args[1]];
+        $url   = '';
+    } elseif (count($args) >= 3) {
+        $query = [(string) $args[0] => (string) $args[1]];
+        $url   = (string) $args[2];
+    } else {
+        return '';
+    }
+
+    $parsed = parse_url($url);
+    $base = ($parsed['scheme'] ?? '') ? ($parsed['scheme'] . '://' . ($parsed['host'] ?? '') . ($parsed['path'] ?? '')) : ($parsed['path'] ?? '');
+    $existing = [];
+    if (!empty($parsed['query'])) {
+        parse_str($parsed['query'], $existing);
+    }
+    $merged = array_merge($existing, $query);
+    $qs = http_build_query($merged);
+    return $base . ($qs ? '?' . $qs : '');
 }
 
 // -----------------------------------------------------------------------------
@@ -826,10 +859,27 @@ function pmpro_changeMembershipLevel($level_id, $user_id) {
     $lid = (int) $level_id;
     $uid = (int) $user_id;
     $GLOBALS['__mm_user_pmpro_level'][$uid] = $lid;
+    $existing_levels = $GLOBALS['__mm_user_pmpro_levels'][$uid] ?? [];
+
     if ($lid === 0) {
-        $GLOBALS['__mm_user_pmpro_levels'][$uid] = [];
+        // If cancelling base levels, retain service levels if any
+        $preserved_services = [];
+        foreach ($existing_levels as $el) {
+            $el_id = is_object($el) ? (int) $el->id : (int) $el;
+            if (in_array($el_id, [4, 5, 25, 26], true)) {
+                $preserved_services[] = $el;
+            }
+        }
+        $GLOBALS['__mm_user_pmpro_levels'][$uid] = $preserved_services;
     } else {
-        $GLOBALS['__mm_user_pmpro_levels'][$uid] = [new FakePMProLevel($lid, 'Level ' . $lid)];
+        $new_levels = [new FakePMProLevel($lid, 'Level ' . $lid)];
+        foreach ($existing_levels as $el) {
+            $el_id = is_object($el) ? (int) $el->id : (int) $el;
+            if ($el_id !== $lid && in_array($el_id, [4, 5, 25, 26], true)) {
+                $new_levels[] = $el;
+            }
+        }
+        $GLOBALS['__mm_user_pmpro_levels'][$uid] = $new_levels;
     }
     if (function_exists('do_action')) {
         do_action('pmpro_after_change_membership_level', $lid, $uid, 0);

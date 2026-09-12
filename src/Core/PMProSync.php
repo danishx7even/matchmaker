@@ -72,6 +72,7 @@ class PMProSync {
         add_filter('pmpro_member_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_filter('pmpro_account_membership_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_filter('pmpro_account_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
+        add_action('init', [$this, 'handle_special_link_sync_trigger'], 5);
         add_action('init', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
         add_action('template_redirect', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
         add_action('wp_footer', [$this, 'render_account_cancel_blockade_script']);
@@ -1342,12 +1343,217 @@ class PMProSync {
     }
 
     /**
+     * Retrieves or generates a secure 32-character secret key for the bulk synchronization special link.
+     *
+     * @return string
+     */
+    public function get_sync_secret_key(): string
+    {
+        $key = get_option('mm_sync_secret_key', '');
+        if (empty($key) || !is_string($key)) {
+            $key = wp_generate_password(32, false);
+            update_option('mm_sync_secret_key', $key);
+        }
+        return (string) $key;
+    }
+
+    /**
+     * Returns the full special URL trigger for bulk user_type and free membership synchronization.
+     *
+     * @param string $format Optional output format ('html' or 'json').
+     * @return string
+     */
+    public function get_special_sync_url(string $format = 'html'): string
+    {
+        $args = [
+            'mm_sync_user_types' => '1',
+            'key'                => $this->get_sync_secret_key(),
+        ];
+        if ($format === 'json') {
+            $args['format'] = 'json';
+        }
+        return add_query_arg($args, home_url('/'));
+    }
+
+    /**
+     * Handles trigger via special link: ?mm_sync_user_types=1&key=<secret_key> or logged-in admin.
+     *
+     * @return void
+     */
+    public function handle_special_link_sync_trigger(): void
+    {
+        if (empty($_GET['mm_sync_user_types'])) {
+            return;
+        }
+
+        $provided_key = isset($_GET['key']) ? sanitize_text_field((string) $_GET['key']) : '';
+        $expected_key = $this->get_sync_secret_key();
+
+        $is_authorized = false;
+        if (!empty($provided_key) && hash_equals($expected_key, $provided_key)) {
+            $is_authorized = true;
+        } elseif (is_user_logged_in() && (current_user_can('manage_options') || current_user_can('manage_matchmaker'))) {
+            $is_authorized = true;
+        }
+
+        if (!$is_authorized) {
+            status_header(403);
+            wp_die(
+                esc_html__('Unauthorized access. Invalid or missing secret synchronization key.', 'matchmaker'),
+                esc_html__('Matchmaker Sync Access Denied', 'matchmaker'),
+                ['response' => 403]
+            );
+            return;
+        }
+
+        // Run synchronization with detailed statistics
+        $stats = $this->sync_all_users_user_types(true);
+        if (!is_array($stats)) {
+            $stats = ['total_users' => (int) $stats, 'synced_users' => (int) $stats];
+        }
+
+        // Log the sync event
+        if (class_exists('\Matchmaker\Repository\MatchRepository')) {
+            \Matchmaker\Repository\MatchRepository::instance()->log_event(
+                'sync',
+                'bulk_user_type_sync',
+                'Bulk User Type Synchronization',
+                'Bulk user_type and free membership synchronization executed via special link.',
+                $stats
+            );
+        }
+
+        // Check if JSON format was requested
+        if (isset($_GET['format']) && $_GET['format'] === 'json') {
+            wp_send_json_success([
+                'message' => __('User types and base memberships synchronized successfully.', 'matchmaker'),
+                'stats'   => $stats,
+            ]);
+            return;
+        }
+
+        // Otherwise render attractive HTML summary page
+        $this->render_sync_results_page($stats);
+        if (!defined('MM_UNIT_TESTS')) {
+            exit;
+        }
+    }
+
+    /**
+     * Renders a styled HTML summary page when bulk synchronization is executed via special link.
+     *
+     * @param array $stats
+     * @return void
+     */
+    public function render_sync_results_page(array $stats): void
+    {
+        $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
+        $admin_url     = admin_url('admin.php?page=matchmaker-settings#tab-membership');
+        $site_name     = get_bloginfo('name') ?: 'Arab Zawaj';
+
+        ?>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title><?php echo esc_html(sprintf(__('User Type Synchronization — %s', 'matchmaker'), $site_name)); ?></title>
+            <style>
+                :root {
+                    --mm-primary: #CC723F;
+                    --mm-primary-dark: #b55d2c;
+                    --mm-bg: #f8fafc;
+                    --mm-surface: #ffffff;
+                    --mm-text-main: #1e293b;
+                    --mm-text-muted: #64748b;
+                    --mm-border: #e2e8f0;
+                    --mm-success: #10b981;
+                    --mm-accent: #f59e0b;
+                }
+                * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+                body { background: var(--mm-bg); color: var(--mm-text-main); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+                .mm-sync-card { background: var(--mm-surface); border: 1px solid var(--mm-border); border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01); max-width: 640px; width: 100%; overflow: hidden; }
+                .mm-sync-header { background: linear-gradient(135deg, var(--mm-primary) 0%, var(--mm-primary-dark) 100%); color: #fff; padding: 32px 28px; text-align: center; }
+                .mm-sync-header h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+                .mm-sync-header p { font-size: 14px; opacity: 0.9; }
+                .mm-sync-body { padding: 28px; }
+                .mm-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+                .mm-stat-box { background: #f8fafc; border: 1px solid var(--mm-border); border-radius: 12px; padding: 16px; text-align: center; }
+                .mm-stat-box.highlight { background: #fff8f5; border-color: #fbd6c5; }
+                .mm-stat-value { font-size: 28px; font-weight: 800; color: var(--mm-text-main); line-height: 1.2; }
+                .mm-stat-box.highlight .mm-stat-value { color: var(--mm-primary); }
+                .mm-stat-label { font-size: 13px; color: var(--mm-text-muted); font-weight: 500; margin-top: 4px; }
+                .mm-sync-details { background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 24px; font-size: 13.5px; line-height: 1.6; color: #334155; }
+                .mm-sync-details li { margin-left: 20px; margin-bottom: 6px; }
+                .mm-sync-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+                .mm-btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.2s; cursor: pointer; }
+                .mm-btn-primary { background: var(--mm-primary); color: #fff; border: 1px solid var(--mm-primary); }
+                .mm-btn-primary:hover { background: var(--mm-primary-dark); }
+                .mm-btn-secondary { background: #fff; color: #475569; border: 1px solid var(--mm-border); }
+                .mm-btn-secondary:hover { background: #f1f5f9; }
+            </style>
+        </head>
+        <body>
+            <div class="mm-sync-card">
+                <div class="mm-sync-header">
+                    <div style="font-size: 40px; margin-bottom: 12px;">✨</div>
+                    <h1><?php esc_html_e('Synchronization Complete', 'matchmaker'); ?></h1>
+                    <p><?php esc_html_e('All user types and membership assignments have been successfully synchronized.', 'matchmaker'); ?></p>
+                </div>
+                <div class="mm-sync-body">
+                    <div class="mm-stats-grid">
+                        <div class="mm-stat-box">
+                            <div class="mm-stat-value"><?php echo (int) ($stats['total_users'] ?? 0); ?></div>
+                            <div class="mm-stat-label"><?php esc_html_e('Total Users Processed', 'matchmaker'); ?></div>
+                        </div>
+                        <div class="mm-stat-box highlight">
+                            <div class="mm-stat-value"><?php echo (int) ($stats['service_only_assigned_free'] ?? 0); ?></div>
+                            <div class="mm-stat-label"><?php esc_html_e('Service-Only Assigned Free', 'matchmaker'); ?></div>
+                        </div>
+                        <div class="mm-stat-box">
+                            <div class="mm-stat-value"><?php echo (int) ($stats['monthly_users'] ?? 0); ?></div>
+                            <div class="mm-stat-label"><?php esc_html_e('Monthly Subscribers', 'matchmaker'); ?></div>
+                        </div>
+                        <div class="mm-stat-box">
+                            <div class="mm-stat-value"><?php echo (int) ($stats['event_users'] ?? 0); ?></div>
+                            <div class="mm-stat-label"><?php esc_html_e('Event Subscribers', 'matchmaker'); ?></div>
+                        </div>
+                    </div>
+
+                    <div class="mm-sync-details">
+                        <strong><?php esc_html_e('Synchronization Breakdown:', 'matchmaker'); ?></strong>
+                        <ul style="margin-top: 8px;">
+                            <li><?php echo sprintf(esc_html__('Free Plan Users: %d (including %d service-only accounts auto-assigned Free tier)', 'matchmaker'), (int) ($stats['free_users'] ?? 0), (int) ($stats['service_only_assigned_free'] ?? 0)); ?></li>
+                            <li><?php echo sprintf(esc_html__('Active Add-on Services: %d users holding active add-ons', 'matchmaker'), (int) ($stats['has_active_services'] ?? 0)); ?></li>
+                            <li><?php echo sprintf(esc_html__('Execution Timestamp: %s (UTC)', 'matchmaker'), esc_html(gmdate('Y-m-d H:i:s'))); ?></li>
+                        </ul>
+                    </div>
+
+                    <div class="mm-sync-actions">
+                        <a href="<?php echo esc_url($admin_url); ?>" class="mm-btn mm-btn-primary">
+                            <?php esc_html_e('← Return to Admin Settings', 'matchmaker'); ?>
+                        </a>
+                        <a href="<?php echo esc_url($dashboard_url); ?>" class="mm-btn mm-btn-secondary">
+                            <?php esc_html_e('Visit Member Dashboard', 'matchmaker'); ?>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        <?php
+    }
+
+    /**
      * Synchronizes all users in the system to ensure their user_type is strictly 'free', 'monthly', or 'event',
      * and their mm_has_one_on_one meta is accurately set based on active PMPro services.
+     * If a user does not have a base membership but has an active service, changes their user_type to 'free'
+     * and assigns the PMPro Free membership level.
      *
-     * @return int Number of users synchronized.
+     * @param bool $detailed Whether to return detailed statistics array or just the total count.
+     * @return array|int Detailed metrics array if $detailed is true, or count of synchronized users.
      */
-    public function sync_all_users_user_types(): int
+    public function sync_all_users_user_types(bool $detailed = false): array|int
     {
         global $wpdb;
 
@@ -1364,33 +1570,60 @@ class PMProSync {
             }
         }
 
-        $count = 0;
+        $stats = [
+            'total_users'                => count($user_ids),
+            'synced_users'               => 0,
+            'monthly_users'              => 0,
+            'event_users'                => 0,
+            'free_users'                 => 0,
+            'service_only_assigned_free' => 0,
+            'has_active_services'        => 0,
+        ];
+
         foreach ($user_ids as $uid) {
             $user_id = (int) $uid;
             if ($user_id <= 0) {
                 continue;
             }
 
-            $resolved_user_type = $this->get_current_user_type($user_id);
-            if (!in_array($resolved_user_type, ['free', 'monthly', 'event'], true)) {
+            $has_base    = $this->has_active_base_membership($user_id);
+            $has_service = $this->has_active_one_on_one_service($user_id);
+
+            if ($has_service) {
+                $stats['has_active_services']++;
+            }
+
+            if (!$has_base && $has_service) {
                 $resolved_user_type = 'free';
-            }
-
-            if ($resolved_user_type === 'free') {
                 $this->maybe_assign_free_membership($user_id);
-            }
+                $stats['service_only_assigned_free']++;
+                $stats['free_users']++;
+            } else {
+                $resolved_user_type = $this->get_current_user_type($user_id);
+                if (!in_array($resolved_user_type, ['free', 'monthly', 'event'], true)) {
+                    $resolved_user_type = 'free';
+                }
 
-            $has_one_on_one = $this->has_active_one_on_one_service($user_id);
+                if ($resolved_user_type === 'free') {
+                    $this->maybe_assign_free_membership($user_id);
+                    $stats['free_users']++;
+                } elseif ($resolved_user_type === 'monthly') {
+                    $stats['monthly_users']++;
+                } elseif ($resolved_user_type === 'event') {
+                    $stats['event_users']++;
+                }
+            }
 
             \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
-            update_user_meta($user_id, 'mm_has_one_on_one', $has_one_on_one ? 1 : 0);
+            update_user_meta($user_id, 'mm_has_one_on_one', $has_service ? 1 : 0);
 
             \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
-            \Matchmaker\Repository\MatchRepository::instance()->update_pool_one_on_one($user_id, $has_one_on_one);
+            \Matchmaker\Repository\MatchRepository::instance()->update_pool_one_on_one($user_id, $has_service);
 
-            $count++;
+            $stats['synced_users']++;
         }
 
-        return $count;
+        return $detailed ? $stats : $stats['synced_users'];
     }
 }
+

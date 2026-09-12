@@ -307,6 +307,45 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     </tr>
                 </table>
             </div>
+
+            <!-- Bulk User Type & Free Membership Sync Tool Card -->
+            <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
+                <h2 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px; display:flex; align-items:center; gap:8px;">
+                    🔄 <?php esc_html_e('Bulk User Type & Free Membership Synchronization', 'matchmaker'); ?>
+                </h2>
+                <p class="description" style="margin-bottom:14px;">
+                    <?php esc_html_e('Synchronizes all users in the system to ensure their user_type is strictly free, monthly, or event. If a member does not have a base membership but holds an active add-on service, this tool automatically assigns them the Free membership tier and preserves their active service status.', 'matchmaker'); ?>
+                </p>
+
+                <?php 
+                $special_sync_url = \Matchmaker\Core\PMProSync::instance()->get_special_sync_url(); 
+                ?>
+
+                <table class="form-table" style="margin-top:0;">
+                    <tr>
+                        <th scope="row"><label><?php esc_html_e('Special Trigger Link', 'matchmaker'); ?></label></th>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px; max-width:700px;">
+                                <input type="text" readonly value="<?php echo esc_url($special_sync_url); ?>" id="mm_special_sync_url_input" class="regular-text" style="background:#f8fafc; font-family:monospace; font-size:12px; width:100%;">
+                                <button type="button" class="button button-secondary" onclick="navigator.clipboard.writeText(document.getElementById('mm_special_sync_url_input').value); alert('<?php echo esc_js(__('Special synchronization URL copied to clipboard!', 'matchmaker')); ?>');">
+                                    📋 <?php esc_html_e('Copy Link', 'matchmaker'); ?>
+                                </button>
+                            </div>
+                            <p class="description" style="margin-top:6px;">
+                                <?php esc_html_e('This special secured link can be visited directly in any browser, executed via external cron/webhooks, or integrated with cURL/server scripts. Append &format=json for API responses.', 'matchmaker'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Instant Action', 'matchmaker'); ?></th>
+                        <td>
+                            <a href="<?php echo esc_url($special_sync_url); ?>" target="_blank" class="button button-secondary" style="font-weight:600; color:#b55d2c; border-color:#cc723f; background:#fff8f5; display:inline-flex; align-items:center; gap:6px;">
+                                ⚡ <?php esc_html_e('Run Synchronization Now (Opens in New Tab)', 'matchmaker'); ?>
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+            </div>
         </div>
 
         <!-- ==========================================

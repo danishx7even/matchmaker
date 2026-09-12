@@ -1591,4 +1591,37 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-13 — Task 81: Bulk User Type Sync & Free Membership Auto-Assignment Script via Special Link
+
+- **Objective**:
+  1. Add a comprehensive synchronization script to update all users' `user_type` strictly according to their base membership (`monthly`, `event`, `free`).
+  2. If a user does not have a base membership but holds an active add-on service (e.g. 1-on-1 VIP Matchmaking, Consultation, Social Media Post), change their `user_type` to `free` and automatically assign them the PMPro Free membership level (`level 2` or mapped free tier) while preserving their active service status.
+  3. Enable synchronization triggering via visiting a special secured URL (`?mm_sync_user_types=1&key=<SECRET_KEY>`) or via logged-in administrator authentication.
+  4. Provide a high-touch branded summary result page (and JSON endpoint via `&format=json`) and embed a copyable link tool and instant execution button in Admin Matchmaker Settings (Tab 2: Membership & Services).
+- **Changes**:
+  - `src/Core/PMProSync.php`:
+    - Hooked `handle_special_link_sync_trigger()` on `init` (priority 5).
+    - Updated `sync_all_users_user_types(bool $detailed = false): array|int` to iterate through all system users, identify service-only accounts without base plans, assign Free PMPro membership level, update `wp_usermeta` and `wp_matchmaking_pool` (`user_type`, `mm_has_one_on_one`), and return comprehensive synchronization metrics.
+    - Added `get_sync_secret_key(): string` to retrieve or generate a persistent 32-character secret key stored in `mm_sync_secret_key`.
+    - Added `get_special_sync_url(string $format = 'html'): string` returning the special trigger URL.
+    - Added `handle_special_link_sync_trigger(): void` checking key authentication (`hash_equals`) or admin capabilities (`manage_options`/`manage_matchmaker`), logging the execution to `wp_matchmaker_logs`, and delivering either JSON or HTML summary reports.
+    - Added `render_sync_results_page(array $stats): void` rendering an Arab Zawaj branded summary page with user breakdown cards and action links.
+  - `src/View/admin/settings/settings.php`:
+    - Added the **Bulk User Type & Free Membership Synchronization** tool card in Tab 2 with a read-only input, one-click clipboard copy button, and an instant execution action button.
+  - `tests/bootstrap.php`:
+    - Updated `add_query_arg()` to support variable argument signatures and array query args.
+    - Updated `pmpro_changeMembershipLevel()` stub to preserve active Group 3 service levels when assigning Free base membership.
+    - Added `status_header()` and `wp_die()` mock stubs.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_sync_all_users_detailed_metrics_and_service_free_assignment()` verifying accurate metrics and Free membership assignment for service-only users.
+    - Added `test_special_sync_url_and_secret_key()` verifying key generation and URL formatting.
+    - Added `test_handle_special_link_sync_trigger_unauthorized()` verifying 403 status and rejection of invalid keys.
+    - Added `test_handle_special_link_sync_trigger_authorized_with_key()` verifying successful HTML report generation and user synchronization.
+    - Added `test_handle_special_link_sync_trigger_authorized_json_format()` verifying JSON API response structure.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 132 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
