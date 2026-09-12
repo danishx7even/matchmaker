@@ -1623,5 +1623,31 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-13 — Task 82: Comprehensive Membership Details & Expiration Dates in PMPro Account Page
+
+- **Objective**:
+  1. Display rich, organized membership metadata (Status, Plan Category, Start Date, Expiration / Renewal Date, Billing/Cost) on the PMPro Membership Account page level cards.
+  2. Resolve expiration dates accurately across all plan types:
+     - Fixed expiration dates (`$level->enddate`).
+     - Gateway subscription renewal dates (`PMPro_Subscription::get_next_payment_date()`).
+     - Auto-renewing monthly subscriptions.
+     - Ongoing / lifetime status for free tiers and one-time add-on services.
+  3. Keep base membership cancellation button strictly hidden when active add-on services are present, while clearly showing an active protection notice (`🛡️ Base membership is active and linked to your add-on services`).
+- **Changes**:
+  - `src/Core/PMProSync.php`:
+    - Hooked `render_membership_account_card_details()` on `pmpro_membership_account_after_level_card_content` (priority 10).
+    - Added `get_membership_level_card_details(mixed $level, int $user_id = 0): array` to resolve status, category tags, start date, expiration/renewal dates, billing cost, and service lock notices.
+    - Added `render_membership_account_card_details(mixed $level): void` generating clean, responsive metadata grid cards using official Arab Zawaj styling tokens (`#CC723F`, `#1e293b`, `#f8fafc`).
+  - `tests/bootstrap.php`:
+    - Updated `FakePMProLevel` to declare typed properties (`startdate`, `initial_payment`, `billing_amount`, `cycle_number`, `cycle_period`, `user_id`, `ID`).
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_membership_account_card_details_resolution()` verifying expiration label/value resolution, service category tags, and service lock notices.
+    - Added `test_render_membership_account_card_details_output()` verifying rendered HTML container and badges.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 134 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
+---
+
+
 
 

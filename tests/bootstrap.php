@@ -786,15 +786,24 @@ function dbDelta($sql) {
 
 class FakePMProLevel {
     public int $id;
+    public int $ID;
     public string $name;
     public string $description;
     public mixed $enddate;
+    public mixed $startdate = 0;
+    public float $initial_payment = 0.0;
+    public float $billing_amount = 0.0;
+    public int $cycle_number = 0;
+    public string $cycle_period = '';
+    public int $user_id = 0;
 
-    public function __construct(int $id, string $name, string $description = '', mixed $enddate = 0) {
+    public function __construct(int $id, string $name, string $description = '', mixed $enddate = 0, mixed $startdate = 0) {
         $this->id = $id;
+        $this->ID = $id;
         $this->name = $name;
         $this->description = $description;
         $this->enddate = $enddate;
+        $this->startdate = $startdate;
     }
 }
 

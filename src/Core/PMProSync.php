@@ -77,6 +77,7 @@ class PMProSync {
         add_action('template_redirect', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
         add_action('wp_footer', [$this, 'render_account_cancel_blockade_script']);
         add_action('pmpro_account_preheader', [$this, 'render_account_error_notice']);
+        add_action('pmpro_membership_account_after_level_card_content', [$this, 'render_membership_account_card_details'], 10, 1);
     }
 
     /**
@@ -859,6 +860,213 @@ class PMProSync {
                 . esc_html__('You cannot cancel your base membership while you have active add-on services. Please contact support.', 'matchmaker')
                 . '</div>';
         }
+    }
+
+    /**
+     * Resolves comprehensive display details (status, category, start date, expiration/renewal date, billing)
+     * for a user's membership level.
+     *
+     * @param mixed $level
+     * @param int   $user_id
+     * @return array<string, mixed>
+     */
+    public function get_membership_level_card_details(mixed $level, int $user_id = 0): array
+    {
+        if ($user_id <= 0) {
+            $user_id = is_object($level) && !empty($level->user_id) ? (int) $level->user_id : get_current_user_id();
+        }
+
+        $level_id = is_object($level) ? (int) ($level->id ?? $level->ID ?? 0) : (int) $level;
+        if ($level_id <= 0) {
+            return [];
+        }
+
+        $is_service = $this->is_service_level($level_id);
+        $tier       = $this->get_user_type_by_level_id($level_id);
+        $custom_tag = $this->get_level_tag($level_id);
+
+        // Plan category label & badge
+        if ($is_service) {
+            $category_label = !empty($custom_tag) ? $custom_tag : __('Add-on Service', 'matchmaker');
+            $category_type  = 'service';
+        } elseif ($tier === 'monthly') {
+            $category_label = !empty($custom_tag) ? $custom_tag : __('Base Plan (Monthly)', 'matchmaker');
+            $category_type  = 'monthly';
+        } elseif ($tier === 'event') {
+            $category_label = !empty($custom_tag) ? $custom_tag : __('Base Plan (Event Pass)', 'matchmaker');
+            $category_type  = 'event';
+        } else {
+            $category_label = !empty($custom_tag) ? $custom_tag : __('Base Plan (Free Tier)', 'matchmaker');
+            $category_type  = 'free';
+        }
+
+        // Start Date
+        $start_date_ts = 0;
+        if (is_object($level) && !empty($level->startdate)) {
+            $start_date_ts = is_numeric($level->startdate) ? (int) $level->startdate : strtotime((string) $level->startdate);
+        }
+        if ($start_date_ts <= 0 && $user_id > 0) {
+            $user_obj = get_userdata($user_id);
+            if ($user_obj && !empty($user_obj->user_registered)) {
+                $start_date_ts = strtotime($user_obj->user_registered);
+            }
+        }
+        $date_format    = get_option('date_format', 'F j, Y');
+        $start_date_str = $start_date_ts > 0 ? (function_exists('date_i18n') ? date_i18n($date_format, $start_date_ts) : gmdate($date_format, $start_date_ts)) : '—';
+
+        // Expiration / Renewal Date
+        $expiration_label = __('Expiration / Renewal', 'matchmaker');
+        $expiration_val   = '';
+        $is_expiring_soon = false;
+
+        $end_date_ts = 0;
+        if (is_object($level) && !empty($level->enddate)) {
+            $end_date_ts = is_numeric($level->enddate) ? (int) $level->enddate : strtotime((string) $level->enddate);
+        }
+
+        if ($end_date_ts > 0) {
+            $expiration_label = __('Expires On', 'matchmaker');
+            $expiration_val   = function_exists('date_i18n') ? date_i18n($date_format, $end_date_ts) : gmdate($date_format, $end_date_ts);
+            if ($end_date_ts <= time() + (7 * 86400)) {
+                $is_expiring_soon = true;
+            }
+        } else {
+            // Check if there is an active PMPro subscription with next payment date
+            $subscription_found = false;
+            if (class_exists('PMPro_Subscription') && method_exists('PMPro_Subscription', 'get_subscriptions_for_user')) {
+                $subs = \PMPro_Subscription::get_subscriptions_for_user($user_id, $level_id);
+                if (!empty($subs) && is_object($subs[0]) && method_exists($subs[0], 'get_next_payment_date')) {
+                    $next_payment = $subs[0]->get_next_payment_date($date_format);
+                    if (!empty($next_payment) && $next_payment !== '—') {
+                        $expiration_label   = __('Next Payment On', 'matchmaker');
+                        $expiration_val     = $next_payment;
+                        $subscription_found = true;
+                    }
+                }
+            }
+
+            if (!$subscription_found) {
+                if ($is_service) {
+                    $expiration_label = __('Status', 'matchmaker');
+                    $expiration_val   = __('Ongoing / Active Service', 'matchmaker');
+                } elseif ($tier === 'monthly') {
+                    $expiration_label = __('Renewal Cycle', 'matchmaker');
+                    $expiration_val   = __('Auto-Renewing Monthly', 'matchmaker');
+                } elseif ($tier === 'event') {
+                    $expiration_label = __('Expiration', 'matchmaker');
+                    $expiration_val   = __('Valid for Single Event', 'matchmaker');
+                } elseif ($tier === 'free') {
+                    $expiration_label = __('Expiration', 'matchmaker');
+                    $expiration_val   = __('Never (Free Plan)', 'matchmaker');
+                } else {
+                    $expiration_label = __('Expiration', 'matchmaker');
+                    $expiration_val   = __('Ongoing Active', 'matchmaker');
+                }
+            }
+        }
+
+        // Cost / Billing description
+        $cost_text = '';
+        if (function_exists('pmpro_getLevelCost') && is_object($level)) {
+            $cost_text = pmpro_getLevelCost($level, true, true);
+        }
+        if (empty($cost_text)) {
+            if ($is_service) {
+                if (is_object($level) && !empty($level->initial_payment) && (float) $level->initial_payment > 0) {
+                    $cost_text = sprintf('$%0.2f', (float) $level->initial_payment);
+                } elseif (is_object($level) && !empty($level->billing_amount) && (float) $level->billing_amount > 0) {
+                    $cost_text = sprintf('$%0.2f', (float) $level->billing_amount);
+                } else {
+                    $cost_text = __('Active Service', 'matchmaker');
+                }
+            } elseif ($tier === 'free') {
+                $cost_text = __('Free ($0.00)', 'matchmaker');
+            } elseif (is_object($level) && !empty($level->billing_amount) && (float) $level->billing_amount > 0) {
+                $cost_text = sprintf('$%0.2f / month', (float) $level->billing_amount);
+            } elseif (is_object($level) && !empty($level->initial_payment) && (float) $level->initial_payment > 0) {
+                $cost_text = sprintf('$%0.2f', (float) $level->initial_payment);
+            } else {
+                $cost_text = '—';
+            }
+        }
+
+        $has_active_services = $this->has_active_one_on_one_service($user_id);
+        $show_service_lock_notice = (!$is_service && $has_active_services);
+
+        return [
+            'level_id'                 => $level_id,
+            'name'                     => is_object($level) ? ($level->name ?? '') : '',
+            'status'                   => __('Active', 'matchmaker'),
+            'category_label'           => $category_label,
+            'category_type'            => $category_type,
+            'is_service'               => $is_service,
+            'start_date'               => $start_date_str,
+            'expiration_label'         => $expiration_label,
+            'expiration_value'         => $expiration_val,
+            'is_expiring_soon'         => $is_expiring_soon,
+            'cost_text'                => strip_tags((string) $cost_text),
+            'show_service_lock_notice' => $show_service_lock_notice,
+        ];
+    }
+
+    /**
+     * Renders rich membership details and expiration info on the PMPro Account page level cards.
+     * Hooked to 'pmpro_membership_account_after_level_card_content'.
+     *
+     * @param mixed $level
+     * @return void
+     */
+    public function render_membership_account_card_details(mixed $level): void
+    {
+        $details = $this->get_membership_level_card_details($level);
+        if (empty($details)) {
+            return;
+        }
+
+        ?>
+        <div class="mm-account-membership-details" style="margin-top:14px; padding:16px 18px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:13.5px; color:#334155;">
+            <div class="mm-account-meta-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px 20px;">
+                <div class="mm-account-meta-item" style="display:flex; flex-direction:column; gap:3px;">
+                    <span class="mm-meta-label" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;"><?php esc_html_e('Status', 'matchmaker'); ?></span>
+                    <span class="mm-meta-value mm-badge-active" style="font-size:12px; font-weight:700; color:#065f46; background:#ecfdf5; border:1px solid #a7f3d0; padding:2px 10px; border-radius:12px; width:fit-content; display:inline-flex; align-items:center; gap:4px;">
+                        ● <?php echo esc_html($details['status']); ?>
+                    </span>
+                </div>
+                <div class="mm-account-meta-item" style="display:flex; flex-direction:column; gap:3px;">
+                    <span class="mm-meta-label" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;"><?php esc_html_e('Plan Type', 'matchmaker'); ?></span>
+                    <span class="mm-meta-value mm-badge-tier" style="font-size:12px; font-weight:700; color:#cc723f; background:#fff8f5; border:1px solid #fbd6c5; padding:2px 10px; border-radius:12px; width:fit-content;">
+                        <?php echo esc_html($details['category_label']); ?>
+                    </span>
+                </div>
+                <div class="mm-account-meta-item" style="display:flex; flex-direction:column; gap:3px;">
+                    <span class="mm-meta-label" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;"><?php esc_html_e('Enrolled Date', 'matchmaker'); ?></span>
+                    <span class="mm-meta-value" style="font-size:13.5px; font-weight:600; color:#1e293b;">
+                        <?php echo esc_html($details['start_date']); ?>
+                    </span>
+                </div>
+                <div class="mm-account-meta-item" style="display:flex; flex-direction:column; gap:3px;">
+                    <span class="mm-meta-label" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;"><?php echo esc_html($details['expiration_label']); ?></span>
+                    <span class="mm-meta-value mm-meta-highlight" style="font-size:13.5px; font-weight:700; color:#cc723f;">
+                        <?php echo esc_html($details['expiration_value']); ?>
+                    </span>
+                </div>
+                <?php if (!empty($details['cost_text']) && $details['cost_text'] !== '—') : ?>
+                    <div class="mm-account-meta-item" style="display:flex; flex-direction:column; gap:3px;">
+                        <span class="mm-meta-label" style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;"><?php esc_html_e('Billing / Price', 'matchmaker'); ?></span>
+                        <span class="mm-meta-value" style="font-size:13.5px; font-weight:600; color:#1e293b;">
+                            <?php echo esc_html($details['cost_text']); ?>
+                        </span>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <?php if (!empty($details['show_service_lock_notice'])) : ?>
+                <div class="mm-account-service-notice" style="margin-top:12px; padding-top:10px; border-top:1px dashed #cbd5e1; font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px;">
+                    <span>🛡️ <?php esc_html_e('Base membership is active and linked to your add-on services. Cancellation is restricted while services are active.', 'matchmaker'); ?></span>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
     }
 
     /**

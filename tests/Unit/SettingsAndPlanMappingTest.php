@@ -695,6 +695,92 @@ final class SettingsAndPlanMappingTest extends TestCase
         }
         $this->assertTrue($caught, 'wp_send_json_success should throw RuntimeException');
     }
+
+    public function test_membership_account_card_details_resolution(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 930;
+
+        // 1. Monthly base tier with active add-on service
+        $start_date = '2026-01-15 10:00:00';
+        $monthly_level = new \FakePMProLevel(3, 'Monthly Membership', '$29/month', 0);
+        $monthly_level->startdate = $start_date;
+        $monthly_level->billing_amount = 29.00;
+
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            $monthly_level,
+            new \FakePMProLevel(4, 'Private Matchmaking'),
+        ];
+
+        $details = $sync->get_membership_level_card_details($monthly_level, $user_id);
+
+        $this->assertEquals('Active', $details['status']);
+        $this->assertEquals('Base Plan (Monthly)', $details['category_label']);
+        $this->assertFalse($details['is_service']);
+        $this->assertStringContainsString('Jan', $details['start_date']);
+        $this->assertEquals('Renewal Cycle', $details['expiration_label']);
+        $this->assertEquals('Auto-Renewing Monthly', $details['expiration_value']);
+        $this->assertTrue($details['show_service_lock_notice'], 'Base tier must show service lock notice when services are active');
+
+        // 2. Add-on service level (Level 4)
+        $service_level = new \FakePMProLevel(4, 'Private Matchmaking', 'VIP Service');
+        $service_level->startdate = $start_date;
+        $service_level->initial_payment = 99.00;
+
+        $service_details = $sync->get_membership_level_card_details($service_level, $user_id);
+        $this->assertEquals('Add-on Service', $service_details['category_label']);
+        $this->assertTrue($service_details['is_service']);
+        $this->assertEquals('Ongoing / Active Service', $service_details['expiration_value']);
+        $this->assertFalse($service_details['show_service_lock_notice'], 'Service levels should not show base lock notice');
+
+        // 3. Level with explicit expiration date
+        $future_enddate = '2026-10-30 23:59:59';
+        $event_level = new \FakePMProLevel(6, 'Event Pass', 'Single Event', $future_enddate);
+        $event_level->startdate = $start_date;
+
+        $event_details = $sync->get_membership_level_card_details($event_level, $user_id);
+        $this->assertEquals('Expires On', $event_details['expiration_label']);
+        $this->assertStringContainsString('Oct', $event_details['expiration_value']);
+
+        // 4. Free level
+        $free_level = new \FakePMProLevel(2, 'Free Membership', 'Free tier', 0);
+        $free_details = $sync->get_membership_level_card_details($free_level, $user_id);
+        $this->assertEquals('Base Plan (Free Tier)', $free_details['category_label']);
+        $this->assertEquals('Never (Free Plan)', $free_details['expiration_value']);
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
+
+    public function test_render_membership_account_card_details_output(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 931;
+
+        $monthly_level = new \FakePMProLevel(3, 'Monthly Membership', '$29/mo', 0);
+        $monthly_level->startdate = '2026-03-01 12:00:00';
+        $monthly_level->billing_amount = 29.00;
+
+        update_user_meta($user_id, 'mm_email_verified', 1);
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            $monthly_level,
+            new \FakePMProLevel(4, '1-on-1 VIP Matchmaking'),
+        ];
+        $GLOBALS['__mm_current_user_id'] = $user_id;
+
+        try {
+            ob_start();
+            $sync->render_membership_account_card_details($monthly_level);
+            $html = ob_get_clean();
+
+            $this->assertStringContainsString('mm-account-membership-details', $html);
+            $this->assertStringContainsString('Active', $html);
+            $this->assertStringContainsString('Base Plan (Monthly)', $html);
+            $this->assertStringContainsString('Auto-Renewing Monthly', $html);
+            $this->assertStringContainsString('Base membership is active and linked to your add-on services', $html);
+        } finally {
+            unset($GLOBALS['__mm_user_pmpro_levels'][$user_id], $GLOBALS['__mm_current_user_id']);
+        }
+    }
 }
 
 
