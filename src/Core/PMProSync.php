@@ -62,12 +62,20 @@ class PMProSync {
         add_action('pmpro_after_checkout', [$this, 'handle_checkout_sync'], 10, 2);
         add_action('pmpro_subscription_payment_completed', [$this, 'reset_user_quota_on_renewal'], 10, 1);
         add_action('pmpro_membership_post_membership_expiry', [$this, 'handle_expiry_sync'], 10, 2);
+        add_action('pmpro_membership_status_change', [$this, 'handle_status_change_sync'], 10, 3);
         add_filter('pmpro_registration_checks', [$this, 'check_service_requires_basic_membership'], 10, 1);
         add_filter('pmpro_has_membership_level', [$this, 'filter_pmpro_has_membership_level_for_checkout'], 10, 3);
         add_filter('pmpro_allow_duplicate_level_checkouts', '__return_true');
         add_filter('pmprommpu_checkout_level', [$this, 'filter_pmprommpu_checkout_level'], 10, 2);
+        add_filter('pmpro_can_cancel_membership_level', [$this, 'filter_pmpro_can_cancel_membership_level'], 10, 3);
         add_filter('pmpro_cancel_membership_level', [$this, 'block_base_membership_cancellation_with_active_services'], 10, 3);
-        add_action('template_redirect', [$this, 'maybe_block_cancel_page_for_active_services']);
+        add_filter('pmpro_member_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
+        add_filter('pmpro_account_membership_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
+        add_filter('pmpro_account_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
+        add_action('init', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
+        add_action('template_redirect', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
+        add_action('wp_footer', [$this, 'render_account_cancel_blockade_script']);
+        add_action('pmpro_account_preheader', [$this, 'render_account_error_notice']);
     }
 
     /**
@@ -674,10 +682,21 @@ class PMProSync {
             return;
         }
 
+        $user_id = get_current_user_id();
+        if ($user_id <= 0 || !$this->has_active_one_on_one_service($user_id)) {
+            return;
+        }
+
+        global $post;
         $is_cancel_page = false;
+
         if (function_exists('pmpro_is_cancel_page') && pmpro_is_cancel_page()) {
             $is_cancel_page = true;
-        } elseif (is_page('cancel') || isset($_REQUEST['membership_cancel']) || (isset($_REQUEST['action']) && $_REQUEST['action'] === 'cancel')) {
+        } elseif (is_page('cancel') || is_page('membership-cancel') || is_page('pmpro-cancel') || is_page('cancel-membership')) {
+            $is_cancel_page = true;
+        } elseif (is_a($post, 'WP_Post') && (has_shortcode($post->post_content, 'pmpro_cancel') || str_contains($post->post_content, 'membership_cancel') || str_contains($post->post_content, 'membership-cancel'))) {
+            $is_cancel_page = true;
+        } elseif (isset($_REQUEST['membership_cancel']) || isset($_REQUEST['pmpro_cancel']) || (isset($_REQUEST['action']) && $_REQUEST['action'] === 'cancel')) {
             $is_cancel_page = true;
         }
 
@@ -685,15 +704,159 @@ class PMProSync {
             return;
         }
 
-        $user_id = get_current_user_id();
-        if ($user_id > 0 && $this->has_active_one_on_one_service($user_id)) {
-            $cancel_level = isset($_REQUEST['level']) ? (int) $_REQUEST['level'] : 0;
-            if ($cancel_level === 0 || !$this->is_service_level($cancel_level)) {
-                $account_url  = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
-                $redirect_url = add_query_arg('msg', 'cannot_cancel_base_with_services', $account_url);
-                wp_safe_redirect($redirect_url);
+        $cancel_level = 0;
+        if (!empty($_REQUEST['level'])) {
+            $cancel_level = (int) $_REQUEST['level'];
+        } elseif (!empty($_POST['level'])) {
+            $cancel_level = (int) $_POST['level'];
+        } elseif (!empty($_REQUEST['membership_cancel']) && is_numeric($_REQUEST['membership_cancel'])) {
+            $cancel_level = (int) $_REQUEST['membership_cancel'];
+        }
+
+        if ($cancel_level === 0 || !$this->is_service_level($cancel_level)) {
+            $account_url  = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
+            $redirect_url = add_query_arg('msg', 'cannot_cancel_base_with_services', $account_url);
+            
+            if (function_exists('pmpro_setMessage')) {
+                pmpro_setMessage(__('You cannot cancel your base membership while you have active add-on services. Please contact support.', 'matchmaker'), 'pmpro_error');
+            }
+
+            wp_safe_redirect($redirect_url);
+            if (!defined('MM_UNIT_TESTS')) {
                 exit;
             }
+        }
+    }
+
+    /**
+     * Filter pmpro_can_cancel_membership_level in PMPro 3.0+
+     *
+     * @param bool       $can_cancel
+     * @param int        $user_id
+     * @param mixed      $level
+     * @return bool
+     */
+    public function filter_pmpro_can_cancel_membership_level(bool $can_cancel, int $user_id, mixed $level = null): bool
+    {
+        if (!$can_cancel) {
+            return false;
+        }
+
+        if ($user_id <= 0) {
+            $user_id = get_current_user_id();
+        }
+
+        if ($user_id <= 0 || !$this->has_active_one_on_one_service($user_id)) {
+            return $can_cancel;
+        }
+
+        $lid = is_object($level) ? (int) ($level->id ?? 0) : (int) $level;
+        if ($lid > 0 && $this->is_service_level($lid)) {
+            return $can_cancel;
+        }
+
+        return false;
+    }
+
+    /**
+     * Removes the 'Cancel' link from PMPro Account membership tables for base memberships if user has active services.
+     *
+     * @param array      $links
+     * @param mixed      $level
+     * @param int|null   $user_id
+     * @return array
+     */
+    public function filter_pmpro_member_action_links(array $links, mixed $level, ?int $user_id = null): array
+    {
+        if ($user_id === null || $user_id <= 0) {
+            $user_id = get_current_user_id();
+        }
+
+        if ($user_id <= 0 || !$this->has_active_one_on_one_service($user_id)) {
+            return $links;
+        }
+
+        $lid = is_object($level) ? (int) ($level->id ?? 0) : (int) $level;
+        if ($lid > 0 && !$this->is_service_level($lid)) {
+            unset($links['cancel'], $links['pmpro_cancel']);
+        }
+
+        return $links;
+    }
+
+    /**
+     * Injects client-side safety script on PMPro Account page to hide base membership cancel links when services are active.
+     *
+     * @return void
+     */
+    public function render_account_cancel_blockade_script(): void
+    {
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        $user_id = get_current_user_id();
+        if ($user_id <= 0 || !$this->has_active_one_on_one_service($user_id)) {
+            return;
+        }
+
+        $services = $this->get_user_active_services($user_id);
+        if (empty($services)) {
+            return;
+        }
+
+        $service_level_ids = array_map(static fn($s) => (int)$s['id'], $services);
+        $service_ids_json  = json_encode($service_level_ids);
+
+        ?>
+        <script>
+        (function() {
+            function enforceCancelBlockade() {
+                var serviceIds = <?php echo $service_ids_json; ?>;
+                var cancelLinks = document.querySelectorAll('a[href*="cancel"], a[href*="membership_cancel"], .pmpro_actionlink-cancel');
+                
+                cancelLinks.forEach(function(link) {
+                    var href = link.getAttribute('href') || '';
+                    var match = href.match(/[?&]level=(\d+)/);
+                    var levelId = match ? parseInt(match[1], 10) : 0;
+                    
+                    // If link is for a base level (not in serviceIds), remove or disable it
+                    if (levelId > 0 && serviceIds.indexOf(levelId) === -1) {
+                        link.style.display = 'none';
+                        var note = document.createElement('span');
+                        note.className = 'pmpro-base-cancel-disabled-note';
+                        note.style.fontSize = '12px';
+                        note.style.color = '#94a3b8';
+                        note.style.fontStyle = 'italic';
+                        note.textContent = 'Active with services';
+                        if (link.parentNode) {
+                            link.parentNode.insertBefore(note, link.nextSibling);
+                        }
+                    }
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', enforceCancelBlockade);
+            } else {
+                enforceCancelBlockade();
+            }
+        })();
+        </script>
+        <?php
+    }
+
+    /**
+     * Displays a clean error notice on the PMPro Account page if redirected from a blocked cancellation attempt.
+     *
+     * @return void
+     */
+    public function render_account_error_notice(): void
+    {
+        if (!empty($_GET['msg']) && $_GET['msg'] === 'cannot_cancel_base_with_services') {
+            echo '<div class="pmpro_message pmpro_error" style="margin-bottom:20px;padding:12px 16px;background:#fef2f2;border-left:4px solid #ef4444;color:#991b1b;border-radius:6px;font-weight:500;">'
+                . esc_html__('You cannot cancel your base membership while you have active add-on services. Please contact support.', 'matchmaker')
+                . '</div>';
         }
     }
 
@@ -732,6 +895,13 @@ class PMProSync {
                 foreach ($user_levels as $ulvl) {
                     $ulid = is_object($ulvl) ? (int) ($ulvl->id ?? 0) : (int) $ulvl;
                     if ($ulid > 0 && isset($service_map[$ulid])) {
+                        // Check expiry if set
+                        if (is_object($ulvl) && !empty($ulvl->enddate)) {
+                            $end_ts = is_numeric($ulvl->enddate) ? (int) $ulvl->enddate : strtotime((string) $ulvl->enddate);
+                            if ($end_ts > 0 && $end_ts <= current_time('timestamp')) {
+                                continue;
+                            }
+                        }
                         $user_service_ids[$ulid] = is_object($ulvl) && !empty($ulvl->name) ? (string) $ulvl->name : ($service_map[$ulid] ?: '');
                     }
                 }
@@ -743,7 +913,9 @@ class PMProSync {
             if (is_object($membership) && !empty($membership->id)) {
                 $mlid = (int) $membership->id;
                 if (isset($service_map[$mlid])) {
-                    $user_service_ids[$mlid] = (string) ($membership->name ?? $service_map[$mlid]);
+                    if (empty($membership->enddate) || (strtotime((string)$membership->enddate) > current_time('timestamp'))) {
+                        $user_service_ids[$mlid] = (string) ($membership->name ?? $service_map[$mlid]);
+                    }
                 }
             }
         }
@@ -806,6 +978,52 @@ class PMProSync {
     }
 
     /**
+     * Recursion guard for assigning the free membership level.
+     *
+     * @var bool
+     */
+    private static bool $is_assigning_free = false;
+
+    /**
+     * Automatically assigns the PMPro Free membership level to a user if they have no active paid base tier
+     * and do not already hold the free membership level.
+     *
+     * @param int $user_id
+     * @return void
+     */
+    public function maybe_assign_free_membership(int $user_id): void
+    {
+        if ($user_id <= 0 || self::$is_assigning_free) {
+            return;
+        }
+
+        // Only assign free membership if the user has no active paid base tier (monthly, event)
+        $current_user_type = $this->get_current_user_type($user_id);
+        if ($current_user_type !== 'free') {
+            return;
+        }
+
+        $free_level_id = $this->get_primary_level_for_tier('free', 2);
+        if ($free_level_id <= 0) {
+            return;
+        }
+
+        // Check if user already has the free level active in PMPro
+        if (function_exists('pmpro_hasMembershipLevel') && pmpro_hasMembershipLevel($free_level_id, $user_id)) {
+            return;
+        }
+
+        if (function_exists('pmpro_changeMembershipLevel')) {
+            self::$is_assigning_free = true;
+            try {
+                pmpro_changeMembershipLevel($free_level_id, $user_id);
+            } finally {
+                self::$is_assigning_free = false;
+            }
+        }
+    }
+
+    /**
      * Syncs PMPro level changes to our system.
      *
      * @param mixed $level_id
@@ -851,6 +1069,8 @@ class PMProSync {
 
         if (in_array($resolved_user_type, ['monthly', 'event'], true)) {
             $this->maybe_cancel_free_levels($user_id);
+        } elseif ($resolved_user_type === 'free') {
+            $this->maybe_assign_free_membership($user_id);
         }
         
         \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
@@ -901,6 +1121,8 @@ class PMProSync {
 
             if (in_array($resolved_user_type, ['monthly', 'event'], true)) {
                 $this->maybe_cancel_free_levels($user_id);
+            } elseif ($resolved_user_type === 'free') {
+                $this->maybe_assign_free_membership($user_id);
             }
 
             \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
@@ -966,6 +1188,23 @@ class PMProSync {
     }
 
     /**
+     * Hook on PMPro membership status changes (e.g. cancelled, expired, inactive).
+     *
+     * @param string $status
+     * @param int    $user_id
+     * @param mixed  $level_id
+     * @return void
+     */
+    public function handle_status_change_sync(string $status, int $user_id, mixed $level_id = null): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $this->sync_all_membership_levels($user_id);
+    }
+
+    /**
      * Cancels any active Free tier levels for a user if they hold a paid base tier.
      * Group 3 (1-on-1) levels are NEVER cancelled.
      *
@@ -999,6 +1238,7 @@ class PMProSync {
     /**
      * Retrieves the current base subscription user_type (Group 1: free, Group 2: monthly / event).
      * 1-on-1 (Group 3) is treated as an independent add-on service.
+     * Respects active subscription periods (grace period before expiry date).
      *
      * @param int $user_id
      * @return string 'monthly' | 'event' | 'free'
@@ -1021,6 +1261,14 @@ class PMProSync {
                 foreach ($levels as $level_obj) {
                     $lvl_id = is_object($level_obj) ? (int) ($level_obj->id ?? 0) : (int) $level_obj;
                     if ($lvl_id > 0 && !$this->is_service_level($lvl_id)) {
+                        // Check expiration date if present
+                        if (is_object($level_obj) && !empty($level_obj->enddate)) {
+                            $end_ts = is_numeric($level_obj->enddate) ? (int) $level_obj->enddate : strtotime((string) $level_obj->enddate);
+                            if ($end_ts > 0 && $end_ts <= current_time('timestamp')) {
+                                continue; // Expired, skip as active tier
+                            }
+                        }
+
                         $tier = $this->get_user_type_by_level_id($lvl_id);
                         if (isset(self::BASE_TIER_PRIORITY[$tier])) {
                             $rank = self::BASE_TIER_PRIORITY[$tier];
@@ -1042,9 +1290,18 @@ class PMProSync {
         if (function_exists('pmpro_getMembershipLevelForUser')) {
             $membership = pmpro_getMembershipLevelForUser($user_id);
             if (is_object($membership) && !empty($membership->id)) {
-                $tier = $this->get_user_type_by_level_id((int) $membership->id);
-                if (in_array($tier, ['monthly', 'event'], true)) {
-                    return $tier;
+                $is_expired = false;
+                if (!empty($membership->enddate)) {
+                    $end_ts = is_numeric($membership->enddate) ? (int) $membership->enddate : strtotime((string) $membership->enddate);
+                    if ($end_ts > 0 && $end_ts <= current_time('timestamp')) {
+                        $is_expired = true;
+                    }
+                }
+                if (!$is_expired) {
+                    $tier = $this->get_user_type_by_level_id((int) $membership->id);
+                    if (in_array($tier, ['monthly', 'event'], true)) {
+                        return $tier;
+                    }
                 }
             }
         }
@@ -1117,6 +1374,10 @@ class PMProSync {
             $resolved_user_type = $this->get_current_user_type($user_id);
             if (!in_array($resolved_user_type, ['free', 'monthly', 'event'], true)) {
                 $resolved_user_type = 'free';
+            }
+
+            if ($resolved_user_type === 'free') {
+                $this->maybe_assign_free_membership($user_id);
             }
 
             $has_one_on_one = $this->has_active_one_on_one_service($user_id);

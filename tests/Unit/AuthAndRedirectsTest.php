@@ -235,12 +235,14 @@ class AuthAndRedirectsTest
 
     public function test_privacy_policy_checkbox_rendering_markup(): void
     {
+        // 1. Logged-out user should render the privacy policy checkbox
+        $GLOBALS['__mm_current_user_id'] = 0;
         ob_start();
         $this->auth->render_checkout_privacy_policy_checkbox();
         $html = (string) ob_get_clean();
 
         if (!str_contains($html, 'id="pmpro_privacy_policy_wrapper"')) {
-            throw new \RuntimeException("Expected privacy policy wrapper in HTML: " . $html);
+            throw new \RuntimeException("Expected privacy policy wrapper in HTML for logged-out user: " . $html);
         }
 
         if (!str_contains($html, 'name="privacy_policy_consent"')) {
@@ -254,27 +256,50 @@ class AuthAndRedirectsTest
         if (!str_contains($html, 'pmpro_asterisk') || !str_contains($html, '*')) {
             throw new \RuntimeException("Expected required asterisk in privacy policy checkbox: " . $html);
         }
+
+        // 2. Logged-in user should NOT render the privacy policy checkbox
+        $GLOBALS['__mm_current_user_id'] = 109;
+        ob_start();
+        $this->auth->render_checkout_privacy_policy_checkbox();
+        $logged_in_html = (string) ob_get_clean();
+
+        if (!empty($logged_in_html)) {
+            throw new \RuntimeException("Expected no privacy policy checkbox for logged-in user, got: " . $logged_in_html);
+        }
+
+        $GLOBALS['__mm_current_user_id'] = 0;
     }
 
     public function test_privacy_policy_consent_validation_on_checkout(): void
     {
+        // 1. For logged-out user:
+        $GLOBALS['__mm_current_user_id'] = 0;
         $_POST['submit-checkout'] = '1';
         unset($_POST['privacy_policy_consent'], $_REQUEST['privacy_policy_consent']);
 
         // Check without consent - must fail
         $valid = $this->auth->check_privacy_policy_consent(true);
         if ($valid !== false) {
-            throw new \RuntimeException("Expected checkout without privacy policy consent to fail validation.");
+            throw new \RuntimeException("Expected logged-out checkout without privacy policy consent to fail validation.");
         }
 
         // Check with consent - must pass
         $_POST['privacy_policy_consent'] = '1';
         $valid_with_consent = $this->auth->check_privacy_policy_consent(true);
         if ($valid_with_consent !== true) {
-            throw new \RuntimeException("Expected checkout with privacy policy consent to pass validation.");
+            throw new \RuntimeException("Expected logged-out checkout with privacy policy consent to pass validation.");
+        }
+
+        // 2. For logged-in user (already agreed previously):
+        $GLOBALS['__mm_current_user_id'] = 109;
+        unset($_POST['privacy_policy_consent'], $_REQUEST['privacy_policy_consent']);
+        $valid_logged_in = $this->auth->check_privacy_policy_consent(true);
+        if ($valid_logged_in !== true) {
+            throw new \RuntimeException("Expected logged-in checkout to pass validation without needing consent checkbox.");
         }
 
         unset($_POST['submit-checkout'], $_POST['privacy_policy_consent']);
+        $GLOBALS['__mm_current_user_id'] = 0;
     }
 
     public function test_privacy_policy_consent_saved_on_checkout(): void

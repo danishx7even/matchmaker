@@ -445,5 +445,106 @@ final class SettingsAndPlanMappingTest extends TestCase
 
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
+
+    public function test_pmpro_cancel_action_links_and_can_cancel_filters_block_base_levels(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 902;
+
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [6],
+        ]);
+
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(3, 'Monthly Matchmaking'),
+            new \FakePMProLevel(6, 'Social Media Post'),
+        ];
+
+        // 1. Test filter_pmpro_can_cancel_membership_level
+        // Base level 3 must NOT be cancellable
+        $can_cancel_base = $sync->filter_pmpro_can_cancel_membership_level(true, $user_id, 3);
+        $this->assertFalse($can_cancel_base, 'filter_pmpro_can_cancel_membership_level should return false for base level when services are active');
+
+        // Service level 6 must be cancellable
+        $can_cancel_service = $sync->filter_pmpro_can_cancel_membership_level(true, $user_id, 6);
+        $this->assertTrue($can_cancel_service, 'filter_pmpro_can_cancel_membership_level should return true for service level');
+
+        // 2. Test filter_pmpro_member_action_links
+        $base_links = [
+            'change' => '<a href="/change">Change</a>',
+            'cancel' => '<a href="/cancel">Cancel</a>',
+        ];
+
+        $filtered_base_links = $sync->filter_pmpro_member_action_links($base_links, (object) ['id' => 3], $user_id);
+        $this->assertArrayNotHasKey('cancel', $filtered_base_links, 'Cancel link should be removed for base level');
+        $this->assertArrayHasKey('change', $filtered_base_links, 'Change link should remain intact');
+
+        $service_links = [
+            'cancel' => '<a href="/cancel">Cancel</a>',
+        ];
+        $filtered_service_links = $sync->filter_pmpro_member_action_links($service_links, (object) ['id' => 6], $user_id);
+        $this->assertArrayHasKey('cancel', $filtered_service_links, 'Cancel link should remain for service level');
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
+
+    public function test_membership_cancellation_auto_assigns_free_membership_and_updates_user_type(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 903;
+
+        // User starts with Monthly membership (level 3)
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(3, 'Monthly Matchmaking'),
+        ];
+        $sync->sync_pmpro_level_to_user_type(3, $user_id, 0);
+        $this->assertEquals('monthly', get_user_meta($user_id, 'user_type', true));
+
+        // User cancels Monthly membership (level 0)
+        pmpro_changeMembershipLevel(0, $user_id);
+        $sync->sync_pmpro_level_to_user_type(0, $user_id, 3);
+
+        // 1. User type should be free in usermeta, pool, and profile service
+        $this->assertEquals('free', get_user_meta($user_id, 'user_type', true));
+        $this->assertEquals('free', ProfileService::instance()->get_user_type($user_id));
+        $this->assertEquals('free', $sync->get_current_user_type($user_id));
+
+        // 2. Free membership level (level 2) should be automatically assigned
+        $this->assertTrue(pmpro_hasMembershipLevel(2, $user_id), 'Free membership level (2) must be assigned on base cancellation');
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id], $GLOBALS['__mm_user_pmpro_level'][$user_id]);
+    }
+
+    public function test_grace_period_retains_active_tier_until_expiration(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 904;
+
+        // 1. Subscription cancelled at gateway, but access remains active until 15 days in the future
+        $future_enddate = gmdate('Y-m-d H:i:s', time() + (86400 * 15));
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(3, 'Monthly Matchmaking', 'Paid access', $future_enddate),
+        ];
+
+        // During grace period, user_type must remain 'monthly'
+        $this->assertEquals('monthly', $sync->get_current_user_type($user_id));
+        $this->assertEquals('monthly', ProfileService::instance()->get_user_type($user_id));
+
+        // 2. Subscription period has ended (enddate is 1 hour in the past)
+        $past_enddate = gmdate('Y-m-d H:i:s', time() - 3600);
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(3, 'Monthly Matchmaking', 'Expired access', $past_enddate),
+        ];
+
+        // On expiry, user_type must resolve to 'free' and assign free level
+        $this->assertEquals('free', $sync->get_current_user_type($user_id));
+        $sync->handle_expiry_sync($user_id, 3);
+
+        $this->assertEquals('free', get_user_meta($user_id, 'user_type', true));
+        $this->assertTrue(pmpro_hasMembershipLevel(2, $user_id), 'Free membership level (2) must be assigned upon expiry');
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id], $GLOBALS['__mm_user_pmpro_level'][$user_id]);
+    }
 }
 

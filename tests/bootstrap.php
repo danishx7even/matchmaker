@@ -185,11 +185,11 @@ function remove_role(string $role): void {
 }
 
 function get_current_user_id(): int {
-    return $GLOBALS['__mm_current_user_id'] ?? 1;
+    return isset($GLOBALS['__mm_current_user_id']) ? (int) $GLOBALS['__mm_current_user_id'] : 1;
 }
 
 function is_user_logged_in(): bool {
-    return true;
+    return get_current_user_id() > 0;
 }
 
 function current_user_can($cap): bool {
@@ -755,11 +755,13 @@ class FakePMProLevel {
     public int $id;
     public string $name;
     public string $description;
+    public mixed $enddate;
 
-    public function __construct(int $id, string $name, string $description = '') {
+    public function __construct(int $id, string $name, string $description = '', mixed $enddate = 0) {
         $this->id = $id;
         $this->name = $name;
         $this->description = $description;
+        $this->enddate = $enddate;
     }
 }
 
@@ -829,6 +831,9 @@ function pmpro_changeMembershipLevel($level_id, $user_id) {
     } else {
         $GLOBALS['__mm_user_pmpro_levels'][$uid] = [new FakePMProLevel($lid, 'Level ' . $lid)];
     }
+    if (function_exists('do_action')) {
+        do_action('pmpro_after_change_membership_level', $lid, $uid, 0);
+    }
     return true;
 }
 
@@ -858,6 +863,9 @@ function pmpro_cancelMembershipLevel(int $level_id, int $user_id): bool {
     }
     if (isset($GLOBALS['__mm_user_pmpro_level'][$user_id]) && $GLOBALS['__mm_user_pmpro_level'][$user_id] === $level_id) {
         unset($GLOBALS['__mm_user_pmpro_level'][$user_id]);
+    }
+    if (function_exists('do_action')) {
+        do_action('pmpro_after_change_membership_level', 0, $user_id, $level_id);
     }
     return true;
 }

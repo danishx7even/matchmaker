@@ -1538,6 +1538,57 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — all 124 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
 
+## 2026-09-13 — Task 79: Restrict Privacy Policy Checkbox to Logged-Out Users & Multi-Layer Base Membership Cancellation Blockade
+
+- **Objective**:
+  1. **Restrict Privacy Policy Checkbox to Logged-Out Users**: Ensure the Privacy Policy consent checkbox in the PMPro checkout page is only rendered and enforced for logged-out users (new registrations / guest checkouts). Logged-in users (who already accepted terms upon account creation) should not see the checkbox nor be blocked by its validation.
+  2. **Multi-Layer Base Membership Cancellation Blockade for Users with Active Services**: Strictly prevent users with active add-on services from cancelling their base membership (Free, Monthly, Event) across all possible cancellation vectors:
+     - Account Page Action Links (`pmpro_member_action_links`, `pmpro_account_membership_action_links`, `pmpro_account_action_links`): Strips "Cancel" links for base tiers when active services are held.
+     - Account Page DOM Safety Script: Injects client-side safety script hiding cancel links and showing an indicator badge.
+     - Early Route Interception (`init`, `template_redirect` at priority 1): Redirects any visit to cancellation URLs or cancel queries to `/membership-account/?msg=cannot_cancel_base_with_services`.
+     - PMPro 3.0+ Filter (`pmpro_can_cancel_membership_level`): Returns `false` for base tiers if active services exist.
+     - Core Cancellation Filter (`pmpro_cancel_membership_level`): Returns `false` with error notice when base tier cancellation is attempted.
+- **Changes**:
+  - `src/Frontend/AuthController.php`:
+    - Updated `render_checkout_privacy_policy_checkbox()` to return immediately if `is_user_logged_in()`.
+    - Updated `check_privacy_policy_consent()` to return `true` immediately if `is_user_logged_in()`.
+  - `src/Core/PMProSync.php`:
+    - Added `filter_pmpro_can_cancel_membership_level()` filter hook.
+    - Added `filter_pmpro_member_action_links()` filter hook.
+    - Added `render_account_cancel_blockade_script()` on `wp_footer`.
+    - Enhanced `maybe_block_cancel_page_for_active_services()` on `init` and `template_redirect` (priority 1).
+  - `tests/bootstrap.php`:
+    - Updated `is_user_logged_in()` to dynamically check `get_current_user_id() > 0`.
+  - `tests/Unit/AuthAndRedirectsTest.php`:
+    - Updated `test_privacy_policy_checkbox_rendering_markup()` to test both logged-out (renders markup) and logged-in (empty markup) states.
+    - Updated `test_privacy_policy_consent_validation_on_checkout()` to test logged-out validation failure/success and logged-in automatic bypass.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_pmpro_cancel_action_links_and_can_cancel_filters_block_base_levels()` verifying `filter_pmpro_can_cancel_membership_level` and `filter_pmpro_member_action_links`.
+## 2026-09-13 — Task 80: User Type Updates on Membership Cancellation, Grace Period Preservation & Auto-Assignment of Free Membership
+
+- **Objective**:
+  1. **User Type on Membership Cancellation & Expiry**: Ensure that when a member cancels their base membership (Monthly or Event) and access ends, their `user_type` is immediately stripped of the old tier and downgraded to `'free'` in `wp_usermeta` and `wp_matchmaking_pool`.
+  2. **Grace Period Preservation**: When a user cancels subscription billing at the payment gateway or via "Cancel at end of cycle" but paid access remains active for the billing period (`enddate > current_time`), preserve the `user_type` as `'monthly'` / `'event'` until the expiration date. When the expiration date passes, immediately transition `user_type` to `'free'`.
+  3. **Auto-Assignment of Free Membership Tier**: When a member's base membership ends (on cancellation or expiration), automatically assign the PMPro Free membership level (`level 2` / mapped `'free'` tier) to the user via `PMProSync::maybe_assign_free_membership()` (protected by recursion guards).
+  4. **Active Services Cancellation Gate & Error Display**: Strictly check for active add-on services before base membership cancellation across all PMPro hooks and display clear error notices if active services exist.
+- **Changes**:
+  - `src/Core/PMProSync.php`:
+    - Added `maybe_assign_free_membership(int $user_id): void` with `$is_assigning_free` recursion protection.
+    - Updated `get_current_user_type(int $user_id)` to evaluate level `enddate` for grace period preservation vs expiration.
+    - Added `handle_status_change_sync()` hooked to `pmpro_membership_status_change`.
+    - Added `render_account_error_notice()` hooked to `pmpro_account_preheader`.
+    - Updated `sync_pmpro_level_to_user_type()`, `sync_all_membership_levels()`, and `sync_all_users_user_types()` to call `maybe_assign_free_membership($user_id)` when resolved tier is `'free'`.
+  - `src/Service/ProfileService.php`:
+    - Updated `get_user_type()` self-healing to invoke `maybe_assign_free_membership($user_id)` when user type is `'free'`.
+  - `tests/bootstrap.php`:
+    - Updated `FakePMProLevel` to support `$enddate`.
+    - Updated `pmpro_changeMembershipLevel` and `pmpro_cancelMembershipLevel` to trigger `pmpro_after_change_membership_level` action hooks.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_membership_cancellation_auto_assigns_free_membership_and_updates_user_type()`.
+    - Added `test_grace_period_retains_active_tier_until_expiration()`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — all 127 unit and integration tests passed with 100% success rate (0 errors, 0 failures).
+
 ---
 
 

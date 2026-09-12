@@ -57,6 +57,10 @@ class ProfileService {
             MatchRepository::instance()->update_pool_user_type($user_id, $current_type);
         }
 
+        if ($current_type === 'free') {
+            \Matchmaker\Core\PMProSync::instance()->maybe_assign_free_membership($user_id);
+        }
+
         return $current_type;
     }
 

@@ -641,11 +641,16 @@ class AuthController
 
     /**
      * Render the Privacy Policy consent checkbox on the PMPro checkout page.
+     * Only shown for logged-out users (new registrations / guest checkouts).
      *
      * @return void
      */
     public function render_checkout_privacy_policy_checkbox(): void
     {
+        if (is_user_logged_in()) {
+            return;
+        }
+
         static $rendered = false;
         if ($rendered) {
             return;
@@ -707,6 +712,7 @@ class AuthController
 
     /**
      * Validates Privacy Policy consent during PMPro checkout registration.
+     * Only enforced for logged-out users creating a new account.
      *
      * @param bool $okay
      * @return bool
@@ -715,6 +721,11 @@ class AuthController
     {
         if (!$okay) {
             return false;
+        }
+
+        // Already logged in users have already agreed to the Privacy Policy upon registration
+        if (is_user_logged_in()) {
+            return true;
         }
 
         $is_checkout = !empty($_REQUEST['submit-checkout']) 
@@ -733,11 +744,6 @@ class AuthController
             || !empty($_POST['mm_privacy_policy_consent']);
 
         if (!$consent) {
-            $user_id = get_current_user_id();
-            if ($user_id > 0 && get_user_meta($user_id, 'mm_privacy_policy_consent', true)) {
-                return true;
-            }
-
             global $pmpro_msg, $pmpro_msgt;
             $pmpro_msg  = __('You must agree to the Privacy Policy to complete your registration.', 'matchmaker');
             $pmpro_msgt = 'pmpro_error';
