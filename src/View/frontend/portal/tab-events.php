@@ -33,10 +33,10 @@ $events_query = new \WP_Query($query_args);
 $total_pages  = (int) $events_query->max_num_pages;
 ?>
 <div class="mm-events-container">
-    <div class="mm-events-header">
+    <!-- <div class="mm-events-header">
         <h2 class="mm-events-title font-cormorant"><?php esc_html_e('Upcoming Events & Mixers', 'matchmaker'); ?></h2>
         <p class="mm-events-subtitle"><?php esc_html_e('Explore our curated matrimonial mixers, webinars, and exclusive community gatherings.', 'matchmaker'); ?></p>
-    </div>
+    </div> -->
 
     <?php if ($events_query->have_posts()) : ?>
         <div class="mm-events-grid">
