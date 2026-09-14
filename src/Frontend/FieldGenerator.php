@@ -139,45 +139,87 @@ class FieldGenerator {
     /**
      * Get preferred states for a specific preferred country (with Any State)
      *
-     * @param string $country
+     * @param string|array $country
      * @return array
      */
-    public function options_pref_state(string $country = ''): array
+    public function options_pref_state($country = ''): array
     {
-        $clean_country = trim($country);
-        if (empty($clean_country) || strcasecmp($clean_country, 'Any Country') === 0) {
+        $countries = is_array($country) ? $country : explode(',', (string) $country);
+        $countries = array_filter(array_map('trim', $countries));
+
+        $states = [];
+        $hierarchy = $this->get_hierarchy_data();
+
+        foreach ($countries as $c) {
+            if (empty($c) || strcasecmp($c, 'Any Country') === 0) {
+                continue;
+            }
+            if (isset($hierarchy[$c]) && is_array($hierarchy[$c])) {
+                foreach (array_keys($hierarchy[$c]) as $s) {
+                    $states[$s] = true;
+                }
+            }
+        }
+
+        if (empty($states)) {
             return ['Any State'];
         }
-        $hierarchy = $this->get_hierarchy_data();
-        if (isset($hierarchy[$clean_country]) && is_array($hierarchy[$clean_country])) {
-            $states = array_keys($hierarchy[$clean_country]);
-            sort($states, SORT_STRING | SORT_FLAG_CASE);
-            return array_merge(['Any State'], $states);
-        }
-        return ['Any State'];
+
+        $state_list = array_keys($states);
+        sort($state_list, SORT_STRING | SORT_FLAG_CASE);
+        return array_merge(['Any State'], $state_list);
     }
 
     /**
      * Get preferred cities for a specific preferred country and state (with Any City)
      *
-     * @param string $country
-     * @param string $state
+     * @param string|array $country
+     * @param string|array $state
      * @return array
      */
-    public function options_pref_city(string $country = '', string $state = ''): array
+    public function options_pref_city($country = '', $state = ''): array
     {
-        $clean_country = trim($country);
-        $clean_state   = trim($state);
-        if (empty($clean_state) || strcasecmp($clean_state, 'Any State') === 0 || empty($clean_country) || strcasecmp($clean_country, 'Any Country') === 0) {
+        $countries = is_array($country) ? $country : explode(',', (string) $country);
+        $countries = array_filter(array_map('trim', $countries));
+
+        $states = is_array($state) ? $state : explode(',', (string) $state);
+        $states = array_filter(array_map('trim', $states));
+
+        $filtered_states = array_filter($states, static function ($s) {
+            return !empty($s) && strcasecmp($s, 'Any State') !== 0;
+        });
+
+        if (empty($filtered_states)) {
             return ['Any City'];
         }
+
+        $cities = [];
         $hierarchy = $this->get_hierarchy_data();
-        if (isset($hierarchy[$clean_country][$clean_state]) && is_array($hierarchy[$clean_country][$clean_state])) {
-            $cities = $hierarchy[$clean_country][$clean_state];
-            sort($cities, SORT_STRING | SORT_FLAG_CASE);
-            return array_merge(['Any City'], $cities);
+
+        foreach ($countries as $c) {
+            if (empty($c) || strcasecmp($c, 'Any Country') === 0) {
+                continue;
+            }
+            if (!isset($hierarchy[$c]) || !is_array($hierarchy[$c])) {
+                continue;
+            }
+
+            foreach ($filtered_states as $s) {
+                if (isset($hierarchy[$c][$s]) && is_array($hierarchy[$c][$s])) {
+                    foreach ($hierarchy[$c][$s] as $city) {
+                        $cities[$city] = true;
+                    }
+                }
+            }
         }
-        return ['Any City'];
+
+        if (empty($cities)) {
+            return ['Any City'];
+        }
+
+        $city_list = array_keys($cities);
+        sort($city_list, SORT_STRING | SORT_FLAG_CASE);
+        return array_merge(['Any City'], $city_list);
     }
 
     /**
@@ -563,13 +605,27 @@ class FieldGenerator {
     }
 
     private function upload(string $name, $preview_url = ''): string {
-        $has_preview = !empty($preview_url);
-        $extra_class = $has_preview ? ' has-preview' : '';
-        $photo_num   = preg_replace('/\D/', '', $name);
-        $label_text  = $photo_num ? sprintf(__('Photo %s', 'matchmaker'), $photo_num) : __('Profile Photo', 'matchmaker');
+        $has_preview  = !empty($preview_url);
+        $extra_class  = $has_preview ? ' has-preview' : '';
+        $photo_num    = preg_replace('/\D/', '', $name);
+        $is_mandatory = ($photo_num === '1' || $photo_num === '');
+
+        if ($is_mandatory) {
+            $label_text = __('Photo 1 (Mandatory)', 'matchmaker');
+        } else {
+            $label_text = sprintf(__('Photo %s (Optional)', 'matchmaker'), $photo_num);
+        }
+
         $html = '<div class="elementor-field-type-upload elementor-field-group elementor-column elementor-field-group-' . esc_attr($name) . $extra_class . '">';
-        $html .= '<label class="elementor-field-label" for="form-field-' . esc_attr($name) . '">' . esc_html($label_text) . ' <span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span></label>';
-        $html .= '<input type="file" accept="image/*" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field"' . ($has_preview ? '' : ' required') . '>';
+        $html .= '<label class="elementor-field-label" for="form-field-' . esc_attr($name) . '">' . esc_html($label_text);
+        if ($is_mandatory) {
+            $html .= ' <span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span>';
+        }
+        $html .= '</label>';
+        $html .= '<input type="file" accept="image/*" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field"' . (($is_mandatory && !$has_preview) ? ' required' : '') . '>';
+        if ($is_mandatory) {
+            $html .= '<small class="mm-field-helper" style="display:block;font-size:12px;color:#6b7280;margin-top:4px;">' . esc_html__('Only the first photo is mandatory. Additional photos are optional.', 'matchmaker') . '</small>';
+        }
         if ($has_preview) { $html .= '<img src="' . esc_url($preview_url) . '" class="upload-preview-img" alt="Photo Preview">'; }
         $html .= '</div>';
         return $html;
@@ -724,7 +780,7 @@ class FieldGenerator {
             $label = ($name === 'pref_location') ? 'Preferred Country / Location' : 'Preferred Country';
             $html .= $this->field_open($name, 'location-cascade-group');
             $html .= $this->label($name, $label);
-            $html .= $this->select($name, $this->options_pref_country(), $val !== '' ? $val : 'Any Country');
+            $html .= $this->multiselect($name, $this->options_pref_country(), 'Any Country', $val !== '' ? $val : 'Any Country', true);
             $html .= $this->field_close();
             return $html;
         }
@@ -733,7 +789,7 @@ class FieldGenerator {
             $pref_country = (string) ($values['pref_country'] ?? $values['pref_location'] ?? '');
             $html .= $this->field_open('pref_state', 'location-cascade-group');
             $html .= $this->label('pref_state', 'Preferred State / Province');
-            $html .= $this->select('pref_state', $this->options_pref_state($pref_country), $val !== '' ? $val : 'Any State');
+            $html .= $this->multiselect('pref_state', $this->options_pref_state($pref_country), 'Any State', $val !== '' ? $val : 'Any State', true);
             $html .= $this->field_close();
             return $html;
         }
@@ -743,7 +799,7 @@ class FieldGenerator {
             $pref_state   = (string) ($values['pref_state'] ?? '');
             $html .= $this->field_open('pref_city', 'location-cascade-group');
             $html .= $this->label('pref_city', 'Preferred City');
-            $html .= $this->select('pref_city', $this->options_pref_city($pref_country, $pref_state), $val !== '' ? $val : 'Any City');
+            $html .= $this->multiselect('pref_city', $this->options_pref_city($pref_country, $pref_state), 'Any City', $val !== '' ? $val : 'Any City', true);
             $html .= $this->field_close();
             return $html;
         }
@@ -790,19 +846,19 @@ class FieldGenerator {
             'user_prayer'         => ['Prayer Habits', $this->options_prayer()],
             'user_education'      => ['Highest Education Level', $this->options_education()],
             'user_income'         => ['Yearly Income Range', $this->options_income()],
-            'pref_origin'         => ['Preferred Origin / Ethnicity', $this->options_pref_origin()],
-            'pref_religion'       => ['Preferred Religion', $this->options_pref_religion()],
             'pref_marital_status' => ['Preferred Marital Status', $this->options_pref_marital()],
             'pref_children'       => ['Children Preference', $this->options_pref_children()],
             'pref_drinking'       => ['Drinking Preference', $this->options_pref_drinking()],
             'pref_smoking'        => ['Smoking Preference', $this->options_pref_smoking()],
-            'pref_prayer'         => ['Prayer Habits Preference', $this->options_prayer()],
+            'pref_prayer'         => ['Prayer Habits Preference', $this->options_pref_prayer()],
             'pref_education'      => ['Preferred Education Level', $this->options_pref_education()],
             'pref_income'         => ['Preferred Yearly Income Range', $this->options_pref_income()],
         ];
 
         $multi_configs = [
             'pref_citizenship' => ['Preferred Citizenship', $this->options_pref_citizenship(), 'Any Citizenship'],
+            'pref_origin'      => ['Preferred Origin / Ethnicity', $this->options_pref_origin(), 'Any Origin'],
+            'pref_religion'    => ['Preferred Religion', $this->options_pref_religion(), 'No Preference'],
         ];
 
         $html = '';

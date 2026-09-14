@@ -143,6 +143,45 @@ final class LocationCascadeTest extends TestCase
         $this->assertStringContainsString('custom-select-search-wrap', $pref_cit_html);
         $this->assertStringContainsString('custom-select-search-input', $pref_cit_html);
     }
+
+    public function test_multiselect_preferences_rendering_and_aggregation(): void
+    {
+        $fg = FieldGenerator::instance();
+
+        // 1. Aggregation across multiple countries
+        $multi_states = $fg->options_pref_state('Saudi Arabia, United States');
+        $this->assertEquals('Any State', $multi_states[0]);
+        $this->assertContains('California', $multi_states);
+        $this->assertContains('Riyadh', $multi_states);
+
+        // 2. Aggregation across multiple states
+        $multi_cities = $fg->options_pref_city('Saudi Arabia, United States', 'California, Riyadh');
+        $this->assertEquals('Any City', $multi_cities[0]);
+        $this->assertContains('Los Angeles', $multi_cities);
+        $this->assertContains('Riyadh', $multi_cities);
+
+        // 3. Multiselect markup rendering for pref_country, pref_state, pref_city
+        $country_html = $fg->render_single_field('pref_country', ['pref_country' => 'Saudi Arabia, United States']);
+        $this->assertStringContainsString('custom-multiselect-wrapper', $country_html);
+        $this->assertStringContainsString('multiple', $country_html);
+
+        $state_html = $fg->render_single_field('pref_state', ['pref_country' => 'Saudi Arabia, United States', 'pref_state' => 'California']);
+        $this->assertStringContainsString('custom-multiselect-wrapper', $state_html);
+        $this->assertStringContainsString('multiple', $state_html);
+
+        $city_html = $fg->render_single_field('pref_city', ['pref_country' => 'Saudi Arabia', 'pref_state' => 'Riyadh', 'pref_city' => 'Riyadh']);
+        $this->assertStringContainsString('custom-multiselect-wrapper', $city_html);
+        $this->assertStringContainsString('multiple', $city_html);
+
+        // 4. Multiselect markup rendering for pref_origin and pref_religion
+        $origin_html = $fg->render_single_field('pref_origin', ['pref_origin' => 'Egyptian, Saudi, Saudi Arabian']);
+        $this->assertStringContainsString('custom-multiselect-wrapper', $origin_html);
+        $this->assertStringContainsString('multiple', $origin_html);
+
+        $rel_html = $fg->render_single_field('pref_religion', ['pref_religion' => 'Islam, Christianity']);
+        $this->assertStringContainsString('custom-multiselect-wrapper', $rel_html);
+        $this->assertStringContainsString('multiple', $rel_html);
+    }
 }
 
 

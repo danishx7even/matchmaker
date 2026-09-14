@@ -1777,10 +1777,38 @@ This document maintains a chronological, step-by-step history of all features, a
     - Removed `position: absolute`, `backdrop-filter: blur(4px)`, and background overlays from `.mm-tab-loader`.
     - Styled `.mm-tab-loader` as an in-flow centered flex container (`min-height: 360px`, `padding: 60px 20px`, `width: 100%`).
     - Styled `.mm-tab-spinner` with a crisp 48px circle, 4px border, and `#CC723F` brand color spinning animation.
+## 2026-09-14 — Task 89: Preference Locations Multi-Select, Preferred Origin/Religion Multi-Select, Prayer "No Preference", and Mandatory Photo 1 Only
+
+- **Objective**:
+  1. Make `pref_country`, `pref_state`, and `pref_city` multi-select fields so users can select multiple countries, states/provinces, and cities for partner preferences.
+  2. Make `pref_origin` and `pref_religion` multi-select fields with searchable custom checkboxes.
+  3. Support dynamic hierarchy cascading across multi-selections (aggregating states across chosen countries, and cities across chosen states), with "Any..." option mutual exclusivity.
+  4. Add `"No Preference"` option to `"PRAYER HABITS PREFERENCE"` (`pref_prayer`).
+  5. Update photo upload policy so only `user_photo1` (first photo) is mandatory, while `user_photo2` and `user_photo3` are optional with appropriate labels and validation updates.
+- **Changes**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Converted `pref_country`, `pref_state`, `pref_city`, `pref_origin`, and `pref_religion` to use `$this->multiselect(...)`.
+    - Updated `options_pref_state($country)` to accept multi-country strings/arrays, aggregating all states across selected countries and prepending `'Any State'`.
+    - Updated `options_pref_city($country, $state)` to accept multi-country and multi-state strings/arrays, aggregating cities across selected states and prepending `'Any City'`.
+    - Updated `options_pref_prayer()` for `pref_prayer` to include `'No Preference'`.
+    - Updated `upload()` method to label `user_photo1` as `Photo 1 (Mandatory) *` with helper text `"Only the first photo is mandatory. Additional photos are optional."` and `required` on input. Labeled `user_photo2` and `user_photo3` as `Photo 2 (Optional)` and `Photo 3 (Optional)` with no `required` attribute and no red asterisk.
+  - `src/Frontend/FormController.php`:
+    - Updated photo validation to strictly check `user_photo1` (either existing usermeta or active file upload), allowing `user_photo2` and `user_photo3` to be optional.
+    - Updated `$pool_payload` and `$meta_map` to normalize `pref_state` and `pref_city` using `$normalize_list(...)` into clean comma-separated lists.
+  - `assets/js/matchmaking-form.js`:
+    - Implemented `initMultiSelect(wrapper)` and `updateCustomMultiselect(fieldName, items, selectedValues, defaultPlaceholder)` with search and "Any..." mutual exclusivity logic.
+    - Implemented Step 2 multi-select cascading for `pref_country` -> `pref_state` -> `pref_city`.
+    - Updated `validateStep(1)` to validate only `user_photo1`.
+    - Updated file upload change listener to clear photo errors once `user_photo1` is provided.
+  - `tests/Unit/LocationCascadeTest.php`:
+    - Added `test_multiselect_preferences_rendering_and_aggregation` to verify multi-country/state aggregation and multi-select markup.
+  - `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Updated `test_photo_fields_and_yearly_income_labels` to verify Photo 1 mandatory label/star/helper text, Photo 2/3 optional labels without star, and `pref_prayer` containing "No Preference".
 - **Verification**:
-  - Executed automated test runner (`tests/run_tests.php`) — **all 156 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 157 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
 ---
+
 
 
 

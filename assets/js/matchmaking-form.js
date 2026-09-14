@@ -172,6 +172,62 @@
     }
 
     /* -------------------------------------------------------
+       Dynamic Custom Multi-Select Updater Helper
+    ------------------------------------------------------- */
+    function updateCustomMultiselect(fieldName, items, selectedValues, defaultPlaceholder) {
+        var select = (form ? (form.querySelector('select[name="form_fields[' + fieldName + '][]"]') || form.querySelector('select[name="form_fields[' + fieldName + ']"]')) : null)
+            || document.getElementById('form-field-' + fieldName)
+            || document.querySelector('select[name="form_fields[' + fieldName + '][]"]')
+            || document.querySelector('select[name="form_fields[' + fieldName + ']"]')
+            || document.querySelector('select[name="' + fieldName + '"]');
+        if (!select) return;
+        var wrapper = select.closest('.custom-multiselect-wrapper') || select.closest('.custom-select-wrapper');
+        if (!wrapper) return;
+        var display = wrapper.querySelector('.custom-select-display');
+        var optionsContainer = wrapper.querySelector('.custom-select-options');
+        if (!display || !optionsContainer) return;
+
+        var selectedArr = Array.isArray(selectedValues) ? selectedValues : (selectedValues ? String(selectedValues).split(',').map(function (s) { return s.trim(); }) : []);
+        if (selectedArr.length === 0 && defaultPlaceholder) {
+            selectedArr = [defaultPlaceholder];
+        }
+
+        var isSearchable = items.length > 5;
+        var selectHtml = '';
+        var optionsHtml = '';
+
+        if (isSearchable) {
+            optionsContainer.classList.add('has-search');
+            optionsHtml += '<div class="custom-select-search-wrap"><input type="text" class="custom-select-search-input" placeholder="Search..." autocomplete="off" data-ignore-validation="1" /></div>';
+        } else {
+            optionsContainer.classList.remove('has-search');
+        }
+
+        items.forEach(function (item, idx) {
+            var isSelected = selectedArr.some(function (sv) {
+                return sv.toLowerCase() === item.toLowerCase();
+            });
+            var selAttr = isSelected ? ' selected' : '';
+            var chkAttr = isSelected ? ' checked' : '';
+
+            selectHtml += '<option value="' + item.replace(/"/g, '&quot;') + '"' + selAttr + '>' + item + '</option>';
+            optionsHtml += '<label class="custom-select-checkbox-option"><input type="checkbox" data-index="' + idx + '"' + chkAttr + '> ' + item + '</label>';
+        });
+
+        select.innerHTML = selectHtml;
+        optionsContainer.innerHTML = optionsHtml;
+
+        initMultiSelect(wrapper);
+    }
+
+    function getSelectedValues(selectEl) {
+        if (!selectEl) return [];
+        return Array.prototype.filter.call(selectEl.options, function (o) { return o.selected; })
+            .map(function (o) { return o.value.trim(); })
+            .filter(function (v) { return v.length > 0; });
+    }
+
+    /* -------------------------------------------------------
        Dynamic Location Cascading (Country -> State -> City)
     ------------------------------------------------------- */
     var hierarchyData = window.__mm_hierarchy || null;
@@ -197,7 +253,7 @@
     }
 
     loadHierarchy(function (data) {
-        // Setup Step 1 Cascading
+        // Setup Step 1 Cascading (Single-select User Location)
         var userCountrySel = form.querySelector('select[name="form_fields[user_country]"]') || form.querySelector('select[name="form_fields[user_location]"]');
         var userStateSel   = form.querySelector('select[name="form_fields[user_state]"]');
         var userCitySel    = form.querySelector('select[name="form_fields[user_city]"]');
@@ -232,39 +288,104 @@
             });
         }
 
-        // Setup Step 2 Cascading (Preferences)
-        var prefCountrySel = form.querySelector('select[name="form_fields[pref_country]"]') || form.querySelector('select[name="form_fields[pref_location]"]');
-        var prefStateSel   = form.querySelector('select[name="form_fields[pref_state]"]');
-        var prefCitySel    = form.querySelector('select[name="form_fields[pref_city]"]');
+        // Setup Step 2 Cascading (Multi-select Preferences)
+        var prefCountrySel = form.querySelector('select[name="form_fields[pref_country][]"]')
+            || form.querySelector('select[name="form_fields[pref_country]"]')
+            || form.querySelector('select[name="form_fields[pref_location][]"]')
+            || form.querySelector('select[name="form_fields[pref_location]"]');
+        var prefStateSel   = form.querySelector('select[name="form_fields[pref_state][]"]')
+            || form.querySelector('select[name="form_fields[pref_state]"]');
+        var prefCitySel    = form.querySelector('select[name="form_fields[pref_city][]"]')
+            || form.querySelector('select[name="form_fields[pref_city]"]');
+
+        function cascadePrefCountry() {
+            var countries = getSelectedValues(prefCountrySel);
+            var validCountries = countries.filter(function (c) {
+                return c && !/^any\b/i.test(c);
+            });
+
+            var prefStates = ['Any State'];
+            if (validCountries.length > 0 && data) {
+                var stateSet = {};
+                validCountries.forEach(function (c) {
+                    if (data[c] && typeof data[c] === 'object') {
+                        Object.keys(data[c]).forEach(function (s) {
+                            stateSet[s] = true;
+                        });
+                    }
+                });
+                var sortedStates = Object.keys(stateSet).sort(function (a, b) {
+                    return a.localeCompare(b, undefined, { sensitivity: 'base' });
+                });
+                prefStates = prefStates.concat(sortedStates);
+            }
+
+            var currentSelectedStates = getSelectedValues(prefStateSel);
+            var preservedStates = currentSelectedStates.filter(function (s) {
+                return prefStates.indexOf(s) !== -1;
+            });
+            if (preservedStates.length === 0) {
+                preservedStates = ['Any State'];
+            }
+
+            updateCustomMultiselect('pref_state', prefStates, preservedStates, 'Any State');
+            cascadePrefState();
+        }
+
+        function cascadePrefState() {
+            var countries = getSelectedValues(prefCountrySel).filter(function (c) {
+                return c && !/^any\b/i.test(c);
+            });
+            var states = getSelectedValues(prefStateSel).filter(function (s) {
+                return s && !/^any\b/i.test(s);
+            });
+
+            var prefCities = ['Any City'];
+            if (countries.length > 0 && data) {
+                var citySet = {};
+                countries.forEach(function (c) {
+                    if (!data[c] || typeof data[c] !== 'object') return;
+                    if (states.length > 0) {
+                        states.forEach(function (s) {
+                            if (data[c][s] && Array.isArray(data[c][s])) {
+                                data[c][s].forEach(function (cty) {
+                                    citySet[cty] = true;
+                                });
+                            }
+                        });
+                    } else {
+                        Object.keys(data[c]).forEach(function (s) {
+                            if (data[c][s] && Array.isArray(data[c][s])) {
+                                data[c][s].forEach(function (cty) {
+                                    citySet[cty] = true;
+                                });
+                            }
+                        });
+                    }
+                });
+                var sortedCities = Object.keys(citySet).sort(function (a, b) {
+                    return a.localeCompare(b, undefined, { sensitivity: 'base' });
+                });
+                prefCities = prefCities.concat(sortedCities);
+            }
+
+            var currentSelectedCities = getSelectedValues(prefCitySel);
+            var preservedCities = currentSelectedCities.filter(function (c) {
+                return prefCities.indexOf(c) !== -1;
+            });
+            if (preservedCities.length === 0) {
+                preservedCities = ['Any City'];
+            }
+
+            updateCustomMultiselect('pref_city', prefCities, preservedCities, 'Any City');
+        }
 
         if (prefCountrySel) {
-            prefCountrySel.addEventListener('change', function () {
-                var pcVal = prefCountrySel.value.trim();
-                var prefStates = ['Any State'];
-                if (pcVal && pcVal !== 'Any Country' && data[pcVal] && typeof data[pcVal] === 'object') {
-                    var psKeys = Object.keys(data[pcVal]).sort(function (a, b) {
-                        return a.localeCompare(b, undefined, { sensitivity: 'base' });
-                    });
-                    prefStates = prefStates.concat(psKeys);
-                }
-                updateCustomSelect('pref_state', prefStates, 'Any State', 'Any State');
-                updateCustomSelect('pref_city', ['Any City'], 'Any City', 'Any City');
-            });
+            prefCountrySel.addEventListener('change', cascadePrefCountry);
         }
 
         if (prefStateSel) {
-            prefStateSel.addEventListener('change', function () {
-                var pcVal = prefCountrySel ? prefCountrySel.value.trim() : '';
-                var psVal = prefStateSel.value.trim();
-                var prefCities = ['Any City'];
-                if (pcVal && pcVal !== 'Any Country' && psVal && psVal !== 'Any State' && data[pcVal] && data[pcVal][psVal] && Array.isArray(data[pcVal][psVal])) {
-                    var pcKeys = data[pcVal][psVal].slice().sort(function (a, b) {
-                        return a.localeCompare(b, undefined, { sensitivity: 'base' });
-                    });
-                    prefCities = prefCities.concat(pcKeys);
-                }
-                updateCustomSelect('pref_city', prefCities, 'Any City', 'Any City');
-            });
+            prefStateSel.addEventListener('change', cascadePrefState);
         }
     });
 
@@ -421,9 +542,9 @@
     handlePrefGenderChange(getPrefGender());
 
     /* -------------------------------------------------------
-       Multi-select custom dropdowns
+       Multi-select custom dropdowns binder
     ------------------------------------------------------- */
-    form.querySelectorAll('.custom-multiselect-wrapper').forEach(function (wrapper) {
+    function initMultiSelect(wrapper) {
         var select          = wrapper.querySelector('select');
         var display         = wrapper.querySelector('.custom-select-display');
         var searchInput     = wrapper.querySelector('.custom-select-search-input');
@@ -459,7 +580,7 @@
             }
         }
 
-        display.addEventListener('click', function (e) {
+        display.onclick = function (e) {
             e.stopPropagation();
             var willOpen = !wrapper.classList.contains('open');
             closeAllExcept(wrapper);
@@ -475,20 +596,20 @@
             } else {
                 wrapper.classList.remove('open');
             }
-        });
+        };
 
         if (searchInput) {
-            searchInput.addEventListener('click', function (e) { e.stopPropagation(); });
-            searchInput.addEventListener('mousedown', function (e) { e.stopPropagation(); });
-            searchInput.addEventListener('keydown', function (e) {
+            searchInput.onclick = function (e) { e.stopPropagation(); };
+            searchInput.onmousedown = function (e) { e.stopPropagation(); };
+            searchInput.onkeydown = function (e) {
                 e.stopPropagation();
                 if (e.key === 'Escape') {
                     wrapper.classList.remove('open');
                 }
-            });
-            searchInput.addEventListener('input', function () {
+            };
+            searchInput.oninput = function () {
                 filterMultiOptions();
-            });
+            };
         }
 
         function updateDisplay() {
@@ -505,19 +626,65 @@
             }
         }
 
+        function isAnyOption(val) {
+            var s = (val || '').trim().toLowerCase();
+            return /^any\b|^no preference$/i.test(s);
+        }
+
         checkboxes.forEach(function (cb) {
-            cb.addEventListener('click', function (e) { e.stopPropagation(); });
-            cb.addEventListener('change', function () {
+            cb.onclick = function (e) { e.stopPropagation(); };
+            cb.onchange = function () {
                 var idx = parseInt(cb.getAttribute('data-index'), 10);
-                if (select.options[idx]) {
-                    select.options[idx].selected = cb.checked;
+                var opt = select.options[idx];
+                var optVal = opt ? opt.value : '';
+                var isAny = isAnyOption(optVal);
+
+                if (cb.checked) {
+                    if (isAny) {
+                        checkboxes.forEach(function (otherCb) {
+                            if (otherCb !== cb) {
+                                otherCb.checked = false;
+                                var oIdx = parseInt(otherCb.getAttribute('data-index'), 10);
+                                if (select.options[oIdx]) select.options[oIdx].selected = false;
+                            }
+                        });
+                        if (opt) opt.selected = true;
+                    } else {
+                        checkboxes.forEach(function (otherCb) {
+                            var oIdx = parseInt(otherCb.getAttribute('data-index'), 10);
+                            if (select.options[oIdx] && isAnyOption(select.options[oIdx].value)) {
+                                otherCb.checked = false;
+                                select.options[oIdx].selected = false;
+                            }
+                        });
+                        if (opt) opt.selected = true;
+                    }
+                } else {
+                    if (opt) opt.selected = false;
+                    var anyChecked = Array.prototype.some.call(checkboxes, function (c) { return c.checked; });
+                    if (!anyChecked) {
+                        var anyCb = Array.prototype.find.call(checkboxes, function (c) {
+                            var oIdx = parseInt(c.getAttribute('data-index'), 10);
+                            return select.options[oIdx] && isAnyOption(select.options[oIdx].value);
+                        }) || checkboxes[0];
+                        if (anyCb) {
+                            anyCb.checked = true;
+                            var aIdx = parseInt(anyCb.getAttribute('data-index'), 10);
+                            if (select.options[aIdx]) select.options[aIdx].selected = true;
+                        }
+                    }
                 }
+
                 select.dispatchEvent(new Event('change', { bubbles: true }));
                 updateDisplay();
-            });
+            };
         });
 
         updateDisplay();
+    }
+
+    form.querySelectorAll('.custom-multiselect-wrapper').forEach(function (wrapper) {
+        initMultiSelect(wrapper);
     });
 
     /* Close all on outside click */
@@ -616,17 +783,15 @@
             }
         }
 
-        // Step 1: Validate all 3 photos
+        // Step 1: Validate Photo 1 only
         if (stepNumber == 1) {
-            for (var p = 1; p <= 3; p++) {
-                var pInput = form.querySelector('[name="form_fields[user_photo' + p + ']"]');
-                var pBox = pInput ? pInput.closest('.elementor-field-group') : null;
-                var hasFile = pInput && pInput.files && pInput.files.length > 0;
-                var hasPreview = pBox && pBox.classList.contains('has-preview');
-                if (!hasFile && !hasPreview) {
-                    showMessage('Photo ' + p + ' is mandatory. Please provide all 3 profile photos.', 'error');
-                    return false;
-                }
+            var pInput = form.querySelector('[name="form_fields[user_photo1]"]');
+            var pBox = pInput ? pInput.closest('.elementor-field-group') : null;
+            var hasFile = pInput && pInput.files && pInput.files.length > 0;
+            var hasPreview = pBox && pBox.classList.contains('has-preview');
+            if (!hasFile && !hasPreview) {
+                showMessage('Photo 1 is mandatory. Please provide your main profile photo.', 'error');
+                return false;
             }
         }
 
@@ -764,18 +929,11 @@
     form.querySelectorAll('input[type="file"]').forEach(function (input) {
         input.addEventListener('change', function () {
             if (msgBox && msgBox.style.display !== 'none' && msgBox.textContent.indexOf('Photo') !== -1) {
-                var allUploaded = true;
-                for (var p = 1; p <= 3; p++) {
-                    var pInput = form.querySelector('[name="form_fields[user_photo' + p + ']"]');
-                    var pBox = pInput ? pInput.closest('.elementor-field-group') : null;
-                    var hasFile = pInput && pInput.files && pInput.files.length > 0;
-                    var hasPreview = pBox && pBox.classList.contains('has-preview');
-                    if (!hasFile && !hasPreview) {
-                        allUploaded = false;
-                        break;
-                    }
-                }
-                if (allUploaded) {
+                var pInput = form.querySelector('[name="form_fields[user_photo1]"]');
+                var pBox = pInput ? pInput.closest('.elementor-field-group') : null;
+                var hasFile = pInput && pInput.files && pInput.files.length > 0;
+                var hasPreview = pBox && pBox.classList.contains('has-preview');
+                if (hasFile || hasPreview) {
                     showMessage('', '');
                 }
             }

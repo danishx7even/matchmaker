@@ -463,16 +463,14 @@ class FormController {
             wp_send_json_error(['message' => __('Please provide a valid full name and email address.', 'matchmaker')]);
         }
 
-        // 4. Validate mandatory profile photos (All 3 photos required)
-        for ($i = 1; $i <= 3; $i++) {
-            $photo_key    = 'user_photo' . $i;
-            $has_existing = !empty(get_user_meta($user_id, $photo_key, true));
-            $has_uploaded = !empty($_FILES['form_fields']['name'][$photo_key])
-                && (int) ($_FILES['form_fields']['error'][$photo_key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+        // 4. Validate mandatory profile photo (Only Photo 1 is mandatory)
+        $photo_key    = 'user_photo1';
+        $has_existing = !empty(get_user_meta($user_id, $photo_key, true));
+        $has_uploaded = !empty($_FILES['form_fields']['name'][$photo_key])
+            && (int) ($_FILES['form_fields']['error'][$photo_key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
 
-            if (!$has_existing && !$has_uploaded) {
-                wp_send_json_error(['message' => sprintf(__('Photo %d is mandatory. Please provide all 3 profile photos.', 'matchmaker'), $i)]);
-            }
+        if (!$has_existing && !$has_uploaded) {
+            wp_send_json_error(['message' => __('Photo 1 is mandatory. Please provide your main profile photo.', 'matchmaker')]);
         }
 
         // 5. Helpers
@@ -559,8 +557,8 @@ class FormController {
             'state'                => sanitize_text_field((string) ($f['user_state'] ?? '')),
             'city'                 => sanitize_text_field((string) ($f['user_city'] ?? '')),
             'pref_country'         => $normalize_list($f['pref_country'] ?? $f['pref_location'] ?? ''),
-            'pref_state'           => sanitize_text_field((string) ($f['pref_state'] ?? '')),
-            'pref_city'            => sanitize_text_field((string) ($f['pref_city'] ?? '')),
+            'pref_state'           => $normalize_list($f['pref_state'] ?? ''),
+            'pref_city'            => $normalize_list($f['pref_city'] ?? ''),
             'religion'             => $sanitize_select((string) ($f['user_religion'] ?? '')),
             'pref_religion'        => $normalize_list($f['pref_religion'] ?? ''),
             'modesty'              => $sanitize_select((string) ($f['user_modesty'] ?? '')),
@@ -612,8 +610,8 @@ class FormController {
             'user_state'          => sanitize_text_field((string) ($f['user_state'] ?? '')),
             'user_city'           => sanitize_text_field((string) ($f['user_city'] ?? '')),
             'pref_country'        => $normalize_list($f['pref_country'] ?? ''),
-            'pref_state'          => sanitize_text_field((string) ($f['pref_state'] ?? '')),
-            'pref_city'           => sanitize_text_field((string) ($f['pref_city'] ?? '')),
+            'pref_state'          => $normalize_list($f['pref_state'] ?? ''),
+            'pref_city'           => $normalize_list($f['pref_city'] ?? ''),
             'pref_citizenship'    => $normalize_list($f['pref_citizenship'] ?? ''),
             'pref_marital_status' => sanitize_text_field((string) ($f['pref_marital_status'] ?? '')),
             'pref_children'       => sanitize_text_field((string) ($f['pref_children'] ?? '')),

@@ -140,19 +140,30 @@ class FormWizardAndShortcodesTest
 
     public function test_photo_fields_and_yearly_income_labels(): void
     {
-        // 1. Photo field upload has required star
+        // 1. Photo 1 upload has required star, label Mandatory, and helper text
         $photo1_html = $this->field_generator->render_single_field('user_photo1');
-        if (!str_contains($photo1_html, 'mm-required-star') || !str_contains($photo1_html, '*')) {
-            throw new \RuntimeException("Expected user_photo1 to have required star indicator: " . $photo1_html);
+        if (!str_contains($photo1_html, 'mm-required-star') || !str_contains($photo1_html, 'Photo 1 (Mandatory)') || !str_contains($photo1_html, 'Only the first photo is mandatory')) {
+            throw new \RuntimeException("Expected user_photo1 to have Mandatory label, star indicator, and helper text: " . $photo1_html);
         }
 
-        // 2. Photo section open has required star
-        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear photos', 'upload-section', true);
+        // 2. Photo 2 and 3 are Optional and do not have required star
+        $photo2_html = $this->field_generator->render_single_field('user_photo2');
+        if (str_contains($photo2_html, 'mm-required-star') || !str_contains($photo2_html, 'Photo 2 (Optional)')) {
+            throw new \RuntimeException("Expected user_photo2 to have Optional label and no required star: " . $photo2_html);
+        }
+
+        $photo3_html = $this->field_generator->render_single_field('user_photo3');
+        if (str_contains($photo3_html, 'mm-required-star') || !str_contains($photo3_html, 'Photo 3 (Optional)')) {
+            throw new \RuntimeException("Expected user_photo3 to have Optional label and no required star: " . $photo3_html);
+        }
+
+        // 3. Photo section open has required star
+        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload clear photos', 'upload-section', true);
         if (!str_contains($section_html, 'mm-required-star') || !str_contains($section_html, '*')) {
             throw new \RuntimeException("Expected photo section header to have required star indicator: " . $section_html);
         }
 
-        // 3. Yearly Income Range labels
+        // 4. Yearly Income Range labels
         $income_html = $this->field_generator->render_single_field('user_income');
         if (!str_contains($income_html, 'Yearly Income Range')) {
             throw new \RuntimeException("Expected user_income to have label 'Yearly Income Range': " . $income_html);
@@ -161,6 +172,12 @@ class FormWizardAndShortcodesTest
         $pref_income_html = $this->field_generator->render_single_field('pref_income');
         if (!str_contains($pref_income_html, 'Preferred Yearly Income Range')) {
             throw new \RuntimeException("Expected pref_income to have label 'Preferred Yearly Income Range': " . $pref_income_html);
+        }
+
+        // 5. Prayer Habits Preference contains No Preference
+        $pref_prayer_html = $this->field_generator->render_single_field('pref_prayer');
+        if (!str_contains($pref_prayer_html, 'No Preference')) {
+            throw new \RuntimeException("Expected pref_prayer to contain No Preference: " . $pref_prayer_html);
         }
     }
 
