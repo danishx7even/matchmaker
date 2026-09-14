@@ -54,7 +54,9 @@ $level_tags      = $sync->get_level_tags();
                         }
                     }
                 }
-                if (empty($srv_price)) {
+                if (!empty($srv_price)) {
+                    $srv_price = (string) preg_replace('/\bmembership\b/i', __('service', 'matchmaker'), $srv_price);
+                } else {
                     $srv_price = __('One-Time Service', 'matchmaker');
                 }
 

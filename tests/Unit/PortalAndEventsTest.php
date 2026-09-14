@@ -100,6 +100,27 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Purchase Service →', $response['data']['html'] ?? '');
     }
 
+    public function test_tab_services_replaces_membership_with_service_in_price_text(): void
+    {
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [
+            3 => [6],
+        ]);
+
+        $user_id = 903;
+        $user_type = 'monthly';
+        $is_premium = true;
+        $repo = MatchRepository::instance();
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-services.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Social Media Post', $html);
+        $this->assertStringContainsString('The price for service is $150.00 now.', $html);
+        $this->assertStringNotContainsString('The price for membership is', $html);
+    }
+
     public function test_ajax_reload_tab_events_returns_rendered_html(): void
     {
         $controller = PortalController::instance();
@@ -480,6 +501,103 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Match Expired', $html_exp);
         $this->assertStringContainsString('The response window for this match recommendation has ended', $html_exp);
     }
+
+    public function test_dual_acceptance_transitions_to_matched_and_reveals_contacts(): void
+    {
+        $repo = MatchRepository::instance();
+        global $wpdb;
+
+        $u1 = 801;
+        $u2 = 802;
+        $match_id = 99;
+
+        // User 1 accepts
+        $wpdb->mock_rows["SELECT * FROM wp_matches WHERE id = {$match_id}"] = [
+            'id' => $match_id,
+            'user_one_id' => $u1,
+            'user_two_id' => $u2,
+            'user_one_response' => 'pending',
+            'user_two_response' => 'pending',
+            'status' => 'approved',
+            'contact_revealed' => 0,
+        ];
+
+        $res1 = $repo->update_match_response($match_id, $u1, 'accept');
+        $this->assertTrue($res1['success']);
+        $this->assertFalse($res1['is_mutual']);
+        $this->assertEquals(3, $res1['next_step']);
+
+        // User 2 accepts when user 1 already accepted
+        $wpdb->mock_rows["SELECT * FROM wp_matches WHERE id = {$match_id}"] = [
+            'id' => $match_id,
+            'user_one_id' => $u1,
+            'user_two_id' => $u2,
+            'user_one_response' => 'accepted',
+            'user_two_response' => 'pending',
+            'status' => 'approved',
+            'contact_revealed' => 0,
+        ];
+
+        $res2 = $repo->update_match_response($match_id, $u2, 'accept');
+        $this->assertTrue($res2['success']);
+        $this->assertTrue($res2['is_mutual']);
+        $this->assertEquals(5, $res2['next_step']);
+    }
+
+    public function test_self_healing_syncs_status_to_matched_for_dual_accepted_rows(): void
+    {
+        $repo = MatchRepository::instance();
+        global $wpdb;
+
+        $match_id = 101;
+        $dual_accepted_row = [
+            'id' => $match_id,
+            'user_one_id' => 811,
+            'user_two_id' => 812,
+            'status' => 'approved',
+            'user_one_response' => 'accepted',
+            'user_two_response' => 'accepted',
+            'contact_revealed' => 0,
+        ];
+
+        // find_match_by_id self-heals
+        $wpdb->mock_rows["SELECT * FROM wp_matches WHERE id = {$match_id}"] = $dual_accepted_row;
+        $healed = $repo->find_match_by_id($match_id);
+
+        $this->assertNotNull($healed);
+        $this->assertEquals('matched', $healed['status']);
+        $this->assertEquals(1, (int) $healed['contact_revealed']);
+    }
+
+    public function test_admin_matches_list_displays_mutual_match_label(): void
+    {
+        $matches = [
+            [
+                'id' => 77,
+                'user_one_id' => 10,
+                'user_two_id' => 20,
+                'score' => 5,
+                'status' => 'matched',
+                'match_source' => 'auto',
+                'user_one_response' => 'accepted',
+                'user_two_response' => 'accepted',
+                'created_at' => '2026-09-14 12:00:00',
+            ],
+        ];
+
+        $repo = MatchRepository::instance();
+        $search = '';
+        $status = '';
+        $source = '';
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/matches-list.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Mutual Match', $html);
+        $this->assertStringContainsString('mm-status-matched', $html);
+    }
 }
+
 
 

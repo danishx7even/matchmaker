@@ -117,11 +117,16 @@ a {
     color: #CC723F;
     border: 1px solid #CC723F;
 }
-.mm-status-approved,
-.mm-status-matched {
+.mm-status-approved {
     background-color: #F0F4EC;
     color: #829067;
     border: 1px solid #829067;
+}
+.mm-status-matched {
+    background-color: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #10B981;
+    font-weight: 700;
 }
 .mm-status-rejected,
 .mm-status-admin_rejected {

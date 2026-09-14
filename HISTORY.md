@@ -1723,3 +1723,47 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-14 — Task 86: Services Card "Service" Wording & Prominent Circular Tab Navigation Loader
+
+- **Objective**:
+  1. Replace PMPro default "The price for membership is $..." text with "The price for service is $..." across all add-on services cards on the Member Portal Services tab.
+  2. Implement a high-visibility, centered circular loading spinner (`.mm-tab-loader` + `.mm-tab-spinner`) on tab reload and navigation so members see immediate, smooth visual feedback when switching tabs, paging events, or submitting match responses.
+- **Changes**:
+  - `src/View/frontend/portal/tab-services.php`:
+    - Added `preg_replace('/\bmembership\b/i', __('service', 'matchmaker'), $srv_price)` to dynamically replace PMPro's "membership" wording with "service".
+  - `src/Core/PMProSync.php`:
+    - Updated `render_membership_account_card_details()` to replace "membership" with "service" for add-on service rows in `pmpro_getLevelCost()` cost text.
+  - `assets/css/member-portal.css`:
+    - Enhanced `.portal-tab-panel`, `.mm-tab-loader` (`z-index: 9999`, `padding-top: 80px`, `backdrop-filter: blur(4px)`), `.mm-tab-spinner` (44px circular ring, `#CC723F`), and `.mm-tab-loader-text`.
+  - `assets/js/member-portal.js`:
+    - Updated `reloadTabAJAX()` to remove stale loaders and prepend the circular loader as the first child of the active panel, guaranteeing top-of-viewport visibility.
+## 2026-09-14 — Task 87: Mutual Match Status Synchronization, Self-Healing, and Admin/Step Views Refinement
+
+- **Objective**:
+  1. Fix the issue where a match row with both users having accepted (`user_one_response: accepted`, `user_two_response: accepted`) remained in `approved` status instead of updating to `matched` in the database, step views, and Admin Matches Queue.
+  2. Implement database self-healing across match retrieval methods (`find_match_by_id`, `find_approved_matches_for_user`, `get_all_matches`, and `find_all_matches_for_user`) so legacy or edge-case rows with dual acceptances automatically synchronize to `status = 'matched'` and `contact_revealed = 1`.
+  3. Ensure all 5 member step views and Admin match views correctly display "Mutual Match" and route participants directly to Step 5 (Contact Reveal).
+- **Changes**:
+  - `src/Repository/MatchRepository.php`:
+    - In `update_match_response()`: Normalized `$action` and `$other_response` with case-insensitivity and whitespace trimming (supporting `'accept'`/`'accepted'`). When both users accept, transition `status` to `'matched'` and set `contact_revealed = 1`.
+    - In `find_match_by_id()`, `find_approved_matches_for_user()`, `get_all_matches()`, and `find_all_matches_for_user()`: Added self-healing logic checking if both responses are accepted; if so, immediately runs an UPDATE query setting `status = 'matched'` and `contact_revealed = 1`.
+  - `src/View/admin/matches/matches-list.php`:
+    - Updated status column to display `"Mutual Match"` when `status === 'matched'`.
+  - `src/View/admin/matches/match-single.php`:
+    - Updated detail header status badge to display `"Mutual Match"` when `status === 'matched'`.
+  - `src/View/admin/pool/user-single.php`:
+    - Updated match history table status badge to display `"Mutual Match"` for matched rows.
+  - `assets/css/admin-matchmaker.css`:
+    - Added dedicated `.mm-status-matched` styling (`background: #ECFDF5; color: #065F46; border: 1px solid #10B981; font-weight: 700;`).
+  - `src/View/frontend/portal/steps/step-2-profile.php`:
+    - Reordered footer action dock checks to evaluate `$is_mutual` first, immediately providing the "View Contact Details →" CTA for mutual matches.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added unit tests: `test_dual_acceptance_transitions_to_matched_and_reveals_contacts`, `test_self_healing_syncs_status_to_matched_for_dual_accepted_rows`, and `test_admin_matches_list_displays_mutual_match_label`.
+  - `tests/bootstrap.php`:
+    - Added `selected()`, `checked()`, `disabled()`, and `wp_nonce_url()` mock helpers.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 156 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+

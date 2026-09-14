@@ -45,15 +45,17 @@
             var panel = document.getElementById('mm-tab-' + tabName);
             if (!panel) return;
 
-            // Ensure loader overlay exists inside the panel
-            var loader = panel.querySelector('.mm-tab-loader');
-            if (!loader) {
-                loader = document.createElement('div');
-                loader.className = 'mm-tab-loader';
-                loader.innerHTML = '<div class="mm-tab-spinner"></div>';
-                panel.appendChild(loader);
+            // Remove any previous loader instance
+            var oldLoader = panel.querySelector('.mm-tab-loader');
+            if (oldLoader) {
+                oldLoader.remove();
             }
-            loader.classList.add('is-active');
+
+            // Create and prepend prominent circular loader at the top of the panel
+            var loader = document.createElement('div');
+            loader.className = 'mm-tab-loader';
+            loader.innerHTML = '<div class="mm-tab-spinner"></div><div class="mm-tab-loader-text">Loading...</div>';
+            panel.insertBefore(loader, panel.firstChild);
             panel.style.opacity = '0.7';
 
             var data = new FormData();
@@ -92,8 +94,8 @@
             })
             .catch(function (err) {
                 panel.style.opacity = '1';
-                if (loader) {
-                    loader.classList.remove('is-active');
+                if (loader && loader.parentNode) {
+                    loader.remove();
                 }
                 throw err;
             });

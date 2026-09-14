@@ -90,7 +90,17 @@ if (!defined('ABSPATH')) {
 
     <!-- Footer Action Dock -->
     <footer class="floating-action-footer">
-        <?php if ($my_resp === 'pending') : ?>
+        <?php if ($is_mutual) : ?>
+            <div class="footer-cta-prompt">
+                <h4 class="font-cormorant"><?php esc_html_e("It's a Match!", 'matchmaker'); ?></h4>
+                <p><?php esc_html_e('Both of you have accepted the match.', 'matchmaker'); ?></p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" data-mm-action="navigate-step" data-step="5">
+                    <?php esc_html_e('View Contact Details →', 'matchmaker'); ?>
+                </button>
+            </div>
+        <?php elseif ($my_resp === 'pending') : ?>
             <div class="footer-cta-prompt">
                 <h4 class="font-cormorant"><?php esc_html_e('What do you think?', 'matchmaker'); ?></h4>
                 <p><?php echo esc_html(sprintf(__('You have %d days to respond to this match.', 'matchmaker'), (int) ($active_match['days_remaining'] ?? 7))); ?></p>
@@ -101,16 +111,6 @@ if (!defined('ABSPATH')) {
                 </button>
                 <button type="button" class="btn btn-primary" data-mm-action="submit-response" data-match-id="<?php echo (int) $active_match['match_id']; ?>" data-decision="accept">
                     <?php esc_html_e('Accept Match →', 'matchmaker'); ?>
-                </button>
-            </div>
-        <?php elseif ($is_mutual) : ?>
-            <div class="footer-cta-prompt">
-                <h4 class="font-cormorant"><?php esc_html_e("It's a Match!", 'matchmaker'); ?></h4>
-                <p><?php esc_html_e('Both of you have accepted the match.', 'matchmaker'); ?></p>
-            </div>
-            <div>
-                <button type="button" class="btn btn-primary" data-mm-action="navigate-step" data-step="5">
-                    <?php esc_html_e('View Contact Details →', 'matchmaker'); ?>
                 </button>
             </div>
         <?php elseif ($my_resp === 'accepted') : ?>

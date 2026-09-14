@@ -969,6 +969,9 @@ class PMProSync {
         $cost_text = '';
         if (function_exists('pmpro_getLevelCost') && is_object($level)) {
             $cost_text = pmpro_getLevelCost($level, true, true);
+            if ($is_service && !empty($cost_text)) {
+                $cost_text = (string) preg_replace('/\bmembership\b/i', __('service', 'matchmaker'), $cost_text);
+            }
         }
         if (empty($cost_text)) {
             if ($is_service) {

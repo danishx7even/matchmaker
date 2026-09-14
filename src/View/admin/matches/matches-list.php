@@ -82,7 +82,8 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                         <small style="color:#666;"><?php echo esc_html($u2 ? $u2->user_email : ''); ?></small>
                     </td>
                     <td><strong><?php echo (int) ($m['score'] ?? 0); ?></strong> / 6</td>
-                    <td><span class="mm-status mm-status-<?php echo esc_attr($st); ?>"><?php echo esc_html(ucfirst(str_replace('_', ' ', $st))); ?></span></td>
+                    <?php $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str_replace('_', ' ', $st)); ?>
+                    <td><span class="mm-status mm-status-<?php echo esc_attr($st); ?>"><?php echo esc_html($st_label); ?></span></td>
                     <td><?php echo esc_html(ucfirst($m['match_source'] ?? 'auto')); ?></td>
                     <td><small>U1: <?php echo esc_html($m['user_one_response'] ?? 'pending'); ?> | U2: <?php echo esc_html($m['user_two_response'] ?? 'pending'); ?></small></td>
                     <td><small><?php echo esc_html($m['created_at'] ?? '—'); ?></small></td>

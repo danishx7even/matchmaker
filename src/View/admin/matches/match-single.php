@@ -35,7 +35,8 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <p class="description">
             <strong><?php esc_html_e('Compatibility Score:', 'matchmaker'); ?></strong> <?php echo (int) ($match['score'] ?? 0); ?> / 6 &nbsp;|&nbsp; 
             <strong><?php esc_html_e('Match Source:', 'matchmaker'); ?></strong> <?php echo esc_html(ucfirst($match['match_source'] ?? 'auto')); ?> &nbsp;|&nbsp; 
-            <strong><?php esc_html_e('Status:', 'matchmaker'); ?></strong> <span class="mm-status mm-status-<?php echo esc_attr($st); ?>"><?php echo esc_html(ucfirst(str_replace('_', ' ', $st))); ?></span>
+            <?php $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str_replace('_', ' ', $st)); ?>
+            <strong><?php esc_html_e('Status:', 'matchmaker'); ?></strong> <span class="mm-status mm-status-<?php echo esc_attr($st); ?>"><?php echo esc_html($st_label); ?></span>
         </p>
     </div>
     <div>

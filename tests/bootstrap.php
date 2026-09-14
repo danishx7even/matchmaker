@@ -583,6 +583,10 @@ function wp_create_nonce($action = -1) {
     return 'test_nonce_' . $action;
 }
 
+function wp_nonce_url($actionurl, $action = -1, $name = '_wpnonce') {
+    return add_query_arg($name, wp_create_nonce($action), $actionurl);
+}
+
 function wp_verify_nonce($nonce, $action = -1) {
     return !empty($nonce);
 }
@@ -598,6 +602,30 @@ function wp_trim_words($text, $num_words = 55, $more = null) {
 
 function wp_logout_url($redirect = '') {
     return 'https://example.com/wp-login.php?action=logout' . ($redirect ? '&redirect_to=' . urlencode((string)$redirect) : '');
+}
+
+function selected($selected, $current = true, $echo = true): string {
+    $result = ((string) $selected === (string) $current) ? " selected='selected'" : '';
+    if ($echo) {
+        echo $result;
+    }
+    return $result;
+}
+
+function checked($checked, $current = true, $echo = true): string {
+    $result = ((string) $checked === (string) $current) ? " checked='checked'" : '';
+    if ($echo) {
+        echo $result;
+    }
+    return $result;
+}
+
+function disabled($disabled, $current = true, $echo = true): string {
+    $result = ((string) $disabled === (string) $current) ? " disabled='disabled'" : '';
+    if ($echo) {
+        echo $result;
+    }
+    return $result;
 }
 
 function wp_get_current_user() {
@@ -846,6 +874,12 @@ function pmpro_hasMembershipLevel($levels = null, $user_id = null): bool {
         }
     }
     return false;
+}
+
+function pmpro_getLevelCost($level, $tags = true, $short = false): string {
+    $lid = is_object($level) ? (int) ($level->id ?? 0) : (int) $level;
+    $amount = ($lid === 4) ? '$250.00' : '$150.00';
+    return 'The price for membership is ' . $amount . ' now.';
 }
 
 function pmpro_getMembershipLevelForUser(int $user_id) {

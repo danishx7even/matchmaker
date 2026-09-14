@@ -230,8 +230,9 @@ $photo3 = $meta['user_photo3'] ?? '';
                             </span>
                         </td>
                         <td>
+                            <?php $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str_replace('_', ' ', $st)); ?>
                             <span class="mm-status mm-status-<?php echo esc_attr($st); ?>">
-                                <?php echo esc_html(ucfirst(str_replace('_', ' ', $st))); ?>
+                                <?php echo esc_html($st_label); ?>
                             </span>
                         </td>
                         <td><small><?php echo esc_html(ucfirst($m['match_source'] ?? 'auto')); ?></small></td>

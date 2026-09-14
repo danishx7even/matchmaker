@@ -784,6 +784,23 @@ class MatchRepository
             $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $match_id),
             ARRAY_A
         );
+        if ($row) {
+            $u1_r = strtolower(trim((string) ($row['user_one_response'] ?? '')));
+            $u2_r = strtolower(trim((string) ($row['user_two_response'] ?? '')));
+            if (in_array($u1_r, ['accepted', 'accept'], true) && in_array($u2_r, ['accepted', 'accept'], true) && ($row['status'] ?? '') !== 'matched') {
+                $wpdb->update(
+                    $table,
+                    [
+                        'status'           => 'matched',
+                        'contact_revealed' => 1,
+                        'updated_at'       => current_time('mysql'),
+                    ],
+                    ['id' => (int) $row['id']]
+                );
+                $row['status']           = 'matched';
+                $row['contact_revealed'] = 1;
+            }
+        }
         return $row ?: null;
     }
 
@@ -831,8 +848,25 @@ class MatchRepository
         foreach ((array) $rows as $row) {
             $is_user_one    = ((int) $row['user_one_id'] === $user_id);
             $other_id       = $is_user_one ? (int) $row['user_two_id'] : (int) $row['user_one_id'];
-            $my_response    = strtolower((string) ($is_user_one ? ($row['user_one_response'] ?? 'pending') : ($row['user_two_response'] ?? 'pending')));
-            $their_response = strtolower((string) ($is_user_one ? ($row['user_two_response'] ?? 'pending') : ($row['user_one_response'] ?? 'pending')));
+            $my_response    = strtolower(trim((string) ($is_user_one ? ($row['user_one_response'] ?? 'pending') : ($row['user_two_response'] ?? 'pending'))));
+            $their_response = strtolower(trim((string) ($is_user_one ? ($row['user_two_response'] ?? 'pending') : ($row['user_one_response'] ?? 'pending'))));
+
+            // Self-heal: If both users have accepted, ensure row status is 'matched' and contact_revealed is 1
+            if (in_array($my_response, ['accepted', 'accept'], true) && in_array($their_response, ['accepted', 'accept'], true)) {
+                if ($row['status'] !== 'matched' || empty($row['contact_revealed'])) {
+                    $wpdb->update(
+                        $table,
+                        [
+                            'status'           => 'matched',
+                            'contact_revealed' => 1,
+                            'updated_at'       => current_time('mysql'),
+                        ],
+                        ['id' => (int) $row['id']]
+                    );
+                    $row['status']           = 'matched';
+                    $row['contact_revealed'] = 1;
+                }
+            }
 
             $other_user = get_userdata($other_id);
             $other_pool = $wpdb->get_row(
@@ -919,6 +953,29 @@ class MatchRepository
             ARRAY_A
         );
 
+        if (!empty($rows)) {
+            foreach ($rows as &$r) {
+                $u1_r = strtolower(trim((string) ($r['user_one_response'] ?? '')));
+                $u2_r = strtolower(trim((string) ($r['user_two_response'] ?? '')));
+                if (in_array($u1_r, ['accepted', 'accept'], true) && in_array($u2_r, ['accepted', 'accept'], true)) {
+                    if (($r['status'] ?? '') !== 'matched' || empty($r['contact_revealed'])) {
+                        $wpdb->update(
+                            $table,
+                            [
+                                'status'           => 'matched',
+                                'contact_revealed' => 1,
+                                'updated_at'       => current_time('mysql'),
+                            ],
+                            ['id' => (int) $r['id']]
+                        );
+                        $r['status']           = 'matched';
+                        $r['contact_revealed'] = 1;
+                    }
+                }
+            }
+            unset($r);
+        }
+
         return $rows ?: [];
     }
 
@@ -987,6 +1044,29 @@ class MatchRepository
         $results = !empty($args)
             ? $wpdb->get_results($wpdb->prepare($query, ...$args), ARRAY_A)
             : $wpdb->get_results($query, ARRAY_A);
+
+        if (!empty($results)) {
+            foreach ($results as &$r) {
+                $u1_r = strtolower(trim((string) ($r['user_one_response'] ?? '')));
+                $u2_r = strtolower(trim((string) ($r['user_two_response'] ?? '')));
+                if (in_array($u1_r, ['accepted', 'accept'], true) && in_array($u2_r, ['accepted', 'accept'], true)) {
+                    if (($r['status'] ?? '') !== 'matched' || empty($r['contact_revealed'])) {
+                        $wpdb->update(
+                            $matches_table,
+                            [
+                                'status'           => 'matched',
+                                'contact_revealed' => 1,
+                                'updated_at'       => current_time('mysql'),
+                            ],
+                            ['id' => (int) $r['id']]
+                        );
+                        $r['status']           = 'matched';
+                        $r['contact_revealed'] = 1;
+                    }
+                }
+            }
+            unset($r);
+        }
 
         return $results ?: [];
     }
@@ -1080,38 +1160,45 @@ class MatchRepository
         }
 
         $is_user_one    = ((int) $match['user_one_id'] === $user_id);
-        $new_val        = ($action === 'accept') ? 'accepted' : 'rejected';
-        $other_response = $is_user_one ? $match['user_two_response'] : $match['user_one_response'];
+        $norm_action    = strtolower(trim($action));
+        $is_accepting   = in_array($norm_action, ['accept', 'accepted'], true);
+        $is_declining   = in_array($norm_action, ['decline', 'declined', 'reject', 'rejected'], true);
+        $new_val        = $is_accepting ? 'accepted' : 'rejected';
+
+        $other_raw      = $is_user_one ? ($match['user_two_response'] ?? 'pending') : ($match['user_one_response'] ?? 'pending');
+        $other_is_acc   = in_array(strtolower(trim((string) $other_raw)), ['accepted', 'accept'], true);
 
         $update_data = $is_user_one ? ['user_one_response' => $new_val] : ['user_two_response' => $new_val];
         $update_data['updated_at'] = current_time('mysql');
 
-        if ($action === 'decline') {
+        $is_mutual = false;
+        if ($is_declining) {
             $update_data['status'] = 'rejected';
-        } elseif ($action === 'accept' && $other_response === 'accepted') {
+        } elseif ($is_accepting && $other_is_acc) {
             $update_data['status']           = 'matched';
             $update_data['contact_revealed'] = 1;
+            $is_mutual                       = true;
         }
 
         $wpdb->update($table, $update_data, ['id' => $match_id]);
 
-        if ($action === 'decline') {
+        if ($is_declining) {
             \Matchmaker\Service\NotificationService::instance()->send_match_expired_admin_email($match_id, 'declined_by_user', $user_id);
-        } elseif ($action === 'accept' && $other_response === 'accepted') {
+        } elseif ($is_mutual) {
             \Matchmaker\Service\NotificationService::instance()->send_mutual_match_notifications($match_id);
         }
 
         $next_step = 3;
-        if ($action === 'decline') {
+        if ($is_declining) {
             $next_step = 1;
-        } elseif ($action === 'accept' && $other_response === 'accepted') {
+        } elseif ($is_mutual) {
             $next_step = 5;
         }
 
         return [
             'success'        => true,
             'next_step'      => $next_step,
-            'is_mutual'      => ($action === 'accept' && $other_response === 'accepted'),
+            'is_mutual'      => $is_mutual,
             'other_user_id'  => $is_user_one ? (int) $match['user_two_id'] : (int) $match['user_one_id'],
             'match'          => $match,
         ];
