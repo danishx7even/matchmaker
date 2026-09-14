@@ -1648,6 +1648,52 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-13 — Task 83: Comprehensive Regression & Edge-Case Testing of All Matchmaker Features
 
+- **Objective**:
+  1. Perform an exhaustive audit and end-to-end regression test suite covering all features, services, forms, workflows, background jobs, and edge cases implemented in the Arab Zawaj Matchmaker plugin.
+  2. Test stress scenarios, invalid/corrupt inputs, unauthorized access attempts, multi-level/multi-service matrix co-existence, rate limits, OTP security, SQL injection boundaries, and range constraints.
+  3. Comply strictly with zero production code modification constraint (pure test-driven verification).
+- **Changes**:
+  - `tests/Integration/ComprehensiveRegressionAndEdgeCaseTest.php`:
+    - Created a 10-suite stress and edge-case test file covering:
+      1. Matching Engine empty candidate pool and self-matching prevention.
+      2. Flexible scoring under corrupt, null, and non-standard candidate metadata.
+      3. PMPro multi-tier matrix (1 base plan + 3 concurrent add-on services).
+      4. Multi-layer cancellation blockade stress (direct filter, PMPro 3.0+ hook, member action links).
+      5. Bulk user type synchronization with missing and corrupt usermeta.
+      6. Membership account card details for all level variants (recurring, fixed, lifetime, add-ons).
+      7. Username change validation, space rejection, HTML/script stripping, and SQL injection safety.
+      8. Email verification OTP generation, 60s cooldown enforcement, brute-force rejection, and verification flag updates.
+      9. Form wizard inverted age/height range validation and select input ignore attributes.
+      10. Bulk email campaign placeholder interpolation (`{name}`, `{email}`, `{user_type}`, `{services}`, `{dashboard_url}`, etc.) and unmatched tag retention.
+## 2026-09-14 — Task 84: Dynamic Match Step Status View & Login Username Validation Removal
 
+- **Objective**:
+  1. Fix the Member Portal Step 3 ("View Status") view so that heading, subtitle, icons, response tags, "What's Next" notes, and primary action buttons dynamically reflect the match status from both user ends (Pending, Candidate Accepted, User Accepted, Mutual Match, Declined by User, Declined by Candidate, and Expired).
+  2. Remove frontend username validation scripts (`input#user_login`, pattern, minlength, space prevention, hints) from the PMPro login form / `custom_pmpro_login_page_design()`.
+  3. Strictly isolate username modification frontend validation to the PMPro Member Profile Edit form (`#pmpro_member_profile_edit` / `#member-profile-edit`) via a dedicated `custom_pmpro_profile_edit_username_script()` hook.
+  4. Refine Step 1 discovery action buttons and Step 2 review dock prompts to accurately adapt to the active response state.
+- **Changes**:
+  - `src/View/frontend/portal/steps/step-3-waiting.php`:
+    - Replaced static/assumed accepted states with full dynamic evaluation of `$my_resp`, `$their_resp`, `$match_status`, and `$is_expired`.
+    - Added dedicated headings ("Match Pending Your Review", "Candidate Accepted — Awaiting Your Response", "Match Accepted", "It's a Mutual Match!", "Match Declined by You", "Match Closed", "Match Expired").
+    - Added dynamic CTA buttons ("Review Profile & Respond →" when pending, "View Contact Details →" when mutual, and "Back to Profile Dashboard →").
+  - `src/View/frontend/portal/steps/step-1-discovery.php`:
+    - Refined action column prompts and buttons for mutual, accepted, and pending matches.
+  - `src/View/frontend/portal/steps/step-2-profile.php`:
+    - Refined footer action dock CTA prompts and status buttons based on active response state.
+  - `src/View/frontend/portal/tab-matches.php`:
+    - Updated `$default_step` calculation to default declined matches to step 3.
+  - `src/Frontend/AuthController.php`:
+    - Removed username validation and hints from `custom_pmpro_login_page_design()`.
+    - Added `custom_pmpro_profile_edit_username_script()` scoped strictly to `#pmpro_member_profile_edit` and `#member-profile-edit`.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added 5 new tests covering Step 3 dynamic status rendering across all two-sided response combinations.
+  - `tests/Unit/AuthAndRedirectsTest.php`:
+    - Added 2 new tests verifying login design has no username edit restrictions and profile edit script scopes strictly to profile forms.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 151 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
 

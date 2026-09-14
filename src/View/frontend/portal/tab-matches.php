@@ -25,7 +25,7 @@ $is_mutual    = ($my_resp === 'accepted' && $their_resp === 'accepted') || (($ac
 $default_step = 1;
 if ($is_mutual) {
     $default_step = 5;
-} elseif ($my_resp === 'accepted') {
+} elseif ($my_resp === 'accepted' || in_array($my_resp, ['declined', 'rejected'], true)) {
     $default_step = 3;
 }
 ?>

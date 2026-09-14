@@ -3,7 +3,10 @@
 **Status**: `IDLE`
 **Active Task**: None
 
-*Ready for next instruction.*
+*Ready for next assignment.*
+
+
+
 
 
 

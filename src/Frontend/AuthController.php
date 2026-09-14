@@ -57,6 +57,7 @@ class AuthController
         add_filter('pmpro_confirmation_url',               [$this, 'custom_pmpro_level_based_registration_redirect'], 10, 3);
         add_filter('show_admin_bar',                       [$this, 'custom_hide_admin_bar_for_subscribers']);
         add_action('wp_footer',                            [$this, 'custom_pmpro_login_page_design']);
+        add_action('wp_footer',                            [$this, 'custom_pmpro_profile_edit_username_script']);
         add_action('profile_update',                       [$this, 'redirect_after_pmpro_profile_update'], 99, 3);
         add_filter('pmpro_member_profile_edit_user_object_fields', [$this, 'add_username_to_pmpro_profile_fields'], 10, 1);
         add_action('pmpro_user_profile_update_errors',             [$this, 'validate_and_save_pmpro_username_update'], 10, 3);
@@ -379,9 +380,33 @@ class AuthController
             if (forgotLink) {
                 forgotLink.textContent = '<?php echo esc_js(__('Forget password', 'matchmaker')); ?>';
             }
+        });
+        </script>
+        <?php
+    }
 
-            /* PMPro Profile Edit Username Field Enhancements */
-            var usernameInput = document.querySelector('#member-profile-edit input[name="user_login"], #pmpro_member_profile_edit input[name="user_login"], input#user_login');
+    /**
+     * Inject JavaScript to enhance the username field strictly on the PMPro member profile edit form.
+     *
+     * Adds client-side space prevention, character pattern validation, and helpful hints.
+     * Strictly isolated from the PMPro login form.
+     *
+     * @return void
+     */
+    public function custom_pmpro_profile_edit_username_script(): void
+    {
+        if (function_exists('pmpro_is_login_page') && pmpro_is_login_page()) {
+            return;
+        }
+        ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            /* PMPro Profile Edit Username Field Enhancements - strictly scoped to member profile edit forms */
+            var profileForm = document.querySelector('#pmpro_member_profile_edit, #member-profile-edit, form.pmpro_form_profile, form[action*="member-profile-edit"]');
+            if (!profileForm) {
+                return;
+            }
+            var usernameInput = profileForm.querySelector('input[name="user_login"], input[name="username"]');
             if (usernameInput) {
                 usernameInput.setAttribute('pattern', '^[a-zA-Z0-9_\\-\\.]+$');
                 usernameInput.setAttribute('minlength', '3');

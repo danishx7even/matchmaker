@@ -54,29 +54,58 @@ if (!defined('ABSPATH')) {
                             </div>
                             <p><?php esc_html_e('Both of you have accepted the match! You can now view each other\'s direct contact details.', 'matchmaker'); ?></p>
                         </div>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+                            <button type="button" class="btn btn-primary" style="width: 100%;" data-mm-action="navigate-step" data-step="5">
+                                <?php esc_html_e('View Contact Details →', 'matchmaker'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-dark" style="width: 100%;" data-mm-action="navigate-step" data-step="2">
+                                <?php esc_html_e('View Full Profile', 'matchmaker'); ?>
+                            </button>
+                        </div>
                     <?php else : ?>
                         <div>
                             <div style="font-family: 'Cormorant SC', serif; font-size: 15px; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">
-                                <?php esc_html_e('Your Response', 'matchmaker'); ?>
+                                <?php
+                                $cur_my_resp = strtolower((string) ($active_match['my_response'] ?? 'pending'));
+                                if ($cur_my_resp === 'accepted') {
+                                    esc_html_e('Match Accepted', 'matchmaker');
+                                } elseif (in_array($cur_my_resp, ['declined', 'rejected'], true)) {
+                                    esc_html_e('Match Declined', 'matchmaker');
+                                } else {
+                                    esc_html_e('Your Response', 'matchmaker');
+                                }
+                                ?>
                             </div>
-                            <p><?php echo esc_html(sprintf(__('Take your time to review this profile. You have %d days to accept or decline this match before it expires.', 'matchmaker'), $expiry_days)); ?></p>
-                            <div class="timer-card">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                <div>
-                                    <div class="timer-title"><?php esc_html_e('Time Remaining', 'matchmaker'); ?></div>
-                                    <div class="timer-val"><?php echo (int) $active_match['days_remaining']; ?> <?php esc_html_e('days remaining', 'matchmaker'); ?></div>
+                            <p>
+                                <?php
+                                if ($cur_my_resp === 'accepted') {
+                                    esc_html_e("You've accepted this match. We're now waiting for the candidate to review and respond.", 'matchmaker');
+                                } elseif (in_array($cur_my_resp, ['declined', 'rejected'], true)) {
+                                    esc_html_e('You have declined this match recommendation.', 'matchmaker');
+                                } else {
+                                    echo esc_html(sprintf(__('Take your time to review this profile. You have %d days to accept or decline this match before it expires.', 'matchmaker'), $expiry_days));
+                                }
+                                ?>
+                            </p>
+                            <?php if ($cur_my_resp === 'pending') : ?>
+                                <div class="timer-card">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                    <div>
+                                        <div class="timer-title"><?php esc_html_e('Time Remaining', 'matchmaker'); ?></div>
+                                        <div class="timer-val"><?php echo (int) $active_match['days_remaining']; ?> <?php esc_html_e('days remaining', 'matchmaker'); ?></div>
+                                    </div>
                                 </div>
-                            </div>
+                            <?php endif; ?>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+                            <button type="button" class="btn btn-primary" style="width: 100%;" data-mm-action="navigate-step" data-step="2">
+                                <?php esc_html_e('View Match →', 'matchmaker'); ?>
+                            </button>
+                            <button type="button" class="btn btn-outline-dark" style="width: 100%;" data-mm-action="navigate-step" data-step="3">
+                                <?php esc_html_e('View Status', 'matchmaker'); ?>
+                            </button>
                         </div>
                     <?php endif; ?>
-                    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
-                        <button type="button" class="btn btn-primary" style="width: 100%;" data-mm-action="navigate-step" data-step="2">
-                            <?php esc_html_e('View Match →', 'matchmaker'); ?>
-                        </button>
-                        <button type="button" class="btn btn-outline-dark" style="width: 100%;" data-mm-action="navigate-step" data-step="3">
-                            <?php esc_html_e('View Status', 'matchmaker'); ?>
-                        </button>
-                    </div>
                 </div>
             </div>
         </main>

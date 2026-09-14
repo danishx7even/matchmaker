@@ -303,6 +303,183 @@ final class PortalAndEventsTest extends TestCase
 
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
+
+    public function test_step_3_renders_pending_state_heading_and_actions(): void
+    {
+        $active_match = [
+            'id' => 13,
+            'match_id' => 13,
+            'user_id' => 502,
+            'name' => 'Layla Hassan',
+            'my_response' => 'pending',
+            'their_response' => 'pending',
+            'status' => 'approved',
+            'days_remaining' => 6,
+        ];
+        $my_resp = 'pending';
+        $their_resp = 'pending';
+        $default_step = 3;
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-3-waiting.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Match Pending Your Review', $html);
+        $this->assertStringContainsString("You haven&#039;t responded to this match yet", $html);
+        $this->assertStringContainsString('Pending', $html);
+        $this->assertStringContainsString('Waiting', $html);
+        $this->assertStringContainsString('Review Profile &amp; Respond →', $html);
+        $this->assertStringNotContainsString('Match Accepted', $html);
+    }
+
+    public function test_step_3_renders_candidate_accepted_state(): void
+    {
+        $active_match = [
+            'id' => 14,
+            'match_id' => 14,
+            'user_id' => 503,
+            'name' => 'Sara Mansour',
+            'my_response' => 'pending',
+            'their_response' => 'accepted',
+            'status' => 'approved',
+            'days_remaining' => 5,
+        ];
+        $my_resp = 'pending';
+        $their_resp = 'accepted';
+        $default_step = 3;
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-3-waiting.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Candidate Accepted — Awaiting Your Response', $html);
+        $this->assertStringContainsString('The candidate has accepted this match recommendation', $html);
+        $this->assertStringContainsString('Pending', $html);
+        $this->assertStringContainsString('Accepted', $html);
+        $this->assertStringContainsString('Review Profile &amp; Respond →', $html);
+    }
+
+    public function test_step_3_renders_my_accepted_waiting_candidate(): void
+    {
+        $active_match = [
+            'id' => 15,
+            'match_id' => 15,
+            'user_id' => 504,
+            'name' => 'Tariq Al-Sabah',
+            'my_response' => 'accepted',
+            'their_response' => 'pending',
+            'status' => 'approved',
+            'days_remaining' => 4,
+        ];
+        $my_resp = 'accepted';
+        $their_resp = 'pending';
+        $default_step = 3;
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-3-waiting.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Match Accepted', $html);
+        $this->assertStringContainsString("We&#039;re now waiting for the candidate to review and respond", $html);
+        $this->assertStringContainsString('Accepted', $html);
+        $this->assertStringContainsString('Waiting', $html);
+        $this->assertStringContainsString('Back to Profile Dashboard →', $html);
+    }
+
+    public function test_step_3_renders_mutual_match_state(): void
+    {
+        $active_match = [
+            'id' => 16,
+            'match_id' => 16,
+            'user_id' => 505,
+            'name' => 'Amira Noor',
+            'my_response' => 'accepted',
+            'their_response' => 'accepted',
+            'status' => 'matched',
+            'days_remaining' => 3,
+        ];
+        $my_resp = 'accepted';
+        $their_resp = 'accepted';
+        $default_step = 3;
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-3-waiting.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString("It&#039;s a Mutual Match!", $html);
+        $this->assertStringContainsString('Both you and the candidate have accepted!', $html);
+        $this->assertStringContainsString('View Contact Details →', $html);
+    }
+
+    public function test_step_3_renders_declined_and_expired_states(): void
+    {
+        // 1. User declined
+        $declined_match = [
+            'id' => 17,
+            'match_id' => 17,
+            'user_id' => 506,
+            'name' => 'Yusuf Ali',
+            'my_response' => 'declined',
+            'their_response' => 'pending',
+            'status' => 'approved',
+            'days_remaining' => 2,
+        ];
+        $my_resp = 'declined';
+        $their_resp = 'pending';
+        $default_step = 3;
+
+        ob_start();
+        $active_match = $declined_match;
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-3-waiting.php';
+        $html_dec = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Match Declined by You', $html_dec);
+        $this->assertStringContainsString('You have declined this match recommendation', $html_dec);
+
+        // 2. Candidate declined
+        $cand_dec = [
+            'id' => 18,
+            'match_id' => 18,
+            'user_id' => 507,
+            'name' => 'Zainab Qasim',
+            'my_response' => 'accepted',
+            'their_response' => 'declined',
+            'status' => 'approved',
+            'days_remaining' => 1,
+        ];
+        $my_resp = 'accepted';
+        $their_resp = 'declined';
+
+        ob_start();
+        $active_match = $cand_dec;
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-3-waiting.php';
+        $html_cand = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Match Closed', $html_cand);
+        $this->assertStringContainsString('The candidate was unable to proceed', $html_cand);
+
+        // 3. Expired
+        $expired_match = [
+            'id' => 19,
+            'match_id' => 19,
+            'user_id' => 508,
+            'name' => 'Bilal Khan',
+            'my_response' => 'pending',
+            'their_response' => 'pending',
+            'status' => 'expired',
+            'days_remaining' => 0,
+        ];
+        $my_resp = 'pending';
+        $their_resp = 'pending';
+
+        ob_start();
+        $active_match = $expired_match;
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-3-waiting.php';
+        $html_exp = (string) ob_get_clean();
+
+        $this->assertStringContainsString('Match Expired', $html_exp);
+        $this->assertStringContainsString('The response window for this match recommendation has ended', $html_exp);
+    }
 }
 
 

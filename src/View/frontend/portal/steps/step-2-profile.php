@@ -93,7 +93,7 @@ if (!defined('ABSPATH')) {
         <?php if ($my_resp === 'pending') : ?>
             <div class="footer-cta-prompt">
                 <h4 class="font-cormorant"><?php esc_html_e('What do you think?', 'matchmaker'); ?></h4>
-                <p><?php esc_html_e('You have 7 days to respond to this match.', 'matchmaker'); ?></p>
+                <p><?php echo esc_html(sprintf(__('You have %d days to respond to this match.', 'matchmaker'), (int) ($active_match['days_remaining'] ?? 7))); ?></p>
             </div>
             <div style="display: flex; gap: 14px; flex-wrap: wrap;">
                 <button type="button" class="btn btn-outline-dark" data-mm-action="navigate-step" data-step="4">
@@ -113,10 +113,20 @@ if (!defined('ABSPATH')) {
                     <?php esc_html_e('View Contact Details →', 'matchmaker'); ?>
                 </button>
             </div>
+        <?php elseif ($my_resp === 'accepted') : ?>
+            <div class="footer-cta-prompt">
+                <h4 class="font-cormorant"><?php esc_html_e('Match Accepted', 'matchmaker'); ?></h4>
+                <p><?php esc_html_e('You have accepted this match. Awaiting candidate response.', 'matchmaker'); ?></p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" data-mm-action="navigate-step" data-step="3">
+                    <?php esc_html_e('View Status →', 'matchmaker'); ?>
+                </button>
+            </div>
         <?php else : ?>
             <div class="footer-cta-prompt">
-                <h4 class="font-cormorant"><?php esc_html_e('Response Submitted', 'matchmaker'); ?></h4>
-                <p><?php esc_html_e('You have already submitted your response for this match.', 'matchmaker'); ?></p>
+                <h4 class="font-cormorant"><?php esc_html_e('Match Declined', 'matchmaker'); ?></h4>
+                <p><?php esc_html_e('You have declined this match recommendation.', 'matchmaker'); ?></p>
             </div>
             <div>
                 <button type="button" class="btn btn-primary" data-mm-action="navigate-step" data-step="3">

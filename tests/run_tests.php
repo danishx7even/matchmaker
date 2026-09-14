@@ -22,6 +22,7 @@ require_once __DIR__ . '/Unit/LocationCascadeTest.php';
 require_once __DIR__ . '/Unit/ExportAndBulkEmailTest.php';
 require_once __DIR__ . '/Integration/EndToEndFlowTest.php';
 require_once __DIR__ . '/Integration/FullMemberLifecycleFlowTest.php';
+require_once __DIR__ . '/Integration/ComprehensiveRegressionAndEdgeCaseTest.php';
 
 $test_classes = [
     \DBMigratorTest::class,
@@ -44,6 +45,7 @@ $test_classes = [
     \Matchmaker\Tests\Unit\ExportAndBulkEmailTest::class,
     \Matchmaker\Tests\Integration\EndToEndFlowTest::class,
     \Matchmaker\Tests\Integration\FullMemberLifecycleFlowTest::class,
+    \Matchmaker\Tests\Integration\ComprehensiveRegressionAndEdgeCaseTest::class,
 ];
 
 $total_tests  = 0;

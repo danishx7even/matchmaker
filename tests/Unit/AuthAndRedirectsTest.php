@@ -316,6 +316,46 @@ class AuthAndRedirectsTest
 
         unset($_POST['privacy_policy_consent']);
     }
+
+    public function test_pmpro_login_page_design_does_not_contain_username_edit_validation(): void
+    {
+        ob_start();
+        $this->auth->custom_pmpro_login_page_design();
+        $html = (string) ob_get_clean();
+
+        // Must contain login title, subtitle, and signup link
+        if (!str_contains($html, 'Sign Into Your Account')) {
+            throw new \RuntimeException("Expected login page to contain 'Sign Into Your Account', got: " . $html);
+        }
+        if (!str_contains($html, 'Please enter your email and password below.')) {
+            throw new \RuntimeException("Expected login page subtitle in markup.");
+        }
+
+        // Must NOT contain username validation / restrictions / pattern / hint
+        if (str_contains($html, 'No spaces allowed') || str_contains($html, 'input#user_login') || str_contains($html, 'mm-username-hint')) {
+            throw new \RuntimeException("PMPro login page design must NOT contain username edit restrictions or hints.");
+        }
+    }
+
+    public function test_pmpro_profile_edit_username_script_scopes_strictly_to_profile_form(): void
+    {
+        ob_start();
+        $this->auth->custom_pmpro_profile_edit_username_script();
+        $html = (string) ob_get_clean();
+
+        // Must scope strictly to member profile edit forms
+        if (!str_contains($html, '#pmpro_member_profile_edit') || !str_contains($html, '#member-profile-edit')) {
+            throw new \RuntimeException("Expected profile edit script to scope to #pmpro_member_profile_edit and #member-profile-edit.");
+        }
+        if (!str_contains($html, 'mm-username-hint') || !str_contains($html, 'No spaces allowed')) {
+            throw new \RuntimeException("Expected profile edit script to include hint and space prevention.");
+        }
+
+        // Must NOT target global input#user_login without profile form scope
+        if (str_contains($html, ', input#user_login\');') || str_contains($html, ', input#user_login"')) {
+            throw new \RuntimeException("Profile edit script must not match generic input#user_login on login pages.");
+        }
+    }
 }
 
 
