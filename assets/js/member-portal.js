@@ -45,7 +45,16 @@
             var panel = document.getElementById('mm-tab-' + tabName);
             if (!panel) return;
 
-            panel.style.opacity = '0.6';
+            // Ensure loader overlay exists inside the panel
+            var loader = panel.querySelector('.mm-tab-loader');
+            if (!loader) {
+                loader = document.createElement('div');
+                loader.className = 'mm-tab-loader';
+                loader.innerHTML = '<div class="mm-tab-spinner"></div>';
+                panel.appendChild(loader);
+            }
+            loader.classList.add('is-active');
+            panel.style.opacity = '0.7';
 
             var data = new FormData();
             data.append('action', 'mm_reload_tab_content');
@@ -83,6 +92,9 @@
             })
             .catch(function (err) {
                 panel.style.opacity = '1';
+                if (loader) {
+                    loader.classList.remove('is-active');
+                }
                 throw err;
             });
         },

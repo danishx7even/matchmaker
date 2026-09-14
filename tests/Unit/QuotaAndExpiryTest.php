@@ -72,4 +72,55 @@ final class QuotaAndExpiryTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('5-match monthly quota', $result['message']);
     }
+
+    public function test_days_remaining_calculated_when_user_has_accepted_and_not_expired(): void
+    {
+        $repo = MatchRepository::instance();
+        update_option('mm_match_expiry_days', 7);
+
+        $user_id = 201;
+        $other_id = 202;
+
+        // Mock approved match created today where user has accepted and other is pending
+        $today = current_time('mysql');
+        $match_row = [
+            'id' => 88,
+            'user_one_id' => $user_id,
+            'user_two_id' => $other_id,
+            'initiator_user_id' => $user_id,
+            'status' => 'approved',
+            'user_one_response' => 'accepted',
+            'user_two_response' => 'pending',
+            'score' => 5,
+            'contact_revealed' => 0,
+            'approved_at' => $today,
+            'created_at' => $today,
+            'updated_at' => $today,
+        ];
+
+        $GLOBALS['wpdb']->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = 201 OR user_two_id = 201)\n                   AND status IN ('approved', 'matched')\n                 ORDER BY created_at DESC"] = [$match_row];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 202"] = [
+            'user_id' => 202,
+            'city' => 'Doha',
+            'country' => 'Qatar',
+            'birth_date' => '1995-05-15',
+        ];
+
+        $matches = $repo->find_approved_matches_for_user($user_id);
+        $this->assertNotEmpty($matches);
+        $this->assertEquals(88, $matches[0]['match_id']);
+        $this->assertEquals('accepted', $matches[0]['my_response']);
+        $this->assertEquals('pending', $matches[0]['their_response']);
+        // days_remaining MUST be 7 (or positive), not 0
+        $this->assertGreaterThanOrEqual(6, $matches[0]['days_remaining']);
+        $this->assertLessThanOrEqual(7, $matches[0]['days_remaining']);
+
+        // Test get_match_stats also returns positive days_remaining
+        $GLOBALS['wpdb']->mock_rows["SELECT id, user_one_id, user_two_id, user_one_response, user_two_response, approved_at, updated_at, created_at\n                 FROM wp_matches\n                 WHERE (user_one_id = 201 OR user_two_id = 201)\n                   AND status = 'approved'\n                 ORDER BY created_at DESC LIMIT 1"] = $match_row;
+
+        $stats = $repo->get_match_stats($user_id);
+        $this->assertGreaterThanOrEqual(6, $stats['days_remaining']);
+        $this->assertLessThanOrEqual(7, $stats['days_remaining']);
+    }
 }
+

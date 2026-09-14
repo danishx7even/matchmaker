@@ -842,8 +842,8 @@ class MatchRepository
 
             // Days remaining to respond
             $days_remaining = 0;
-            if ($my_response === 'pending' && $row['status'] === 'approved') {
-                $ref_date       = !empty($row['approved_at']) ? $row['approved_at'] : $row['updated_at'];
+            if ($row['status'] === 'approved') {
+                $ref_date       = !empty($row['approved_at']) ? $row['approved_at'] : (!empty($row['created_at']) ? $row['created_at'] : $row['updated_at']);
                 $deadline       = strtotime($ref_date . ' +' . $expiry_days . ' days');
                 $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
             }
@@ -1179,8 +1179,7 @@ class MatchRepository
 
         $expired_rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE status = 'approved' AND (COALESCE(approved_at, updated_at) < DATE_SUB(NOW(), INTERVAL %d DAY) OR updated_at < DATE_SUB(NOW(), INTERVAL %d DAY))",
-                $expiry_days,
+                "SELECT id FROM {$table} WHERE status = 'approved' AND COALESCE(approved_at, created_at, updated_at) < DATE_SUB(NOW(), INTERVAL %d DAY)",
                 $expiry_days
             ),
             ARRAY_A
@@ -1323,14 +1322,10 @@ class MatchRepository
 
         $days_remaining = 0;
         if ($active_row) {
-            $is_u1   = ((int) $active_row['user_one_id'] === $user_id);
-            $my_resp = $is_u1 ? $active_row['user_one_response'] : $active_row['user_two_response'];
-            if ($my_resp === 'pending') {
-                $expiry_days    = $this->get_match_expiry_days();
-                $ref_date       = !empty($active_row['approved_at']) ? $active_row['approved_at'] : $active_row['updated_at'];
-                $deadline       = strtotime($ref_date . ' +' . $expiry_days . ' days');
-                $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
-            }
+            $expiry_days    = $this->get_match_expiry_days();
+            $ref_date       = !empty($active_row['approved_at']) ? $active_row['approved_at'] : (!empty($active_row['created_at']) ? $active_row['created_at'] : $active_row['updated_at']);
+            $deadline       = strtotime($ref_date . ' +' . $expiry_days . ' days');
+            $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
         }
 
         // 3. Count of total matches accepted by the user in the current month

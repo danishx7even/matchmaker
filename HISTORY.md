@@ -1697,3 +1697,29 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-14 — Task 85: Match Expiration Duration Bug Fix, Tab Loading Overlay & Comprehensive Match States Documentation
+
+- **Objective**:
+  1. Fix false expiration bug on active matches where accepting a match set `days_remaining` to 0 and prematurely caused the other candidate's status to display as "Expired" on newly created matches.
+  2. Enforce accurate expiration duration calculation based on admin settings (`mm_match_expiry_days`, default 7 days) across all approved match queries.
+  3. Implement a lightweight, smooth tab loading overlay (`mm-tab-loader` + CSS spinner) during dynamic tab switching and match responses without introducing artificial delays.
+  4. Ensure server-side data is always freshly fetched on match status transitions and tab switching.
+  5. Provide comprehensive Markdown documentation (`context/match_views_guide.md` and user artifact) covering all 7 match scenarios and UI states for Step 1 through Step 5.
+- **Changes**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `find_approved_matches_for_user()` to calculate `$days_remaining` whenever `$row['status'] === 'approved'`, ensuring the remaining countdown window is maintained when `$my_response === 'accepted'`.
+    - Updated `get_match_stats()` to calculate `$days_remaining` for any active approved match.
+    - Cleaned `check_7day_match_expirations()` query to reference `COALESCE(approved_at, created_at, updated_at) < DATE_SUB(NOW(), INTERVAL %d DAY)`.
+  - `assets/css/member-portal.css`:
+    - Added `.portal-tab-panel`, `.mm-tab-loader`, `.mm-tab-loader.is-active`, and `.mm-tab-spinner` keyframe styles.
+  - `assets/js/member-portal.js`:
+    - Updated `reloadTabAJAX()` to dynamically inject and activate `.mm-tab-loader` overlay during AJAX roundtrips, smoothly removing it upon completion.
+  - `context/match_views_guide.md` & Artifact `match_views_guide.md`:
+    - Created comprehensive 5-step workflow and 7-scenario state matrix guide detailing headings, descriptions, response tags, action buttons, countdown timers, and expiration rules.
+  - `tests/Unit/QuotaAndExpiryTest.php`:
+    - Added `test_days_remaining_calculated_when_user_has_accepted_and_not_expired()`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 152 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
