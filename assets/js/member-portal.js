@@ -45,18 +45,11 @@
             var panel = document.getElementById('mm-tab-' + tabName);
             if (!panel) return;
 
-            // Remove any previous loader instance
-            var oldLoader = panel.querySelector('.mm-tab-loader');
-            if (oldLoader) {
-                oldLoader.remove();
-            }
-
-            // Create and prepend prominent circular loader at the top of the panel
-            var loader = document.createElement('div');
-            loader.className = 'mm-tab-loader';
-            loader.innerHTML = '<div class="mm-tab-spinner"></div><div class="mm-tab-loader-text">Loading...</div>';
-            panel.insertBefore(loader, panel.firstChild);
-            panel.style.opacity = '0.7';
+            // Completely replace panel content with prominent circular loader while fetching data
+            panel.innerHTML = '<div class="mm-tab-loader">' +
+                '<div class="mm-tab-spinner"></div>' +
+                '<div class="mm-tab-loader-text">Loading...</div>' +
+                '</div>';
 
             var data = new FormData();
             data.append('action', 'mm_reload_tab_content');
@@ -77,7 +70,6 @@
             })
             .then(function (res) { return res.json(); })
             .then(function (resData) {
-                panel.style.opacity = '1';
                 if (resData.success && resData.data && resData.data.html) {
                     panel.innerHTML = resData.data.html;
 
@@ -89,14 +81,19 @@
                             stepHistory = [1];
                         }
                     }
+                } else {
+                    panel.innerHTML = '<div class="az-card" style="text-align:center; padding:40px 20px; color:#C2410C;">' +
+                        '<p style="font-weight:600; margin-bottom:12px;">Failed to load tab content.</p>' +
+                        '<button type="button" class="btn btn-primary" data-mm-action="switch-tab" data-tab="' + tabName + '">Retry</button>' +
+                        '</div>';
                 }
                 return resData;
             })
             .catch(function (err) {
-                panel.style.opacity = '1';
-                if (loader && loader.parentNode) {
-                    loader.remove();
-                }
+                panel.innerHTML = '<div class="az-card" style="text-align:center; padding:40px 20px; color:#C2410C;">' +
+                    '<p style="font-weight:600; margin-bottom:12px;">Network error while loading tab content.</p>' +
+                    '<button type="button" class="btn btn-primary" data-mm-action="switch-tab" data-tab="' + tabName + '">Retry</button>' +
+                    '</div>';
                 throw err;
             });
         },

@@ -1699,60 +1699,54 @@ a.az-edit-btn:hover {
 }
 
 /* ----------------------------------------------------
-   Tab Loading Overlay & Circular Spinner
+   Tab Loading Container & Circular Spinner
 ---------------------------------------------------- */
 .portal-tab-panel {
-    position: relative !important;
-    min-height: 280px;
-    transition: opacity 0.2s ease;
+    min-height: 320px;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .mm-tab-loader {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    min-height: 260px;
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
-    justify-content: flex-start !important;
-    padding-top: 80px !important;
-    box-sizing: border-box;
-    z-index: 9999;
-    border-radius: 24px;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    transition: opacity 0.2s ease;
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 360px !important;
+    padding: 60px 20px !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
 }
 
 .mm-tab-spinner {
-    width: 44px;
-    height: 44px;
-    border: 4px solid rgba(204, 114, 63, 0.18);
-    border-top-color: #CC723F;
-    border-radius: 50%;
-    animation: mm-tab-spin 0.65s linear infinite;
-    box-shadow: 0 4px 14px rgba(204, 114, 63, 0.2);
+    width: 48px !important;
+    height: 48px !important;
+    border: 4px solid rgba(204, 114, 63, 0.2) !important;
+    border-top: 4px solid #CC723F !important;
+    border-radius: 50% !important;
+    animation: mm-tab-spin 0.75s linear infinite !important;
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
 }
 
 .mm-tab-loader-text {
-    margin-top: 14px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #CC723F;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    margin-top: 16px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: #CC723F !important;
+    letter-spacing: 0.8px !important;
+    text-transform: uppercase !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
 
 @keyframes mm-tab-spin {
-    to {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
         transform: rotate(360deg);
     }
 }
+
 

@@ -1762,8 +1762,25 @@ This document maintains a chronological, step-by-step history of all features, a
   - `tests/bootstrap.php`:
     - Added `selected()`, `checked()`, `disabled()`, and `wp_nonce_url()` mock helpers.
 - **Verification**:
+## 2026-09-14 — Task 88: Clean Tab Loading Architecture (Content Hiding & Centered Circular Spinner)
+
+- **Objective**:
+  1. Resolve issue where the previous tab loading implementation used an absolute overlay with `backdrop-filter: blur(4px)` which blurred the background content without cleanly hiding it or displaying a centered circular loader.
+  2. Implement a clean, dedicated loading state where old tab content is completely hidden during AJAX reload and replaced with a prominent, centered circular loading spinner (`#CC723F`).
+  3. Ensure that once data is received, the loader is cleanly replaced with the fresh, rendered tab content.
+- **Changes**:
+  - `assets/js/member-portal.js`:
+    - Updated `reloadTabAJAX()` to immediately set `panel.innerHTML = '<div class="mm-tab-loader"><div class="mm-tab-spinner"></div><div class="mm-tab-loader-text">Loading...</div></div>'`, cleanly replacing existing content during the AJAX roundtrip.
+    - Updated success handler to populate `panel.innerHTML = resData.data.html`, cleanly revealing the new tab content with zero blur artifacts.
+    - Added clean error/retry markup in `.catch()`.
+  - `assets/css/member-portal.css`:
+    - Removed `position: absolute`, `backdrop-filter: blur(4px)`, and background overlays from `.mm-tab-loader`.
+    - Styled `.mm-tab-loader` as an in-flow centered flex container (`min-height: 360px`, `padding: 60px 20px`, `width: 100%`).
+    - Styled `.mm-tab-spinner` with a crisp 48px circle, 4px border, and `#CC723F` brand color spinning animation.
+- **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — **all 156 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
 ---
+
 
 
