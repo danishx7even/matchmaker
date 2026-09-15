@@ -1895,11 +1895,32 @@ This document maintains a chronological, step-by-step history of all features, a
   - `assets/js/matchmaking-form.js`:
     - Updated `modestyConfig.female.self` and `modestyConfig.female.pref` to use `'Abaya & Hijabi'` and include `'No Preference'`.
   - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
-    - Updated test assertions to expect `'Abaya & Hijabi'`.
 - **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — **all 160 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
 ---
+
+## 2026-09-15 — Task 93: Unified Modesty Options for Men and Women Everywhere
+
+- **Objective**:
+  - Standardize modesty level options across all forms (questionnaire self-profile, questionnaire partner preferences, and admin manual matchmaking) to the exact same unified 3 options for both men and women:
+    - `traditional / Hijab`
+    - `Modest dress / conservative`
+    - `No religious dress / trendy`
+    *(plus "No Preference" for preference selections)*.
+- **Changes**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `options_modesty()`, `options_modesty_female()`, and `options_modesty_male()` to return `['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy']`.
+    - Updated `options_pref_modesty()`, `options_pref_modesty_female()`, and `options_pref_modesty_male()` to return `['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']`.
+  - `assets/js/matchmaking-form.js`:
+    - Updated `modestyConfig.female` and `modestyConfig.male` for both `self` and `pref` to the unified 3 options (+ `'No Preference'`).
+  - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Updated assertions to verify the unified modesty options for both male and female contexts.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 160 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
 
 
 

@@ -394,12 +394,12 @@
     ------------------------------------------------------- */
     var modestyConfig = {
         female: {
-            self: ['Select preference', 'Full Veil', 'Abaya & Hijabi', 'Hijab Only', 'Modest', 'Modern / Casual'],
-            pref: ['Select preference', 'Full Veil', 'Abaya & Hijabi', 'Hijab Only', 'Modest', 'Modern / Casual', 'No Preference']
+            self: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'],
+            pref: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']
         },
         male: {
-            self: ['Select preference', 'Traditional', 'Conservative', 'Moderate', 'Casual Modern', 'Trend-focused'],
-            pref: ['Select preference', 'Traditional', 'Conservative', 'Moderate', 'Casual Modern', 'Trend-focused', 'No Preference']
+            self: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'],
+            pref: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']
         }
     };
 

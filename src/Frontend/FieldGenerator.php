@@ -372,36 +372,34 @@ class FieldGenerator {
     public function options_pref_children(): array { return array_merge($this->options_children(), ['No Preference']); }
 
     /**
-     * Get female modesty options
+     * Get female modesty options (unified for all genders)
      *
      * @return list<string>
      */
     public function options_modesty_female(): array
     {
-        return ['Select preference', 'Full Veil', 'Abaya & Hijabi', 'Hijab Only', 'Modest', 'Modern / Casual'];
+        return ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
     }
 
     /**
-     * Get male modesty options
+     * Get male modesty options (unified for all genders)
      *
      * @return list<string>
      */
     public function options_modesty_male(): array
     {
-        return ['Select preference', 'Traditional', 'Conservative', 'Moderate', 'Casual Modern', 'Trend-focused'];
+        return ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
     }
 
     /**
      * Get modesty options according to gender
      *
-     * @param string $gender 'female', 'male', or empty (defaults to female)
+     * @param string $gender 'female', 'male', or empty
      * @return list<string>
      */
-    public function options_modesty(string $gender = 'female'): array
+    public function options_modesty(string $gender = ''): array
     {
-        return strtolower(trim($gender)) === 'male'
-            ? $this->options_modesty_male()
-            : $this->options_modesty_female();
+        return ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
     }
     
     /**
@@ -427,14 +425,12 @@ class FieldGenerator {
     /**
      * Get preferred modesty options according to target/preferred gender (with No Preference)
      *
-     * @param string $gender 'female', 'male', or empty (defaults to female)
+     * @param string $gender 'female', 'male', or empty
      * @return list<string>
      */
-    public function options_pref_modesty(string $gender = 'female'): array
+    public function options_pref_modesty(string $gender = ''): array
     {
-        return strtolower(trim($gender)) === 'male'
-            ? $this->options_pref_modesty_male()
-            : $this->options_pref_modesty_female();
+        return array_merge($this->options_modesty($gender), ['No Preference']);
     }
 
     /**
