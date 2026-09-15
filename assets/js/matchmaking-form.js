@@ -394,12 +394,12 @@
     ------------------------------------------------------- */
     var modestyConfig = {
         female: {
-            self: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'],
-            pref: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']
+            self: ['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'],
+            pref: ['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']
         },
         male: {
-            self: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'],
-            pref: ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']
+            self: ['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'],
+            pref: ['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']
         }
     };
 

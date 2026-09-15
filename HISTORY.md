@@ -1904,14 +1904,14 @@ This document maintains a chronological, step-by-step history of all features, a
 
 - **Objective**:
   - Standardize modesty level options across all forms (questionnaire self-profile, questionnaire partner preferences, and admin manual matchmaking) to the exact same unified 3 options for both men and women:
-    - `traditional / Hijab`
+    - `Traditional / Hijab`
     - `Modest dress / conservative`
     - `No religious dress / trendy`
     *(plus "No Preference" for preference selections)*.
 - **Changes**:
   - `src/Frontend/FieldGenerator.php`:
-    - Updated `options_modesty()`, `options_modesty_female()`, and `options_modesty_male()` to return `['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy']`.
-    - Updated `options_pref_modesty()`, `options_pref_modesty_female()`, and `options_pref_modesty_male()` to return `['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']`.
+    - Updated `options_modesty()`, `options_modesty_female()`, and `options_modesty_male()` to return `['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy']`.
+    - Updated `options_pref_modesty()`, `options_pref_modesty_female()`, and `options_pref_modesty_male()` to return `['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy', 'No Preference']`.
   - `assets/js/matchmaking-form.js`:
     - Updated `modestyConfig.female` and `modestyConfig.male` for both `self` and `pref` to the unified 3 options (+ `'No Preference'`).
   - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:

@@ -115,25 +115,25 @@ class FormWizardAndShortcodesTest
     {
         // 1. Female self modesty
         $female_mod_html = $this->field_generator->render_single_field('user_modesty', ['user_gender' => 'Female']);
-        if (!str_contains($female_mod_html, 'traditional / Hijab') || !str_contains($female_mod_html, 'Modest dress / conservative')) {
+        if (!str_contains($female_mod_html, 'Traditional / Hijab') || !str_contains($female_mod_html, 'Modest dress / conservative')) {
             throw new \RuntimeException("Expected female user_modesty field to contain unified options: " . $female_mod_html);
         }
 
         // 2. Male self modesty
         $male_mod_html = $this->field_generator->render_single_field('user_modesty', ['user_gender' => 'Male']);
-        if (!str_contains($male_mod_html, 'traditional / Hijab') || !str_contains($male_mod_html, 'No religious dress / trendy')) {
+        if (!str_contains($male_mod_html, 'Traditional / Hijab') || !str_contains($male_mod_html, 'No religious dress / trendy')) {
             throw new \RuntimeException("Expected male user_modesty field to contain unified options: " . $male_mod_html);
         }
 
         // 3. Female preferred modesty
         $pref_female_html = $this->field_generator->render_single_field('pref_modesty', ['pref_gender' => 'Female']);
-        if (!str_contains($pref_female_html, 'traditional / Hijab') || !str_contains($pref_female_html, 'No Preference')) {
+        if (!str_contains($pref_female_html, 'Traditional / Hijab') || !str_contains($pref_female_html, 'No Preference')) {
             throw new \RuntimeException("Expected female pref_modesty field to contain unified options and No Preference: " . $pref_female_html);
         }
 
         // 4. Male preferred modesty
         $pref_male_html = $this->field_generator->render_single_field('pref_modesty', ['pref_gender' => 'Male']);
-        if (!str_contains($pref_male_html, 'traditional / Hijab') || !str_contains($pref_male_html, 'No Preference')) {
+        if (!str_contains($pref_male_html, 'Traditional / Hijab') || !str_contains($pref_male_html, 'No Preference')) {
             throw new \RuntimeException("Expected male pref_modesty field to contain unified options and No Preference: " . $pref_male_html);
         }
     }

@@ -378,7 +378,7 @@ class FieldGenerator {
      */
     public function options_modesty_female(): array
     {
-        return ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
+        return ['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
     }
 
     /**
@@ -388,7 +388,7 @@ class FieldGenerator {
      */
     public function options_modesty_male(): array
     {
-        return ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
+        return ['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
     }
 
     /**
@@ -399,7 +399,7 @@ class FieldGenerator {
      */
     public function options_modesty(string $gender = ''): array
     {
-        return ['Select preference', 'traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
+        return ['Select preference', 'Traditional / Hijab', 'Modest dress / conservative', 'No religious dress / trendy'];
     }
     
     /**
