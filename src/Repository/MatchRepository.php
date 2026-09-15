@@ -39,7 +39,7 @@ class MatchRepository
         'user_prayer', 'pref_prayer',
         'user_education', 'pref_education',
         'user_income', 'pref_income',
-        'pref_additional_info',
+        'user_about_me', 'pref_additional_info',
         'user_photo1', 'user_photo2', 'user_photo3',
         'cycle_matches_count', 'mm_last_match_run',
         'user_type', 'mm_has_one_on_one', 'is_parent_applying',
@@ -888,6 +888,7 @@ class MatchRepository
                 'user_marital_status'  => (string) get_user_meta($other_id, 'user_marital_status', true),
                 'user_education'       => (string) get_user_meta($other_id, 'user_education', true),
                 'user_photo1'          => (string) get_user_meta($other_id, 'user_photo1', true),
+                'user_about_me'        => (string) get_user_meta($other_id, 'user_about_me', true),
                 'pref_additional_info' => (string) get_user_meta($other_id, 'pref_additional_info', true),
             ];
 
@@ -904,6 +905,7 @@ class MatchRepository
                 'marital_status'       => $other_meta['user_marital_status'],
                 'education'            => $other_meta['user_education'],
                 'photo'                => $other_meta['user_photo1'],
+                'user_about_me'        => $other_meta['user_about_me'],
                 'pref_additional_info' => $other_meta['pref_additional_info'],
                 'age'                  => $this->calc_age($other_pool['birth_date'] ?? ''),
                 'location'             => $candidate_loc,

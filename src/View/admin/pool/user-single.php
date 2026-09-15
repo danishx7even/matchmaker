@@ -123,6 +123,14 @@ $photo3 = $meta['user_photo3'] ?? '';
             <tr><th><?php esc_html_e('Yearly Income Range', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_income'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_social_links'] ?: '—'); ?></td></tr>
         </table>
+
+        <?php if (!empty($meta['user_about_me'])) : ?>
+            <hr style="margin:15px 0 10px; border:0; border-top:1px solid #eee;">
+            <strong><?php esc_html_e('About Myself:', 'matchmaker'); ?></strong>
+            <p style="margin:6px 0 0; color:#444; font-style:italic; font-size:13px; line-height:1.4;">
+                "<?php echo esc_html($meta['user_about_me']); ?>"
+            </p>
+        <?php endif; ?>
     </div>
 
     <!-- Candidate Partner Preferences Card -->
@@ -150,7 +158,7 @@ $photo3 = $meta['user_photo3'] ?? '';
 
         <?php if (!empty($meta['pref_additional_info'])) : ?>
             <hr style="margin:15px 0 10px; border:0; border-top:1px solid #eee;">
-            <strong><?php esc_html_e('About Ideal Partner:', 'matchmaker'); ?></strong>
+            <strong><?php esc_html_e('About My Perfect Match:', 'matchmaker'); ?></strong>
             <p style="margin:6px 0 0; color:#444; font-style:italic; font-size:13px; line-height:1.4;">
                 "<?php echo esc_html($meta['pref_additional_info']); ?>"
             </p>

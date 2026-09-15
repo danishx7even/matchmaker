@@ -81,6 +81,13 @@ if (!defined('ABSPATH')) {
             <strong>ⓘ <?php esc_html_e('Important Note:', 'matchmaker'); ?></strong> <?php esc_html_e('Our platform does not provide internal chat messaging. You can now contact each other directly using the information above. Please communicate respectfully.', 'matchmaker'); ?>
         </div>
 
+        <div class="highlight-next-match-box" style="background: #FFF7ED; border: 1.5px solid #FDBA74; border-radius: 12px; padding: 14px 18px; margin: 0 0 20px 0; display: flex; align-items: center; gap: 12px; text-align: left;">
+            <div style="font-size: 22px; flex-shrink: 0; line-height: 1;">📅</div>
+            <div style="color: #9A3412; font-size: 13.5px; font-weight: 600; line-height: 1.45;">
+                <?php esc_html_e('You will get a new match next month if you do not cancel the subscription.', 'matchmaker'); ?>
+            </div>
+        </div>
+
         <div class="step-5-actions" style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
             <button type="button" class="btn btn-primary" style="width: 100%;" data-mm-action="switch-tab" data-tab="profile">
                 <?php esc_html_e('Back to Profile Dashboard →', 'matchmaker'); ?>

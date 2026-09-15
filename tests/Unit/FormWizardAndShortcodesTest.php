@@ -140,25 +140,25 @@ class FormWizardAndShortcodesTest
 
     public function test_photo_fields_and_yearly_income_labels(): void
     {
-        // 1. Photo 1 upload has required star, label Mandatory, and helper text
+        // 1. Photo 1 upload has required star and required attribute
         $photo1_html = $this->field_generator->render_single_field('user_photo1');
-        if (!str_contains($photo1_html, 'mm-required-star') || !str_contains($photo1_html, 'Photo 1 (Mandatory)') || !str_contains($photo1_html, 'Only the first photo is mandatory')) {
-            throw new \RuntimeException("Expected user_photo1 to have Mandatory label, star indicator, and helper text: " . $photo1_html);
+        if (!str_contains($photo1_html, 'mm-required-star') || !str_contains($photo1_html, 'Photo 1') || !str_contains($photo1_html, 'required')) {
+            throw new \RuntimeException("Expected user_photo1 to have Photo 1 label and required star indicator: " . $photo1_html);
         }
 
-        // 2. Photo 2 and 3 are Optional and do not have required star
+        // 2. Photo 2 and 3 are Optional and do not have required star or required attribute
         $photo2_html = $this->field_generator->render_single_field('user_photo2');
-        if (str_contains($photo2_html, 'mm-required-star') || !str_contains($photo2_html, 'Photo 2 (Optional)')) {
-            throw new \RuntimeException("Expected user_photo2 to have Optional label and no required star: " . $photo2_html);
+        if (str_contains($photo2_html, 'mm-required-star') || str_contains($photo2_html, 'required>')) {
+            throw new \RuntimeException("Expected user_photo2 to have no required star or required attribute: " . $photo2_html);
         }
 
         $photo3_html = $this->field_generator->render_single_field('user_photo3');
-        if (str_contains($photo3_html, 'mm-required-star') || !str_contains($photo3_html, 'Photo 3 (Optional)')) {
-            throw new \RuntimeException("Expected user_photo3 to have Optional label and no required star: " . $photo3_html);
+        if (str_contains($photo3_html, 'mm-required-star') || str_contains($photo3_html, 'required>')) {
+            throw new \RuntimeException("Expected user_photo3 to have no required star or required attribute: " . $photo3_html);
         }
 
         // 3. Photo section open has required star
-        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload clear photos', 'upload-section', true);
+        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. Only first one is mandatory and additional photos are optional.', 'upload-section', true);
         if (!str_contains($section_html, 'mm-required-star') || !str_contains($section_html, '*')) {
             throw new \RuntimeException("Expected photo section header to have required star indicator: " . $section_html);
         }
@@ -193,6 +193,30 @@ class FormWizardAndShortcodesTest
         $origin_html = $this->field_generator->render_single_field('pref_origin', ['pref_origin' => 'Arab, Gulf']);
         if (!str_contains($origin_html, 'custom-select-search-input') || !str_contains($origin_html, 'data-ignore-validation="1"')) {
             throw new \RuntimeException("Expected pref_origin search input to have data-ignore-validation='1': " . $origin_html);
+        }
+    }
+
+    public function test_about_myself_and_about_perfect_match_fields(): void
+    {
+        // 1. user_about_me field renders with "About Myself" label
+        $about_me_html = $this->field_generator->render_single_field('user_about_me', ['user_about_me' => 'I love reading and traveling.']);
+        if (!str_contains($about_me_html, 'About Myself') || !str_contains($about_me_html, 'I love reading and traveling.')) {
+            throw new \RuntimeException("Expected user_about_me field to render label 'About Myself': " . $about_me_html);
+        }
+
+        // 2. pref_additional_info field renders with "About My Perfect Match" label
+        $perf_match_html = $this->field_generator->render_single_field('pref_additional_info', ['pref_additional_info' => 'Looking for a kind soul.']);
+        if (!str_contains($perf_match_html, 'About My Perfect Match') || !str_contains($perf_match_html, 'Looking for a kind soul.')) {
+            throw new \RuntimeException("Expected pref_additional_info to render label 'About My Perfect Match': " . $perf_match_html);
+        }
+    }
+
+    public function test_multi_select_preferred_marital_status(): void
+    {
+        // 1. pref_marital_status renders as multiselect checkbox list with No Preference
+        $pref_marital_html = $this->field_generator->render_single_field('pref_marital_status', ['pref_marital_status' => 'Never Married, Divorced']);
+        if (!str_contains($pref_marital_html, 'custom-select-checkbox-option') || !str_contains($pref_marital_html, 'No Preference') || !str_contains($pref_marital_html, 'Never Married')) {
+            throw new \RuntimeException("Expected pref_marital_status to render as multi-select checkboxes: " . $pref_marital_html);
         }
     }
 }

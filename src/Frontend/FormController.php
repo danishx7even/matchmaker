@@ -185,7 +185,7 @@ class FormController {
             'is_parent_applying',
             'phone_number', 'user_citizenship', 'user_social_links', 'user_marital_status',
             'user_children', 'user_prayer', 'user_education', 'user_income',
-            'user_country', 'user_state', 'user_city',
+            'user_country', 'user_state', 'user_city', 'user_about_me',
             'user_photo1', 'user_photo2', 'user_photo3',
             'pref_country', 'pref_state', 'pref_city',
             'pref_citizenship', 'pref_marital_status',
@@ -307,10 +307,19 @@ class FormController {
                         <?php echo $this->fg->render_single_field('user_income', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
-                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. All 3 photos are mandatory.', 'upload-section', true); ?>
+                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. Only first one is mandatory and additional photos are optional.', 'upload-section', true); ?>
                         <?php echo $this->fg->render_single_field('user_photo1', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo2', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo3', $v); ?>
+                    <?php echo $this->fg->section_close(); ?>
+
+                    <?php echo $this->fg->section_open(
+                        '',
+                        'About Myself',
+                        'Use this space to tell potential matches and matchmakers about yourself, your personality, lifestyle, interests, and values.',
+                        'about-myself-section'
+                    ); ?>
+                        <?php echo $this->fg->render_single_field('user_about_me', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
                     <div class="e-form__buttons elementor-column elementor-col-100">
@@ -365,7 +374,7 @@ class FormController {
 
                     <?php echo $this->fg->section_open(
                         '',
-                        'Your Ideal Match',
+                        'About My Perfect Match',
                         'Use this space to describe the person you hope to meet. This helps our matchmakers understand your personal preferences beyond the checkboxes.',
                         'ideal-match-section'
                     ); ?>
@@ -609,11 +618,12 @@ class FormController {
             'user_country'        => sanitize_text_field((string) ($f['user_country'] ?? '')),
             'user_state'          => sanitize_text_field((string) ($f['user_state'] ?? '')),
             'user_city'           => sanitize_text_field((string) ($f['user_city'] ?? '')),
+            'user_about_me'       => sanitize_textarea_field((string) ($f['user_about_me'] ?? '')),
             'pref_country'        => $normalize_list($f['pref_country'] ?? ''),
             'pref_state'          => $normalize_list($f['pref_state'] ?? ''),
             'pref_city'           => $normalize_list($f['pref_city'] ?? ''),
             'pref_citizenship'    => $normalize_list($f['pref_citizenship'] ?? ''),
-            'pref_marital_status' => sanitize_text_field((string) ($f['pref_marital_status'] ?? '')),
+            'pref_marital_status' => $normalize_list($f['pref_marital_status'] ?? ''),
             'pref_children'       => sanitize_text_field((string) ($f['pref_children'] ?? '')),
             'pref_prayer'         => sanitize_text_field((string) ($f['pref_prayer'] ?? '')),
             'pref_education'      => sanitize_text_field((string) ($f['pref_education'] ?? '')),

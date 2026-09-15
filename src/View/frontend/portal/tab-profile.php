@@ -137,7 +137,10 @@ $badge_label = $repo->format_tier_label($user_type);
     </div>
 
     <div class="az-card">
-        <h3 class="az-card-title"><?php esc_html_e('A Little More About Me', 'matchmaker'); ?></h3>
+        <h3 class="az-card-title"><?php esc_html_e('About Myself', 'matchmaker'); ?></h3>
+        <?php if (!empty($meta['user_about_me'])) : ?>
+            <p class="az-looking-text" style="margin-bottom: 16px;"><?php echo esc_html($meta['user_about_me']); ?></p>
+        <?php endif; ?>
         <div class="az-rows">
             <div class="az-row"><span class="az-label"><?php esc_html_e('Height', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($height); ?></span></div>
             <div class="az-row"><span class="az-label"><?php esc_html_e('Education', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($meta['user_education'] ?? '—'); ?></span></div>
@@ -148,7 +151,7 @@ $badge_label = $repo->format_tier_label($user_type);
     </div>
 
     <div class="az-card">
-        <h3 class="az-card-title"><?php esc_html_e('Who I Am Looking For', 'matchmaker'); ?></h3>
+        <h3 class="az-card-title"><?php esc_html_e('About My Perfect Match', 'matchmaker'); ?></h3>
         <?php if (!empty($meta['pref_additional_info'])) : ?>
             <p class="az-looking-text"><?php echo esc_html($meta['pref_additional_info']); ?></p>
         <?php endif; ?>

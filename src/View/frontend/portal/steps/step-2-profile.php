@@ -55,9 +55,16 @@ if (!defined('ABSPATH')) {
 
             <main class="details-stream">
                 <div class="about-quote-card">
-                    <div class="about-title"><span style="color: #CC723F; font-size: 20px;">❞</span> <?php esc_html_e('About', 'matchmaker'); ?></div>
-                    <p><?php echo esc_html($active_match['pref_additional_info'] ?: __('Dedicated individual who values family, growth, and building a meaningful connection based on shared values.', 'matchmaker')); ?></p>
+                    <div class="about-title"><span style="color: #CC723F; font-size: 20px;">❞</span> <?php esc_html_e('About Myself', 'matchmaker'); ?></div>
+                    <p><?php echo esc_html(!empty($active_match['user_about_me']) ? $active_match['user_about_me'] : __('Dedicated individual who values family, growth, and building a meaningful connection based on shared values.', 'matchmaker')); ?></p>
                 </div>
+
+                <?php if (!empty($active_match['pref_additional_info'])) : ?>
+                    <div class="about-quote-card">
+                        <div class="about-title"><span style="color: #CC723F; font-size: 20px;">❞</span> <?php esc_html_e('About My Perfect Match', 'matchmaker'); ?></div>
+                        <p><?php echo esc_html($active_match['pref_additional_info']); ?></p>
+                    </div>
+                <?php endif; ?>
 
                 <div>
                     <div class="section-header-title font-cormorant"><?php esc_html_e('Background', 'matchmaker'); ?></div>

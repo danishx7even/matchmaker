@@ -93,6 +93,7 @@
 #matchmaking_form{max-width:1180px;margin:0 auto;}
 #matchmaking_form .elementor-hidden{display:none !important;}
 #matchmaking_form .elementor-field-group-user_gender,
+#matchmaking_form .elementor-field-group-user_about_me,
 #matchmaking_form .elementor-field-group-pref_gender,
 #matchmaking_form .elementor-field-group-pref_additional_info{flex:1 1 100% !important;}
 #matchmaking_form .elementor-field-textual{width:100%;box-sizing:border-box;padding:8px 2px;font-size:14px;color:#333;border:none;border-bottom:1px solid #ddd3c2;background:transparent;outline:none;font-family:inherit;}

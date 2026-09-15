@@ -347,7 +347,15 @@ class FieldGenerator {
      *
      * @return array
      */
-    public function options_pref_marital(): array { return array_merge($this->options_marital(), ['No Preference']); }
+    public function options_pref_marital(): array
+    {
+        $opts = $this->options_marital();
+        if (!empty($opts) && preg_match('/^select\b/i', (string) $opts[0])) {
+            array_shift($opts);
+        }
+        array_unshift($opts, 'No Preference');
+        return $opts;
+    }
 
     /**
      * Get children options
@@ -462,7 +470,7 @@ class FieldGenerator {
      *
      * @return array
      */
-    public function options_prayer(): array { return ['Select preference', 'Pray 5 Times a Day', 'Pray Regularly', 'Pray Occasionally', 'Rarely Pray', 'Do Not Pray']; }
+    public function options_prayer(): array { return ['Select preference', 'Actively practicing', 'Practicing Regularly', 'Pray Occasionally', 'Occasionally practicing', 'Rarely practicing', 'Not practicing']; }
     
     /**
      * Get preferred prayer options (with No Preference)
@@ -610,11 +618,7 @@ class FieldGenerator {
         $photo_num    = preg_replace('/\D/', '', $name);
         $is_mandatory = ($photo_num === '1' || $photo_num === '');
 
-        if ($is_mandatory) {
-            $label_text = __('Photo 1 (Mandatory)', 'matchmaker');
-        } else {
-            $label_text = sprintf(__('Photo %s (Optional)', 'matchmaker'), $photo_num);
-        }
+        $label_text = $photo_num ? sprintf(__('Photo %s', 'matchmaker'), $photo_num) : __('Profile Photo', 'matchmaker');
 
         $html = '<div class="elementor-field-type-upload elementor-field-group elementor-column elementor-field-group-' . esc_attr($name) . $extra_class . '">';
         $html .= '<label class="elementor-field-label" for="form-field-' . esc_attr($name) . '">' . esc_html($label_text);
@@ -623,9 +627,6 @@ class FieldGenerator {
         }
         $html .= '</label>';
         $html .= '<input type="file" accept="image/*" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field"' . (($is_mandatory && !$has_preview) ? ' required' : '') . '>';
-        if ($is_mandatory) {
-            $html .= '<small class="mm-field-helper" style="display:block;font-size:12px;color:#6b7280;margin-top:4px;">' . esc_html__('Only the first photo is mandatory. Additional photos are optional.', 'matchmaker') . '</small>';
-        }
         if ($has_preview) { $html .= '<img src="' . esc_url($preview_url) . '" class="upload-preview-img" alt="Photo Preview">'; }
         $html .= '</div>';
         return $html;
@@ -843,22 +844,22 @@ class FieldGenerator {
             'user_children'       => ['Do You Have Children', $this->options_children()],
             'user_drinking'       => ['Drinking Habits', $this->options_drinking()],
             'user_smoking'        => ['Smoking Habits', $this->options_smoking()],
-            'user_prayer'         => ['Prayer Habits', $this->options_prayer()],
-            'user_education'      => ['Highest Education Level', $this->options_education()],
+            'user_prayer'         => ['Practicing religion', $this->options_prayer()],
+            'user_education'      => ['Lowest Education Level', $this->options_education()],
             'user_income'         => ['Yearly Income Range', $this->options_income()],
-            'pref_marital_status' => ['Preferred Marital Status', $this->options_pref_marital()],
             'pref_children'       => ['Children Preference', $this->options_pref_children()],
             'pref_drinking'       => ['Drinking Preference', $this->options_pref_drinking()],
             'pref_smoking'        => ['Smoking Preference', $this->options_pref_smoking()],
-            'pref_prayer'         => ['Prayer Habits Preference', $this->options_pref_prayer()],
+            'pref_prayer'         => ['Practicing religion Preference', $this->options_pref_prayer()],
             'pref_education'      => ['Preferred Education Level', $this->options_pref_education()],
             'pref_income'         => ['Preferred Yearly Income Range', $this->options_pref_income()],
         ];
 
         $multi_configs = [
-            'pref_citizenship' => ['Preferred Citizenship', $this->options_pref_citizenship(), 'Any Citizenship'],
-            'pref_origin'      => ['Preferred Origin / Ethnicity', $this->options_pref_origin(), 'Any Origin'],
-            'pref_religion'    => ['Preferred Religion', $this->options_pref_religion(), 'No Preference'],
+            'pref_citizenship'    => ['Preferred Citizenship', $this->options_pref_citizenship(), 'Any Citizenship'],
+            'pref_origin'         => ['Preferred Origin / Ethnicity', $this->options_pref_origin(), 'Any Origin'],
+            'pref_religion'       => ['Preferred Religion', $this->options_pref_religion(), 'No Preference'],
+            'pref_marital_status' => ['Preferred Marital Status', $this->options_pref_marital(), 'No Preference'],
         ];
 
         $html = '';
@@ -896,9 +897,14 @@ class FieldGenerator {
             $html .= $this->label('user_social_links', 'Social Media Links (Separate multiple selections with commas)');
             $html .= $this->textarea('user_social_links', 'Add your social media links', 2, $val);
             $html .= $this->field_close();
+        } elseif ($name === 'user_about_me' || $name === 'user_bio') {
+            $html .= $this->field_open('user_about_me');
+            $html .= $this->label('user_about_me', 'About Myself');
+            $html .= $this->textarea('user_about_me', 'Tell us about yourself, your personality, lifestyle, interests, and values...', 4, $val);
+            $html .= $this->field_close();
         } elseif ($name === 'pref_additional_info') {
             $html .= $this->field_open('pref_additional_info');
-            $html .= $this->label('pref_additional_info', 'About Your Ideal Partner');
+            $html .= $this->label('pref_additional_info', 'About My Perfect Match');
             $html .= $this->textarea('pref_additional_info', 'Describe the qualities, values, and traits you are seeking in a lifelong partner...', 4, $val);
             $html .= $this->field_close();
         } elseif ($name === 'preferred_age_range') {

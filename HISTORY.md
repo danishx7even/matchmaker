@@ -1809,6 +1809,52 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-15 — Task 90: Profile Photo Text Clean-Up, "About Myself" & "About My Perfect Match" Fields, Multi-Select Preferred Marital Status, and Step 5 Next Month Highlight Notice
+
+- **Objective**:
+  1. Update Profile Photos section: remove helper text from inside the image upload display cards (preventing UI overlap with the "Add Photo" overlay) and set section subtitle to `"Upload 3 clear, recent photos. Only first one is mandatory and additional photos are optional."`
+  2. Add an `"About Myself"` field (`user_about_me`) on Step 1 beneath the Profile Photos section.
+  3. Distinguish both fields in label and presentation as **"About Myself"** (`user_about_me`) and **"About My Perfect Match"** (`pref_additional_info`) across:
+     - User Profile details (`tab-profile.php`)
+     - Match details in member dashboard (`step-2-profile.php`)
+     - Admin single candidate profile view (`user-single.php`)
+  4. Make `"Preferred Marital Status"` (`pref_marital_status`) multi-select with search and checkboxes supporting multiple selections and `"No Preference"`.
+  5. Add highlighted notice banner on Step 5 (`step-5-contact.php`): `"You will get a new match next month if you do not cancel the subscription."`
+- **Changes**:
+  - `src/Frontend/FieldGenerator.php`:
+    - `upload()`: Cleaned up and removed `<small class="mm-field-helper">` from inside upload card to prevent overlay collision. Kept `Photo 1 *` with `required` and `Photo 2` / `Photo 3` as optional.
+    - Moved `pref_marital_status` to `$multi_configs` using `options_pref_marital()`.
+    - Added rendering for `user_about_me` (`label('user_about_me', 'About Myself')`) and renamed `pref_additional_info` label to `'About My Perfect Match'`.
+    - Fixed `options_modesty_female()` string `'Abaya & Hijab'`.
+  - `src/Frontend/FormController.php`:
+    - Added `user_about_me` to `$meta_keys` and `$meta_map`.
+    - Normalized `pref_marital_status` using `$normalize_list(...)` in `$meta_map`.
+    - Step 1: Updated photo section subtitle to `"Upload 3 clear, recent photos. Only first one is mandatory and additional photos are optional."`
+    - Step 1: Added `"About Myself"` section (`user_about_me`) beneath the Profile Photos section.
+    - Step 2: Renamed section title to `'About My Perfect Match'`.
+  - `src/Repository/MatchRepository.php`:
+    - Added `'user_about_me'` to `META_KEYS`.
+    - Updated `get_active_match_details_for_user()` to extract candidate's `'user_about_me'` into match details payload.
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Added `"About Myself"` block (`user_about_me`) under "A Little More About Me" card, and renamed partner preferences title to `"About My Perfect Match"`.
+  - `src/View/frontend/portal/steps/step-2-profile.php`:
+    - Displayed candidate's `user_about_me` under `"About Myself"` card, and `pref_additional_info` under `"About My Perfect Match"` card.
+  - `src/View/admin/pool/user-single.php`:
+    - Added `"About Myself"` block to Candidate Self Profile card and labeled `"About My Perfect Match"` in Candidate Partner Preferences card.
+  - `src/View/frontend/portal/steps/step-5-contact.php`:
+    - Added highlighted callout notice: `"You will get a new match next month if you do not cancel the subscription."`
+  - `assets/css/matchmaking-form.css`:
+    - Added `#matchmaking_form .elementor-field-group-user_about_me` to full-width (100%) flex rule.
+  - `tests/Unit/FormWizardAndShortcodesTest.php` & `tests/Unit/PortalAndEventsTest.php`:
+    - Updated photo field test assertions for clean label and asterisk indicators.
+    - Added `test_about_myself_and_about_perfect_match_fields` and `test_multi_select_preferred_marital_status`.
+    - Added assertion for next month match highlighted notice in Step 5 test.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 159 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+
 
 
 
