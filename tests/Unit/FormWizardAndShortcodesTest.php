@@ -115,8 +115,8 @@ class FormWizardAndShortcodesTest
     {
         // 1. Female self modesty
         $female_mod_html = $this->field_generator->render_single_field('user_modesty', ['user_gender' => 'Female']);
-        if (!str_contains($female_mod_html, 'Full Veil') || !str_contains($female_mod_html, 'Abaya &amp; Hijab') && !str_contains($female_mod_html, 'Abaya & Hijab')) {
-            throw new \RuntimeException("Expected female user_modesty field to contain Full Veil and Abaya & Hijab: " . $female_mod_html);
+        if (!str_contains($female_mod_html, 'Full Veil') || !str_contains($female_mod_html, 'Abaya &amp; Hijabi') && !str_contains($female_mod_html, 'Abaya & Hijabi')) {
+            throw new \RuntimeException("Expected female user_modesty field to contain Full Veil and Abaya & Hijabi: " . $female_mod_html);
         }
 
         // 2. Male self modesty
@@ -217,6 +217,36 @@ class FormWizardAndShortcodesTest
         $pref_marital_html = $this->field_generator->render_single_field('pref_marital_status', ['pref_marital_status' => 'Never Married, Divorced']);
         if (!str_contains($pref_marital_html, 'custom-select-checkbox-option') || !str_contains($pref_marital_html, 'No Preference') || !str_contains($pref_marital_html, 'Never Married')) {
             throw new \RuntimeException("Expected pref_marital_status to render as multi-select checkboxes: " . $pref_marital_html);
+        }
+    }
+
+    public function test_education_labels_and_practicing_religion_options(): void
+    {
+        // 1. user_education label is "Highest Education Level"
+        $user_edu_html = $this->field_generator->render_single_field('user_education');
+        if (!str_contains($user_edu_html, 'Highest Education Level')) {
+            throw new \RuntimeException("Expected user_education to have label 'Highest Education Level': " . $user_edu_html);
+        }
+
+        // 2. pref_education label is "Lowest Education Level"
+        $pref_edu_html = $this->field_generator->render_single_field('pref_education');
+        if (!str_contains($pref_edu_html, 'Lowest Education Level')) {
+            throw new \RuntimeException("Expected pref_education to have label 'Lowest Education Level': " . $pref_edu_html);
+        }
+
+        // 3. options_prayer has exact 5 options
+        $prayer_options = $this->field_generator->options_prayer();
+        $expected_options = ['Actively practicing', 'practicing Regularly', 'Occasionally practicing', 'Rarely practicing', 'I’m not practicing'];
+        foreach ($expected_options as $opt) {
+            if (!in_array($opt, $prayer_options, true)) {
+                throw new \RuntimeException("Expected options_prayer to contain '$opt'. Options: " . json_encode($prayer_options));
+            }
+        }
+
+        // 4. pref_prayer has No Preference
+        $pref_prayer_options = $this->field_generator->options_pref_prayer();
+        if (!in_array('No Preference', $pref_prayer_options, true)) {
+            throw new \RuntimeException("Expected options_pref_prayer to contain 'No Preference'");
         }
     }
 }

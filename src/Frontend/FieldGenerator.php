@@ -470,7 +470,17 @@ class FieldGenerator {
      *
      * @return array
      */
-    public function options_prayer(): array { return ['Select preference', 'Actively practicing', 'Practicing Regularly', 'Pray Occasionally', 'Occasionally practicing', 'Rarely practicing', 'Not practicing']; }
+    public function options_prayer(): array
+    {
+        return [
+            'Select preference',
+            'Actively practicing',
+            'practicing Regularly',
+            'Occasionally practicing',
+            'Rarely practicing',
+            'I’m not practicing',
+        ];
+    }
     
     /**
      * Get preferred prayer options (with No Preference)
@@ -844,14 +854,14 @@ class FieldGenerator {
             'user_children'       => ['Do You Have Children', $this->options_children()],
             'user_drinking'       => ['Drinking Habits', $this->options_drinking()],
             'user_smoking'        => ['Smoking Habits', $this->options_smoking()],
-            'user_prayer'         => ['Practicing religion', $this->options_prayer()],
-            'user_education'      => ['Lowest Education Level', $this->options_education()],
+            'user_prayer'         => ['Practicing Religion', $this->options_prayer()],
+            'user_education'      => ['Highest Education Level', $this->options_education()],
             'user_income'         => ['Yearly Income Range', $this->options_income()],
             'pref_children'       => ['Children Preference', $this->options_pref_children()],
             'pref_drinking'       => ['Drinking Preference', $this->options_pref_drinking()],
             'pref_smoking'        => ['Smoking Preference', $this->options_pref_smoking()],
-            'pref_prayer'         => ['Practicing religion Preference', $this->options_pref_prayer()],
-            'pref_education'      => ['Preferred Education Level', $this->options_pref_education()],
+            'pref_prayer'         => ['Preference Practicing Religion', $this->options_pref_prayer()],
+            'pref_education'      => ['Lowest Education Level', $this->options_pref_education()],
             'pref_income'         => ['Preferred Yearly Income Range', $this->options_pref_income()],
         ];
 

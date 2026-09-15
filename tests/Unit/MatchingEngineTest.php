@@ -126,7 +126,7 @@ final class MatchingEngineTest extends TestCase
 
         $this->assertNotContains('No Preference', $gen->options_modesty('female'));
         $this->assertContains('Full Veil', $gen->options_modesty('female'));
-        $this->assertContains('Abaya & Hijab', $gen->options_modesty('female'));
+        $this->assertContains('Abaya & Hijabi', $gen->options_modesty('female'));
         $this->assertContains('Modern / Casual', $gen->options_modesty('female'));
 
         $this->assertNotContains('No Preference', $gen->options_modesty('male'));

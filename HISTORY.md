@@ -1854,6 +1854,55 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-15 — Task 91: Education Titles, Practicing Religion Options, Female Modesty Alignment, and Step 5 Banner Text
+
+- **Objective**:
+  1. For Education level fields, set the user education label to `"Highest Education Level"` and match preference education label to `"Lowest Education Level"`.
+  2. Update Practicing Religion options across both user and partner preference fields to:
+     - Actively practicing
+     - practicing Regularly
+     - Occasionally practicing
+     - Rarely practicing
+     - I’m not practicing
+     *(plus "No Preference" on preferences)*.
+  3. Align female modesty options across manual matchmaking and form fields to: `'Full Veil', 'Abaya & Hijab', 'Hijab Only', 'Modest', 'Modern / Casual'`.
+  4. In Step 5 of matchmaking, update the highlighted match notice to `"You will get a new match next month."` (removing `"if you do not...subscription"`).
+- **Changes**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `user_education` label to `'Highest Education Level'` and `pref_education` label to `'Lowest Education Level'` in `$select_configs`.
+    - Updated `options_prayer()` to the exact 5 options: `['Select preference', 'Actively practicing', 'practicing Regularly', 'Occasionally practicing', 'Rarely practicing', 'I’m not practicing']`.
+    - Updated `options_pref_prayer()` to merge `options_prayer()` with `['No Preference']`.
+    - Ensured `options_modesty_female()` uses `['Select preference', 'Full Veil', 'Abaya & Hijab', 'Hijab Only', 'Modest', 'Modern / Casual']`.
+  - `src/View/frontend/portal/steps/step-5-contact.php`:
+    - Changed highlighted notice text to `"You will get a new match next month."`.
+  - `tests/Unit/FormWizardAndShortcodesTest.php` & `tests/Unit/PortalAndEventsTest.php`:
+    - Added `test_education_labels_and_practicing_religion_options` to verify labels and options.
+    - Updated Step 5 notice assertion to check for `"You will get a new match next month."`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 160 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+## 2026-09-15 — Task 92: Female Modesty Option "Abaya & Hijabi" and No Preference Support
+
+- **Objective**:
+  1. Update the female modesty option string to `"Abaya & Hijabi"` across `FieldGenerator.php` (`options_modesty_female()`, `options_pref_modesty_female()`), `matchmaking-form.js` (`modestyConfig.female.self`, `modestyConfig.female.pref`), and unit tests.
+  2. Ensure `"No Preference"` option is available for the preferred female modesty field (`options_pref_modesty_female()`).
+- **Changes**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `options_modesty_female()` to `['Select preference', 'Full Veil', 'Abaya & Hijabi', 'Hijab Only', 'Modest', 'Modern / Casual']`.
+    - `options_pref_modesty_female()` retains `"No Preference"` via `array_merge`.
+  - `assets/js/matchmaking-form.js`:
+    - Updated `modestyConfig.female.self` and `modestyConfig.female.pref` to use `'Abaya & Hijabi'` and include `'No Preference'`.
+  - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Updated test assertions to expect `'Abaya & Hijabi'`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 160 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+
+
 
 
 

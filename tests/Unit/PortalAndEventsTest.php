@@ -257,7 +257,7 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Pause Subscription', $html);
         $this->assertStringContainsString('Back to Profile Dashboard', $html);
         $this->assertStringContainsString('Direct Contact Information', $html);
-        $this->assertStringContainsString('You will get a new match next month if you do not cancel the subscription', $html);
+        $this->assertStringContainsString('You will get a new match next month.', $html);
     }
 
     public function test_portal_renders_dynamic_service_tag_and_removes_vip_banner(): void

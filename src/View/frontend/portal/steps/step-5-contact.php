@@ -84,7 +84,7 @@ if (!defined('ABSPATH')) {
         <div class="highlight-next-match-box" style="background: #FFF7ED; border: 1.5px solid #FDBA74; border-radius: 12px; padding: 14px 18px; margin: 0 0 20px 0; display: flex; align-items: center; gap: 12px; text-align: left;">
             <div style="font-size: 22px; flex-shrink: 0; line-height: 1;">📅</div>
             <div style="color: #9A3412; font-size: 13.5px; font-weight: 600; line-height: 1.45;">
-                <?php esc_html_e('You will get a new match next month if you do not cancel the subscription.', 'matchmaker'); ?>
+                <?php esc_html_e('You will get a new match next month.', 'matchmaker'); ?>
             </div>
         </div>
 
