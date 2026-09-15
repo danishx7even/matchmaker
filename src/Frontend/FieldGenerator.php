@@ -378,7 +378,7 @@ class FieldGenerator {
      */
     public function options_modesty_female(): array
     {
-        return ['Select preference', 'Full Veil', 'Abaya & Hijab', 'Hijab Only', 'Modest', 'Modern / Casual'];
+        return ['Select preference', 'Full Veil', 'Abaya & Hijabi', 'Hijab Only', 'Modest', 'Modern / Casual'];
     }
 
     /**
