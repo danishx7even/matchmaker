@@ -30,6 +30,13 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
    - **Tab 2: Notification & Email Logs** (`tab=notification_logs`, template: `src/View/admin/logs/tab-notification-logs.php`): In-app alerts and transactional email dispatches with rendered HTML email preview modal.
    - **Tab 3: Candidate Gate Debugger** (`tab=debugger`, template: `src/View/admin/logs/tab-debugger.php`): Live runner tool to audit all 7 bi-directional matching gates against the pool.
 
+5. **Join Click Analytics (`edit.php?post_type=tribe_events&page=matchmaking-event-clicks`)** — Sub-menu under the **Events CPT** top-level menu:
+   - **Overview Table** (`src/View/admin/events/event-clicks.php`): Lists all events with at least one click, showing Event Title (linked), Total Clicks, Unique Members, and Last Activity timestamp.
+   - **Single Event Detail** (`src/View/admin/events/event-clicks-single.php`): Accessed via `?event_id=<ID>`. Lists every member who clicked, with their display name, email, avatar, click count, first-clicked timestamp, and last-clicked timestamp.
+   - **CSV Export**: Triggered via `?mm_action=export_event_clicks&event_id=<ID>`. Downloads a CSV file with columns: Member Name, Email, Click Count, First Clicked, Last Clicked.
+   - Data sourced from `wp_matchmaker_event_clicks` table via `MatchRepository::get_events_click_summary()` and `get_event_click_details()`.
+   - See [`context/event_click_tracking.md`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/context/event_click_tracking.md) for the complete feature reference.
+
 ---
 
 ## 2. Match Approval & Quota Enforcement Rules
@@ -50,4 +57,3 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
   - Standard WordPress core menus (`index.php`, `plugins.php`, `themes.php`, `users.php`, `tools.php`, `options-general.php`, `edit.php`, etc.) and third-party menus (PMPro, Elementor) are stripped via `restrict_admin_menus_for_matchmaker_admin()`.
   - Direct navigation to `wp-admin/` or `index.php` automatically redirects to `admin_url('admin.php?page=matchmaking-pool')`.
   - Login redirect (`AuthController::custom_role_based_login_redirect`) automatically sends Matchmaker Admins to the Pool Browser.
-

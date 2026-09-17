@@ -13,21 +13,23 @@ The **Matchmaker Plugin** is an enterprise-grade, high-touch matrimony matchmaki
 ```
 matchmaker/
 ├── matchmaker.php                     # Main plugin bootstrap & PSR-4 autoloader
+├── README.md                          # 📖 Plugin overview, features, installation & quick reference
 ├── AGENTS.md                          # 🌟 SINGLE MASTER ENTRY POINT & OPERATIONAL GUIDE (this file)
 ├── BUILD_PLAN.md                      # 📝 ACTIVE TASK WORKING FILE (Set when working, clear when done)
 ├── HISTORY.md                         # 📜 PERMANENT CHRONOLOGICAL EXECUTION LOG
 │
 ├── context/                           # 📚 Detailed Domain & Feature Context References
 │   ├── matching_engine.md             # Hard gates, 6-point scoring, SQL queries, batch chunking
-│   ├── admin_portal.md                # Admin pool browser, matches queue, manual matchmaker, settings
-│   ├── member_portal.md               # 5-state interactive match review flow, tab navigation, contact reveal
+│   ├── admin_portal.md                # Admin pool browser, matches queue, manual matchmaker, settings, event analytics
+│   ├── member_portal.md               # 5-state interactive match review flow, tab navigation, contact reveal, event tracking
 │   ├── pmpro_sync.md                  # Dynamic PMPro level connector matrix, tier sync
-│   ├── form_handler.md                # 37-field questionnaire wizard, hydration, file uploads, shortcodes
+│   ├── form_handler.md                # Questionnaire wizard, About Me fields, photo rules, multi-select fields
 │   ├── notifications.md               # Heartbeat API 15s polling, toast alerts, unread badges, email templates
 │   ├── free_registration.md           # Elementor Pro form decoupled validation, user creation, auto-login
 │   ├── auth_and_routing.md            # Dynamic page URL resolvers, login/logout redirects, PMPro login styling
 │   ├── design_system.md               # Color tokens (#CC723F), typography, status badges, responsive layout
-│   └── testing_guide.md               # PHPUnit test suite, bootstrap stubs, test runner instructions
+│   ├── testing_guide.md               # PHPUnit test suite, bootstrap stubs, test runner instructions
+│   └── event_click_tracking.md        # 🆕 Join Event click recording, analytics sub-menu, CSV export
 │
 ├── src/                               # PSR-4 Root Namespace: Matchmaker\
 │   ├── Repository/
@@ -37,7 +39,7 @@ matchmaker/
 │   │   ├── ProfileService.php         # Profile data assembly, dynamic page URL resolvers
 │   │   └── NotificationService.php    # Email dispatch, Heartbeat API & notifications
 │   ├── Core/
-│   │   ├── DBMigrator.php             # Database schema installer & dbDelta migration (v2.3.0)
+│   │   ├── DBMigrator.php             # Database schema installer & dbDelta migration (v2.9.0)
 │   │   ├── MatchingEngine.php         # Async matching calculation & Action Scheduler batch workers
 │   │   ├── PMProSync.php              # Dynamic PMPro plan mapping & user_type synchronization
 │   │   ├── FreeRegHandler.php         # Decoupled Elementor Free Registration handler
@@ -46,26 +48,35 @@ matchmaker/
 │   │   ├── AuthController.php         # Role-based redirects, PMPro login cards & [logout_url]
 │   │   ├── FieldGenerator.php         # Matchmaking form HTML input generator primitives
 │   │   ├── FormController.php         # [matchmaking_form] & [matchmaking_field] shortcodes
-│   │   └── PortalController.php       # [matchmaker_member_portal] / [az_profile] shortcode
+│   │   └── PortalController.php       # [matchmaker_member_portal] / [az_profile] shortcode + AJAX handlers
 │   ├── Admin/
-│   │   └── AdminPortal.php            # Admin portal menus, pool browser, matches queue, settings & debugger
+│   │   └── AdminPortal.php            # Admin portal menus, pool browser, matches queue, settings & analytics
 │   ├── View/                          # Pure PHP presentation template views
-│   │   └── frontend/
-│   │       └── portal/
-│   │           ├── portal.php         # Portal canvas wrapper & header
-│   │           ├── tab-profile.php    # Member profile tab
-│   │           └── tab-matches.php    # 5-step interactive matches flow
+│   │   ├── frontend/
+│   │   │   └── portal/
+│   │   │       ├── portal.php         # Portal canvas wrapper & header
+│   │   │       ├── tab-profile.php    # Member profile tab
+│   │   │       └── tab-matches.php    # 5-step interactive matches flow
+│   │   └── admin/
+│   │       ├── pool/                  # Pool browser list & single user detail views
+│   │       ├── matches/               # Match queue list & single match view
+│   │       ├── settings/              # Settings page
+│   │       ├── logs/                  # Log tabs & candidate gate debugger
+│   │       └── events/
+│   │           ├── event-clicks.php       # Join Click Analytics overview table
+│   │           └── event-clicks-single.php # Per-event member breakdown & CSV export link
 │   └── functions.php                  # Global helper wrappers (mm_enqueue_user_matching_job)
 │
 ├── assets/
 │   ├── css/                           # admin-matchmaker.css, member-portal.css, matchmaking-form.css
 │   └── js/                            # admin-matchmaker.js, member-portal.js, matchmaking-form.js, phone-mask.js
 │
-└── tests/                             # Automated PHPUnit & Integration Test Suite
+└── tests/                             # Automated PHPUnit & Integration Test Suite (168+ tests)
     ├── bootstrap.php                  # Full mock layer for WP Core, PMPro & Action Scheduler
     ├── run_tests.php                  # CLI test runner script
     ├── DBMigratorTest.php             # Schema migration tests
-    ├── Unit/                          # Settings, PMPro mapping, Quotas, Scoring tests
+    ├── Unit/                          # Settings, PMPro mapping, Quotas, Scoring, Event Tracking tests
+    │   └── EventClickTrackingTest.php # Join Event click tracking & analytics tests
     └── Integration/                   # End-to-end user lifecycle flow test
 ```
 
@@ -137,3 +148,4 @@ When working on a specific feature, consult its dedicated context document:
 | **Auth & Routing** | [`context/auth_and_routing.md`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/context/auth_and_routing.md) | Dynamic page URL resolvers, role-based redirects & PMPro login card styling. |
 | **Design System** | [`context/design_system.md`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/context/design_system.md) | Official brand color tokens (`#CC723F`), typography, status badges & mobile breakpoints. |
 | **Testing Guide** | [`context/testing_guide.md`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/context/testing_guide.md) | PHPUnit test suite structure, mock layers & test execution commands. |
+| **Event Click Tracking** | [`context/event_click_tracking.md`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/context/event_click_tracking.md) | Join Event click interception, DB schema, AJAX endpoint, admin analytics sub-menu & CSV export. |

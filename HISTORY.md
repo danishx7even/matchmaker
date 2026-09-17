@@ -6,6 +6,21 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 97: Documentation Update — README & Context Files
+- **Objective**: Create a comprehensive `README.md` for the plugin root; update all relevant `context/` files to reflect every feature built in the plugin; add a new dedicated context file for the Event Click Tracking feature; update `AGENTS.md` directory map and context index.
+- **Constraint**: Documentation-only update. Zero changes to any feature implementation code (`.php`, `.js`, `.css`, test files).
+- **Files Created**:
+  - `README.md` — Full plugin overview, features table, architecture diagram, DB tables, shortcodes, questionnaire field summary, admin portal navigation, test suite command, and core invariants.
+  - `context/event_click_tracking.md` — Dedicated context document for Join Event click tracking: DB schema, MatchRepository methods, AJAX endpoint, JS record-before-redirect pattern, admin analytics sub-menu, CSV export, access control, and test coverage.
+- **Files Updated**:
+  - `context/admin_portal.md` — Added item 5: "Join Click Analytics" sub-menu under Events CPT, overview/detail views, and CSV export.
+  - `context/member_portal.md` — Added State 2 profile field notes (About Myself / About My Perfect Match display), Profile Tab Field Display section, and Section 5 documenting Join Event click tracking JS behavior, selector, record-before-redirect flow, `data-event-id` convention, and nonce usage.
+  - `context/form_handler.md` — Fully updated field tables for Step 1 (added About Myself, photo optionality rules, Practicing Level options) and Step 2 (added About My Perfect Match, multi-select Preferred Marital Status, Preferred Practicing Level options, No Preference for modesty); added modesty level options table (universal, gender-neutral).
+  - `context/testing_guide.md` — Updated test file tree to include `EventClickTrackingTest.php`; updated total test count to 168; updated DBMigrator version to 2.9.0; expanded bootstrap stubs table with `date_i18n`, `human_time_diff`, `get_avatar`, `Fakewpdb::$posts`; added "Adding New Tests" section.
+  - `AGENTS.md` — Updated directory map (added `README.md`, `event_click_tracking.md`, all admin View subdirectories, `EventClickTrackingTest.php`, `v2.9.0` DBMigrator annotation); updated context index table to include Event Click Tracking row.
+- **Verification**: No automated tests run (documentation-only task). All existing 168 tests remain passing from prior task.
+
+
 ### Task 1: Procedural Codebase Refactoring to OOP Architecture
 - **Objective**: Refactor legacy procedural PHP files into a clean, modern, class-based PSR-4 PHP 8.1+ structure with strict typing (`declare(strict_types=1);`).
 - **Implemented**:

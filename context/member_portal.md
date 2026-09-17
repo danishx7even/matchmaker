@@ -1,6 +1,6 @@
 # Feature Context: Member Portal & 5-State Interactive Match Flow
 
-This document details the frontend member portal dashboard, 2-tab layout, and the 5-state interactive match decision flow (`src/Frontend/PortalController.php`, `src/View/frontend/portal/`, `assets/css/member-portal.css`, `assets/js/member-portal.js`).
+This document details the frontend member portal dashboard, 2-tab layout, 5-state interactive match decision flow, and event click tracking integration (`src/Frontend/PortalController.php`, `src/View/frontend/portal/`, `assets/css/member-portal.css`, `assets/js/member-portal.js`).
 
 ---
 
@@ -34,6 +34,7 @@ When an approved match is available, the Matches tab renders an interactive 5-st
 
 ### State 2: Full Profile Review & Decision (`step-2-profile.php`)
 - Complete candidate details: Background, religious observance, lifestyle, photos, and mutual compatibility highlights.
+- Displays both **About Myself** (candidate's self-description) and **About My Perfect Match** (candidate's ideal partner description) fields.
 - Top navigation: `← Back to Matches` arrow.
 - Inside-canvas action footer:
   - If pending: `Decline Match` (secondary button) & `Accept Match →` (primary `#CC723F` button).
@@ -51,6 +52,7 @@ When an approved match is available, the Matches tab renders an interactive 5-st
 - Triggered when **both** parties accept (`user_one_response = 'accepted'` AND `user_two_response = 'accepted'`).
 - Status automatically updates to `matched` and `contact_revealed = 1`.
 - Unlocks candidate full name, verified phone number, email address, and direct messaging link.
+- Displays a highlighted notice reminding the member that they will receive a new match next month.
 - **CTAs**:
   - `Back to Profile Dashboard →` (Navigates to the Profile tab).
   - `Pause Subscription` (Direct dynamic link to PMPro membership account page `ProfileService::get_membership_account_url()` allowing users connecting with their match to cancel/pause recurring membership).
@@ -60,3 +62,41 @@ When an approved match is available, the Matches tab renders an interactive 5-st
 ## 3. Tier-Gating & Upsell Experience
 - **Monthly / 1-on-1 VIP Members**: Full access to Profile and Matches tabs.
 - **Free / Event Tier Members**: Profile tab is accessible; Matches tab displays a high-converting luxury upsell card directing users to configured membership checkout (`ProfileService::get_membership_checkout_url()`).
+
+---
+
+## 4. Profile Tab Field Display
+
+The **Profile tab** (`tab-profile.php`) renders all member self criteria and preferences side-by-side. Key fields displayed include:
+
+- **About Myself** — The member's free-text self-description (stored in `user_about_me` usermeta).
+- **About My Perfect Match** — The member's description of their ideal partner (stored in `user_about_ideal_partner` usermeta).
+- Education level labelled as **"Highest Education Level"** for own profile.
+- Preferred education level labelled as **"Lowest Education Level"** in partner preferences section.
+- **Preferred Marital Status** — Displayed as a comma-separated list (field is multi-select on the form).
+
+---
+
+## 5. Join Event Click Tracking
+
+The `member-portal.js` file includes a delegated event listener that intercepts clicks on **"Join Event"** buttons across the site before the browser navigates to the external link (e.g. Zoom).
+
+### Selector
+```javascript
+e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn')
+```
+The primary selector is `.join-btn` — the Elementor widget class applied to the Join Event button widget.
+
+### Record-Before-Redirect Flow
+1. `e.preventDefault()` stops immediate navigation.
+2. `MM_Portal.trackEventClick(eventId, redirectUrl, target)` fires a `fetch` POST to `wp_ajax_mm_track_event_click`.
+3. On AJAX response **or** 600ms safety timeout, the user is redirected via `window.open()` or `window.location.href`.
+4. A temporary visual lock (`pointer-events: none; opacity: 0.7`) is applied to the button while pending.
+
+### `data-event-id` Attribute Convention
+The event card container (or the `.join-btn` wrapper) must carry a `data-event-id` attribute with the WordPress post ID of the event. This is read by the JS via `joinBtn.closest('[data-event-id]')?.dataset.eventId`.
+
+### Nonce
+`mm_track_event_nonce` is localized via `wp_localize_script` in `PortalController`.
+
+For the complete event click tracking reference, see [`context/event_click_tracking.md`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/context/event_click_tracking.md).
