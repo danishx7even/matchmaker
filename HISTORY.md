@@ -1955,6 +1955,22 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-17 — Task 95: Record Event Click Before Redirecting User
+
+- **Objective**:
+  - Ensure that when a user clicks the "Join Event" button (`.join-btn`) containing an external link (such as Zoom, event URL, etc.), the click event is first recorded via AJAX before redirecting the user to the destination URL.
+- **Changes**:
+  - `assets/js/member-portal.js`:
+    - Updated `MM_Portal.trackEventClick(eventId, redirectUrl, target)` to intercept valid link URLs (`e.preventDefault()`).
+    - Applied temporary visual feedback / debounce (`pointer-events: none; opacity: 0.7`).
+    - Dispatched `fetch` POST to `wp_ajax_mm_track_event_click` and redirected upon response.
+    - Added a safety timeout (600ms) to ensure users are redirected without delay even in slow or offline conditions.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 167 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+
 
 
 

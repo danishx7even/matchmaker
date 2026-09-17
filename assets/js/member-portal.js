@@ -263,10 +263,30 @@
         },
 
         /**
-         * Track "Join Event" click asynchronously without blocking link navigation.
+         * Track "Join Event" click and then navigate user to destination URL.
+         *
+         * @param {number} eventId Event post ID.
+         * @param {string} [redirectUrl] Destination link URL.
+         * @param {string} [target] Window target (_blank, etc.).
          */
-        trackEventClick: function (eventId) {
-            if (!eventId || eventId <= 0) return;
+        trackEventClick: function (eventId, redirectUrl, target) {
+            var redirected = false;
+            var performRedirect = function () {
+                if (redirected) return;
+                redirected = true;
+                if (redirectUrl) {
+                    if (target === '_blank') {
+                        window.open(redirectUrl, '_blank');
+                    } else {
+                        window.location.href = redirectUrl;
+                    }
+                }
+            };
+
+            if (!eventId || eventId <= 0) {
+                performRedirect();
+                return;
+            }
 
             var ajaxUrl = (window.mmPortalData && window.mmPortalData.ajaxUrl)
                 ? window.mmPortalData.ajaxUrl
@@ -280,16 +300,23 @@
             data.append('event_id', eventId);
             data.append('nonce', nonce);
 
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon(ajaxUrl, data);
-            } else {
-                fetch(ajaxUrl, {
-                    method: 'POST',
-                    body: data,
-                    credentials: 'same-origin',
-                    keepalive: true
-                }).catch(function () {});
-            }
+            // Set safety fallback timer (600ms) so user is never stuck if network is slow
+            var safetyTimer = redirectUrl ? setTimeout(performRedirect, 600) : null;
+
+            fetch(ajaxUrl, {
+                method: 'POST',
+                body: data,
+                credentials: 'same-origin',
+                keepalive: true
+            })
+            .then(function (res) {
+                if (safetyTimer) clearTimeout(safetyTimer);
+                performRedirect();
+            })
+            .catch(function () {
+                if (safetyTimer) clearTimeout(safetyTimer);
+                performRedirect();
+            });
         }
     };
 
@@ -342,17 +369,30 @@
                 return;
             }
 
-            // 3. Event "Join Event" Click Tracking
+            // 3. Event "Join Event" Click Tracking — Record click FIRST, then redirect
             var joinBtn = e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn');
             if (joinBtn) {
                 var eventCard = joinBtn.closest('[data-event-id]');
-                if (eventCard) {
-                    var eventId = parseInt(eventCard.getAttribute('data-event-id'), 10);
-                    if (eventId) {
-                        MM_Portal.trackEventClick(eventId);
-                    }
+                var eventId = eventCard ? parseInt(eventCard.getAttribute('data-event-id'), 10) : 0;
+
+                // Find destination link URL and target
+                var linkEl = e.target.closest('a') || joinBtn.querySelector('a') || (joinBtn.tagName === 'A' ? joinBtn : null);
+                var href = linkEl ? (linkEl.getAttribute('href') || linkEl.href || '') : '';
+                var target = linkEl ? (linkEl.getAttribute('target') || '') : '';
+
+                var isValidUrl = href && href !== '#' && !href.startsWith('javascript:');
+
+                if (isValidUrl) {
+                    e.preventDefault();
+                    // Provide temporary feedback state
+                    joinBtn.style.pointerEvents = 'none';
+                    joinBtn.style.opacity = '0.7';
+
+                    MM_Portal.trackEventClick(eventId, href, target);
+                    return;
+                } else if (eventId > 0) {
+                    MM_Portal.trackEventClick(eventId);
                 }
-                // Do not preventDefault so external links or form triggers continue unimpeded
             }
         });
 
