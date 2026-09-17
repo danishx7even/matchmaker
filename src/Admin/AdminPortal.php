@@ -178,6 +178,7 @@ class AdminPortal
             'matchmaking-matches',
             'matchmaking-settings',
             'matchmaking-logs',
+            'matchmaking-event-clicks',
         ];
 
         if (!in_array($page, $allowed_matchmaking_pages, true)) {
@@ -295,6 +296,16 @@ class AdminPortal
             'matchmaking-logs',
             [$this, 'render_logs_page']
         );
+
+        $cpt_slug = (string) get_option('mm_events_cpt_slug', 'event');
+        add_submenu_page(
+            'edit.php?post_type=' . $cpt_slug,
+            __('Event Click Analytics', 'matchmaker'),
+            __('Join Click Analytics', 'matchmaker'),
+            'manage_matchmaker',
+            'matchmaking-event-clicks',
+            [$this, 'render_event_clicks_page']
+        );
     }
 
     /**
@@ -305,7 +316,7 @@ class AdminPortal
     public function handle_admin_actions(): void
     {
         $page = sanitize_text_field(wp_unslash($_GET['page'] ?? ''));
-        if (!in_array($page, ['matchmaking-pool', 'matchmaking-matches', 'matchmaking-settings', 'matchmaking-logs'], true)) {
+        if (!in_array($page, ['matchmaking-pool', 'matchmaking-matches', 'matchmaking-settings', 'matchmaking-logs', 'matchmaking-event-clicks'], true)) {
             return;
         }
 
@@ -543,6 +554,17 @@ class AdminPortal
             mm_enqueue_user_matching_job($user_id, 'admin_manual_trigger');
             add_settings_error('mm_admin_notices', 'job_queued', sprintf(__('Matching engine job queued for User #%d.', 'matchmaker'), $user_id), 'updated');
             return;
+        }
+
+        // --- EVENT CLICKS CSV EXPORT ---
+        if ($page === 'matchmaking-event-clicks' && $action === 'export_event_clicks' && $nonce !== '') {
+            if (wp_verify_nonce($nonce, 'mm_export_event_clicks')) {
+                $event_id = isset($_GET['event_id']) ? (int) $_GET['event_id'] : 0;
+                if ($event_id > 0) {
+                    $this->export_event_clicks_csv($event_id);
+                    exit;
+                }
+            }
         }
     }
 
@@ -1168,5 +1190,105 @@ class AdminPortal
 
         \Matchmaker\Service\BulkEmailService::instance()->save_default_template($subject, $template);
         wp_send_json_success(['message' => __('Default bulk email template saved successfully.', 'matchmaker')]);
+    }
+
+    /**
+     * Render the Event Click Analytics admin page.
+     * Displays all events overview or a single event user breakdown table.
+     *
+     * @return void
+     */
+    public function render_event_clicks_page(): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_die(esc_html__('You do not have permission to access this page.', 'matchmaker'));
+        }
+
+        $repo     = MatchRepository::instance();
+        $event_id = isset($_GET['event_id']) ? (int) $_GET['event_id'] : 0;
+
+        echo '<div class="wrap mm-admin-wrap">';
+        settings_errors('mm_admin_notices');
+
+        if ($event_id > 0) {
+            $event   = get_post($event_id);
+            $clicks  = $repo->get_event_click_details($event_id);
+            $summary = [
+                'total_clicks' => (int) array_sum(array_column($clicks, 'click_count')),
+                'unique_users' => count($clicks),
+            ];
+            include __DIR__ . '/../View/admin/events/event-clicks-single.php';
+        } else {
+            $events_summary = $repo->get_events_click_summary();
+            include __DIR__ . '/../View/admin/events/event-clicks.php';
+        }
+
+        echo '</div>';
+    }
+
+    /**
+     * Export event click users to CSV.
+     *
+     * @param int $event_id Event post ID.
+     * @return void
+     */
+    private function export_event_clicks_csv(int $event_id): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_die(esc_html__('Unauthorized.', 'matchmaker'));
+        }
+
+        $repo   = MatchRepository::instance();
+        $clicks = $repo->get_event_click_details($event_id);
+        $event  = get_post($event_id);
+        $title  = $event ? sanitize_title($event->post_title) : "event-{$event_id}";
+        $filename = "event-{$event_id}-clicks-" . gmdate('Y-m-d') . '.csv';
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            return;
+        }
+
+        // Add UTF-8 BOM for Excel compatibility
+        fputs($out, "\xEF\xBB\xBF");
+
+        fputcsv($out, [
+            __('User ID', 'matchmaker'),
+            __('Full Name', 'matchmaker'),
+            __('Username', 'matchmaker'),
+            __('Email', 'matchmaker'),
+            __('Phone', 'matchmaker'),
+            __('Gender', 'matchmaker'),
+            __('Location', 'matchmaker'),
+            __('Membership Tier', 'matchmaker'),
+            __('Total Clicks', 'matchmaker'),
+            __('First Clicked At', 'matchmaker'),
+            __('Last Clicked At', 'matchmaker'),
+        ]);
+
+        foreach ($clicks as $row) {
+            $location = trim(($row['city'] ?? '') . ', ' . ($row['country'] ?? ''), ', ');
+            fputcsv($out, [
+                $row['user_id'] ?? '',
+                $row['full_name'] ?? '',
+                $row['user_login'] ?? '',
+                $row['user_email'] ?? '',
+                $row['phone'] ?? '',
+                ucfirst((string) ($row['gender'] ?? '')),
+                $location,
+                ucfirst((string) ($row['user_type'] ?? '')),
+                $row['click_count'] ?? 1,
+                $row['first_clicked_at'] ?? '',
+                $row['last_clicked_at'] ?? '',
+            ]);
+        }
+
+        fclose($out);
+        exit;
     }
 }

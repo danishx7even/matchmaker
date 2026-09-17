@@ -1917,9 +1917,44 @@ This document maintains a chronological, step-by-step history of all features, a
   - `tests/Unit/MatchingEngineTest.php` & `tests/Unit/FormWizardAndShortcodesTest.php`:
     - Updated assertions to verify the unified modesty options for both male and female contexts.
 - **Verification**:
-  - Executed automated test runner (`tests/run_tests.php`) — **all 160 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+## 2026-09-17 — Task 94: Event CPT "Join Event" Click Tracking & Admin Metrics Reporting
+
+- **Objective**:
+  - Track and record whenever a logged-in member clicks the "Join Event" button (`.join-btn`) on any event card within the Member Portal Events tab.
+  - Record the user ID, event ID, click timestamp, and increment individual click counts.
+  - Introduce a new **"Join Click Analytics"** submenu under the configured Event CPT menu in WP Admin with two levels of reporting:
+    1. **Overview Table**: Lists all tracked events with total click count, unique member count, and last clicked date.
+    2. **Event Member Breakdown Detail View**: Displays the list of members who clicked the button with contact details (email, phone), membership tier, click count, first clicked, and last clicked timestamps, with a downloadable CSV export.
+- **Changes**:
+  - `src/Core/DBMigrator.php`:
+    - Bumped schema version to `2.9.0`.
+    - Created `wp_matchmaker_event_clicks` table (`id`, `event_id`, `user_id`, `click_count`, `first_clicked_at`, `last_clicked_at`, `UNIQUE KEY uniq_event_user`).
+  - `src/Repository/MatchRepository.php`:
+    - Added `record_event_click(int $event_id, int $user_id): bool` with atomic UPSERT query.
+    - Added `get_events_click_summary(): array` aggregating total clicks and unique members per event.
+    - Added `get_event_click_details(int $event_id): array` querying member interactions, user type, and contact information.
+    - Added `get_event_click_count_for_user(int $event_id, int $user_id): int`.
+  - `src/Frontend/PortalController.php`:
+    - Registered AJAX action `wp_ajax_mm_track_event_click` with nonce and login validation.
+  - `assets/js/member-portal.js`:
+    - Added `MM_Portal.trackEventClick(eventId)` using non-blocking `navigator.sendBeacon` (with keepalive `fetch` fallback).
+    - Added delegated click listener targeting `.join-btn` (and `#join-btn`, `[data-event-action="join"]`, `.mm-event-action-btn`).
+  - `src/Admin/AdminPortal.php`:
+    - Registered `add_submenu_page` under `edit.php?post_type={$cpt_slug}` for "Join Click Analytics".
+    - Added `render_event_clicks_page()` controller method.
+    - Added `export_event_clicks_csv()` method for single event attendee CSV downloads.
+    - Added `matchmaking-event-clicks` to allowed screen restrictions.
+  - `src/View/admin/events/event-clicks.php`:
+    - Created overview summary template for all tracked events.
+  - `src/View/admin/events/event-clicks-single.php`:
+    - Created member breakdown template for single event analysis.
+  - `tests/Unit/EventClickTrackingTest.php` & `tests/run_tests.php`:
+    - Added 7 new test assertions covering click recording, aggregated summaries, member details, AJAX hooks, and template rendering.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 167 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
 ---
+
 
 
 

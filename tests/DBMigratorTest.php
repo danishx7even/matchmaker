@@ -28,14 +28,15 @@ final class DBMigratorTest extends TestCase
         $this->assertStringContainsString($GLOBALS['wpdb']->prefix . 'matchmaking_pool', $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString($GLOBALS['wpdb']->prefix . 'matches', $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString($GLOBALS['wpdb']->prefix . 'matchmaker_logs', $GLOBALS['__mm_dbdelta_sql']);
+        $this->assertStringContainsString($GLOBALS['wpdb']->prefix . 'matchmaker_event_clicks', $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString('has_one_on_one', $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString('is_parent_applying', $GLOBALS['__mm_dbdelta_sql']);
-        $this->assertEquals('2.8.0', $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version']);
+        $this->assertEquals('2.9.0', $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version']);
     }
 
     public function test_maybe_migrate_skips_when_already_installed(): void
     {
-        $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version'] = '2.8.0';
+        $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version'] = '2.9.0';
         $migrator = DBMigrator::instance();
         $migrator->maybe_migrate();
 

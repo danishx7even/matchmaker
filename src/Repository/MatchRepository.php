@@ -1905,4 +1905,150 @@ class MatchRepository
 
         return is_array($row) ? $row : null;
     }
+
+    // =========================================================================
+    // EVENT CLICK TRACKING METHODS
+    // =========================================================================
+
+    /**
+     * Record or increment a "Join Event" click for a user on a given event.
+     *
+     * @param int $event_id Event post ID.
+     * @param int $user_id  WordPress user ID.
+     * @return bool True on success, false on failure.
+     */
+    public function record_event_click(int $event_id, int $user_id): bool
+    {
+        if ($event_id <= 0 || $user_id <= 0) {
+            return false;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaker_event_clicks';
+        $now   = gmdate('Y-m-d H:i:s');
+
+        $sql = "INSERT INTO {$table} (event_id, user_id, click_count, first_clicked_at, last_clicked_at)
+                VALUES (%d, %d, 1, %s, %s)
+                ON DUPLICATE KEY UPDATE click_count = click_count + 1, last_clicked_at = %s";
+
+        $result = $wpdb->query($wpdb->prepare($sql, $event_id, $user_id, $now, $now, $now));
+
+        return $result !== false;
+    }
+
+    /**
+     * Get aggregated click summary for all events.
+     *
+     * @return array<int, array<string, mixed>> List of events with click counts and unique users.
+     */
+    public function get_events_click_summary(): array
+    {
+        global $wpdb;
+        $clicks_table = $wpdb->prefix . 'matchmaker_event_clicks';
+        $posts_table  = !empty($wpdb->posts) ? $wpdb->posts : ($wpdb->prefix . 'posts');
+
+        $sql = "SELECT c.event_id,
+                       COALESCE(p.post_title, CONCAT('Event #', c.event_id)) AS event_title,
+                       p.post_date AS event_date,
+                       p.post_status AS event_status,
+                       SUM(c.click_count) AS total_clicks,
+                       COUNT(DISTINCT c.user_id) AS unique_users,
+                       MIN(c.first_clicked_at) AS first_clicked_at,
+                       MAX(c.last_clicked_at) AS last_clicked_at
+                FROM {$clicks_table} c
+                LEFT JOIN {$posts_table} p ON p.ID = c.event_id
+                GROUP BY c.event_id, p.post_title, p.post_date, p.post_status
+                ORDER BY last_clicked_at DESC";
+
+        $rows = $wpdb->get_results($sql, ARRAY_A);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Get detailed list of users who clicked "Join Event" for a specific event.
+     *
+     * @param int $event_id Event post ID.
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_event_click_details(int $event_id): array
+    {
+        if ($event_id <= 0) {
+            return [];
+        }
+
+        global $wpdb;
+        $clicks_table = $wpdb->prefix . 'matchmaker_event_clicks';
+        $users_table  = $wpdb->users;
+        $pool_table   = $wpdb->prefix . 'matchmaking_pool';
+
+        $sql = "SELECT c.id,
+                       c.event_id,
+                       c.user_id,
+                       c.click_count,
+                       c.first_clicked_at,
+                       c.last_clicked_at,
+                       u.user_login,
+                       u.user_email,
+                       u.display_name,
+                       pool.user_type,
+                       pool.gender,
+                       pool.country,
+                       pool.city
+                FROM {$clicks_table} c
+                LEFT JOIN {$users_table} u ON u.ID = c.user_id
+                LEFT JOIN {$pool_table} pool ON pool.user_id = c.user_id
+                WHERE c.event_id = %d
+                ORDER BY c.last_clicked_at DESC";
+
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $event_id), ARRAY_A);
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        foreach ($rows as &$row) {
+            $uid = (int) ($row['user_id'] ?? 0);
+            if ($uid > 0) {
+                $phone = (string) (get_user_meta($uid, 'phone_number', true) 
+                    ?: get_user_meta($uid, 'billing_phone', true) 
+                    ?: get_user_meta($uid, 'phone', true) 
+                    ?: '');
+                $row['phone'] = $phone;
+
+                $first_name = (string) get_user_meta($uid, 'first_name', true);
+                $last_name  = (string) get_user_meta($uid, 'last_name', true);
+                $full_name  = trim("{$first_name} {$last_name}");
+                $row['full_name'] = !empty($full_name) ? $full_name : ((string) ($row['display_name'] ?: $row['user_login'] ?: "User #{$uid}"));
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * Get click count for a specific user and event.
+     *
+     * @param int $event_id Event post ID.
+     * @param int $user_id  WordPress user ID.
+     * @return int Total clicks for this user on this event.
+     */
+    public function get_event_click_count_for_user(int $event_id, int $user_id): int
+    {
+        if ($event_id <= 0 || $user_id <= 0) {
+            return 0;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'matchmaker_event_clicks';
+        $count = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT click_count FROM {$table} WHERE event_id = %d AND user_id = %d",
+                $event_id,
+                $user_id
+            )
+        );
+
+        return (int) ($count ?: 0);
+    }
 }

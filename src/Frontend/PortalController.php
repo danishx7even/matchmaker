@@ -42,6 +42,7 @@ class PortalController
         add_action('wp_ajax_mm_submit_match_response', [$this, 'handle_ajax_match_response']);
         add_action('wp_ajax_mm_reload_tab_content',    [$this, 'handle_ajax_reload_tab']);
         add_action('wp_ajax_mm_portal_action',         [$this, 'handle_ajax_portal_action']);
+        add_action('wp_ajax_mm_track_event_click',     [$this, 'handle_ajax_track_event_click']);
 
         // Conditional asset enqueue
         add_action('wp_enqueue_scripts', [$this, 'maybe_enqueue_assets']);
@@ -386,5 +387,35 @@ class PortalController
         $html .= '</div></div>';
 
         return $html;
+    }
+
+    /**
+     * AJAX handler to record a "Join Event" click.
+     *
+     * @return void
+     */
+    public function handle_ajax_track_event_click(): void
+    {
+        check_ajax_referer('mm_portal_nonce', 'nonce');
+
+        $user_id = get_current_user_id();
+        if ($user_id <= 0) {
+            wp_send_json_error(['message' => __('User not logged in.', 'matchmaker')], 403);
+            return;
+        }
+
+        $event_id = isset($_POST['event_id']) ? (int) $_POST['event_id'] : 0;
+        if ($event_id <= 0) {
+            wp_send_json_error(['message' => __('Invalid event ID.', 'matchmaker')], 400);
+            return;
+        }
+
+        $recorded = \Matchmaker\Repository\MatchRepository::instance()->record_event_click($event_id, $user_id);
+        if ($recorded) {
+            $count = \Matchmaker\Repository\MatchRepository::instance()->get_event_click_count_for_user($event_id, $user_id);
+            wp_send_json_success(['event_id' => $event_id, 'user_id' => $user_id, 'click_count' => $count]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to record event click.', 'matchmaker')], 500);
+        }
     }
 }

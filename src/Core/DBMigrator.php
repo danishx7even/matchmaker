@@ -41,7 +41,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.8.0';
+        $new_version = '2.9.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -64,6 +64,7 @@ class DBMigrator {
         $matches_table       = $wpdb->prefix . 'matches';
         $notifications_table = $wpdb->prefix . 'matchmaker_notifications';
         $logs_table          = $wpdb->prefix . 'matchmaker_logs';
+        $event_clicks_table  = $wpdb->prefix . 'matchmaker_event_clicks';
 
         $sql_pool = "CREATE TABLE {$pool_table} (
             user_id bigint(20) unsigned NOT NULL,
@@ -173,10 +174,25 @@ class DBMigrator {
             KEY idx_status (status)
         ) {$charset_collate};";
 
+        $sql_event_clicks = "CREATE TABLE {$event_clicks_table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            event_id bigint(20) unsigned NOT NULL,
+            user_id bigint(20) unsigned NOT NULL,
+            click_count int(10) unsigned NOT NULL DEFAULT 1,
+            first_clicked_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_clicked_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            UNIQUE KEY uniq_event_user (event_id, user_id),
+            KEY idx_event (event_id),
+            KEY idx_user (user_id),
+            KEY idx_last_clicked (last_clicked_at)
+        ) {$charset_collate};";
+
         dbDelta($sql_pool);
         dbDelta($sql_matches);
         dbDelta($sql_notifications);
         dbDelta($sql_logs);
+        dbDelta($sql_event_clicks);
 
         // Direct schema patch: dbDelta does NOT modify existing ENUM definitions or always drop columns
         $wpdb->query(

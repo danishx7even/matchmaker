@@ -512,6 +512,32 @@ function get_the_date($format = 'M j, Y'): string {
     return 'Sep 3, 2026';
 }
 
+function get_avatar(mixed $id_or_email, int $size = 96, string $default = '', string $alt = '', array $args = []): string {
+    return '<img src="https://example.com/avatar.jpg" class="avatar" width="' . $size . '" height="' . $size . '" alt="' . esc_attr($alt) . '">';
+}
+
+function date_i18n(string $format, mixed $timestamp_with_offset = false, bool $gmt = false): string {
+    $ts = is_numeric($timestamp_with_offset) ? (int) $timestamp_with_offset : time();
+    return gmdate($format, $ts);
+}
+
+function human_time_diff(int $from, int $to = 0): string {
+    if (empty($to)) {
+        $to = time();
+    }
+    $diff = (int) abs($to - $from);
+    if ($diff < 3600) {
+        $mins = round($diff / 60);
+        return $mins <= 1 ? '1 min' : "{$mins} mins";
+    }
+    if ($diff < 86400) {
+        $hours = round($diff / 3600);
+        return $hours <= 1 ? '1 hour' : "{$hours} hours";
+    }
+    $days = round($diff / 86400);
+    return $days <= 1 ? '1 day' : "{$days} days";
+}
+
 function the_title_attribute(array|string $args = ''): void {
     echo esc_attr($GLOBALS['post']->post_title ?? '');
 }
@@ -1009,6 +1035,7 @@ class Fakewpdb {
     public string $prefix = 'wp_';
     public string $usermeta = 'wp_usermeta';
     public string $users = 'wp_users';
+    public string $posts = 'wp_posts';
     public int $insert_id = 1;
     public array $queries = [];
     public array $mock_results = [];

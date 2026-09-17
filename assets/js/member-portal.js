@@ -260,6 +260,36 @@
             if (!toast) return;
             toast.classList.remove('mm-toast-visible');
             toast.classList.add('mm-toast-hidden');
+        },
+
+        /**
+         * Track "Join Event" click asynchronously without blocking link navigation.
+         */
+        trackEventClick: function (eventId) {
+            if (!eventId || eventId <= 0) return;
+
+            var ajaxUrl = (window.mmPortalData && window.mmPortalData.ajaxUrl)
+                ? window.mmPortalData.ajaxUrl
+                : '/wp-admin/admin-ajax.php';
+            var nonce = (window.mmPortalData && window.mmPortalData.nonce)
+                ? window.mmPortalData.nonce
+                : '';
+
+            var data = new FormData();
+            data.append('action', 'mm_track_event_click');
+            data.append('event_id', eventId);
+            data.append('nonce', nonce);
+
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(ajaxUrl, data);
+            } else {
+                fetch(ajaxUrl, {
+                    method: 'POST',
+                    body: data,
+                    credentials: 'same-origin',
+                    keepalive: true
+                }).catch(function () {});
+            }
         }
     };
 
@@ -310,6 +340,19 @@
                     MM_Portal.reloadTabAJAX('events', null, pageNum);
                 }
                 return;
+            }
+
+            // 3. Event "Join Event" Click Tracking
+            var joinBtn = e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn');
+            if (joinBtn) {
+                var eventCard = joinBtn.closest('[data-event-id]');
+                if (eventCard) {
+                    var eventId = parseInt(eventCard.getAttribute('data-event-id'), 10);
+                    if (eventId) {
+                        MM_Portal.trackEventClick(eventId);
+                    }
+                }
+                // Do not preventDefault so external links or form triggers continue unimpeded
             }
         });
 
