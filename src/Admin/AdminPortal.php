@@ -470,8 +470,8 @@ class AdminPortal
             return;
         }
 
-        // 3. GET Query Actions (Approve / Reject / Trigger / Manual Match)
-        $action   = sanitize_text_field(wp_unslash($_GET['mm_action'] ?? ''));
+        // 3. GET Query Actions (Approve / Reject / Trigger / Manual Match / CSV Export)
+        $action   = sanitize_text_field(wp_unslash($_GET['mm_action'] ?? $_GET['action'] ?? ''));
         $match_id = (int) ($_GET['match_id'] ?? 0);
         $user_id  = (int) ($_GET['user_id'] ?? 0);
         $nonce    = sanitize_text_field(wp_unslash($_GET['_wpnonce'] ?? ''));
@@ -1232,7 +1232,7 @@ class AdminPortal
      * @param int $event_id Event post ID.
      * @return void
      */
-    private function export_event_clicks_csv(int $event_id): void
+    public function export_event_clicks_csv(int $event_id): void
     {
         if (!current_user_can('manage_matchmaker')) {
             wp_die(esc_html__('Unauthorized.', 'matchmaker'));
@@ -1243,6 +1243,10 @@ class AdminPortal
         $event  = get_post($event_id);
         $title  = $event ? sanitize_title($event->post_title) : "event-{$event_id}";
         $filename = "event-{$event_id}-clicks-" . gmdate('Y-m-d') . '.csv';
+
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
 
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');

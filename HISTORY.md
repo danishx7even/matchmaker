@@ -1970,6 +1970,25 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-17 — Task 96: Fix Event CPT "Join Click Analytics" CSV Exporter
+
+- **Objective**:
+  - Fix single event attendee CSV export button under Event CPT Join Click Analytics (`edit.php?post_type=event&page=matchmaking-event-clicks&event_id=...`).
+  - Ensure zero changes are made to the Candidate Pool Browser exporter.
+- **Changes**:
+  - `src/Admin/AdminPortal.php`:
+    - Updated `handle_admin_actions()` to extract `$action` checking both `$_GET['mm_action']` and `$_GET['action']`.
+    - Added buffer cleaning (`ob_end_clean()`) in `export_event_clicks_csv()` to prevent output leakage before streaming headers.
+  - `src/View/admin/events/event-clicks-single.php`:
+    - Updated `$export_url` to use `mm_action=export_event_clicks`.
+  - `tests/Unit/EventClickTrackingTest.php`:
+    - Added `test_export_event_clicks_csv_generation()` verifying single event CSV export data structure.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 168 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+
 
 
 

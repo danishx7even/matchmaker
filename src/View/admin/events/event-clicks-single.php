@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 $cpt_slug   = (string) get_option('mm_events_cpt_slug', 'event');
 $back_url   = admin_url('edit.php?post_type=' . urlencode($cpt_slug) . '&page=matchmaking-event-clicks');
 $export_url = wp_nonce_url(
-    admin_url('edit.php?post_type=' . urlencode($cpt_slug) . '&page=matchmaking-event-clicks&action=export_event_clicks&event_id=' . $event_id),
+    admin_url('edit.php?post_type=' . urlencode($cpt_slug) . '&page=matchmaking-event-clicks&mm_action=export_event_clicks&event_id=' . $event_id),
     'mm_export_event_clicks'
 );
 

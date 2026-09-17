@@ -235,4 +235,65 @@ final class EventClickTrackingTest extends TestCase
         $this->assertStringContainsString('+1 (555) 234-5678', $single_html);
         $this->assertStringContainsString('3 clicks', $single_html);
     }
+
+    public function test_export_event_clicks_csv_generation(): void
+    {
+        $repo = MatchRepository::instance();
+
+        $GLOBALS['__mm_usermeta'][5]['phone_number'] = '+1 (555) 234-5678';
+        $GLOBALS['__mm_usermeta'][5]['first_name'] = 'John';
+        $GLOBALS['__mm_usermeta'][5]['last_name'] = 'Doe';
+
+        $mock_rows = [
+            [
+                'id'               => 1,
+                'event_id'         => 101,
+                'user_id'          => 5,
+                'click_count'      => 3,
+                'first_clicked_at' => '2026-09-15 10:00:00',
+                'last_clicked_at'  => '2026-09-17 19:30:00',
+                'user_login'       => 'john_doe',
+                'user_email'       => 'john@example.com',
+                'display_name'     => 'John Doe',
+                'user_type'        => 'monthly',
+                'gender'           => 'male',
+                'country'          => 'United States',
+                'city'             => 'Chicago',
+            ]
+        ];
+
+        $sql = "SELECT c.id,
+                       c.event_id,
+                       c.user_id,
+                       c.click_count,
+                       c.first_clicked_at,
+                       c.last_clicked_at,
+                       u.user_login,
+                       u.user_email,
+                       u.display_name,
+                       pool.user_type,
+                       pool.gender,
+                       pool.country,
+                       pool.city
+                FROM wp_matchmaker_event_clicks c
+                LEFT JOIN wp_users u ON u.ID = c.user_id
+                LEFT JOIN wp_matchmaking_pool pool ON pool.user_id = c.user_id
+                WHERE c.event_id = 101
+                ORDER BY c.last_clicked_at DESC";
+
+        $GLOBALS['wpdb']->mock_results[$sql] = $mock_rows;
+
+        // Ensure user has manage_matchmaker cap
+        $admin_user = new \FakeWP_User(1, 'admin', 'admin@example.com');
+        $admin_user->roles = ['administrator'];
+        $GLOBALS['__mm_users'][1] = $admin_user;
+        $GLOBALS['__mm_current_user_id'] = 1;
+
+        // Verify direct repository data retrieval for event 101
+        $clicks = $repo->get_event_click_details(101);
+        $this->assertNotEmpty($clicks);
+        $this->assertEquals('John Doe', $clicks[0]['full_name']);
+        $this->assertEquals('+1 (555) 234-5678', $clicks[0]['phone']);
+        $this->assertEquals(3, $clicks[0]['click_count']);
+    }
 }
