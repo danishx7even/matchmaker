@@ -6,6 +6,18 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 100: Event Link Modal Icon Design & Active State Styling Refinement
+- **Objective**: Fix SVG icon styling in `member-portal.css` so outline icons are crisp and clean (`fill: none; stroke: currentColor;`), ensure hover states turn icons to pure white, and eliminate green background colors on active/copied states.
+- **Implemented**:
+  - `assets/css/member-portal.css`:
+    - Updated `.mm-modal-icon-btn svg` to enforce `stroke: currentColor; stroke-width: 2; fill: none !important; stroke-linecap: round; stroke-linejoin: round;`.
+    - Added explicit `:hover` rule forcing child SVGs to `stroke: #ffffff !important; color: #ffffff !important; fill: none !important;`.
+    - Added `:active` rule with brand `#b6602f` background and pure white icon stroke.
+    - Updated `.mm-modal-icon-btn.mm-copied` to sleek obsidian `#1D1E20` background (completely removing green `#829067`).
+    - Added `:focus-visible` outline using brand `#CC723F`.
+- **Verification**: Ran automated test suite with **169/169 tests passing** (0 failures, 0 errors).
+
+
 ### Task 99: Custom "Event Link" Modal Popup & Click Tracking Action Icons
 - **Objective**: Implement a custom responsive modal popup titled "Event Link" when `.join-btn` is clicked, displaying the event link (from `event_link` post meta/ACF) with interactive "Go to Link" and "Copy Link" action icons, while tracking the click in the database.
 - **Implemented**:

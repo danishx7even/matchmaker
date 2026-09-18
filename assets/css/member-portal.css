@@ -1906,7 +1906,7 @@ a.az-edit-btn:hover {
     width: 38px;
     height: 38px;
     border-radius: 8px;
-    border: 1px solid #e2ddd3;
+    border: 1.5px solid #e2ddd3;
     background: #ffffff;
     color: #1D1E20;
     cursor: pointer;
@@ -1914,26 +1914,66 @@ a.az-edit-btn:hover {
     text-decoration: none;
     padding: 0;
     position: relative;
+    outline: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .mm-modal-icon-btn svg {
     width: 18px;
     height: 18px;
-    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none !important;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    display: block;
+    transition: stroke 0.2s ease, color 0.2s ease;
 }
 
 .mm-modal-icon-btn:hover {
-    background: #CC723F;
-    border-color: #CC723F;
-    color: #ffffff;
+    background: #CC723F !important;
+    border-color: #CC723F !important;
+    color: #ffffff !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(204, 114, 63, 0.25);
+    box-shadow: 0 4px 12px rgba(204, 114, 63, 0.3);
+}
+
+.mm-modal-icon-btn:hover svg {
+    stroke: #ffffff !important;
+    color: #ffffff !important;
+    fill: none !important;
+}
+
+.mm-modal-icon-btn:active {
+    background: #b6602f !important;
+    border-color: #b6602f !important;
+    color: #ffffff !important;
+    transform: translateY(0) scale(0.96);
+    box-shadow: 0 2px 6px rgba(182, 96, 47, 0.25);
+}
+
+.mm-modal-icon-btn:active svg {
+    stroke: #ffffff !important;
+    color: #ffffff !important;
+    fill: none !important;
+}
+
+.mm-modal-icon-btn:focus-visible {
+    outline: 2px solid #CC723F;
+    outline-offset: 2px;
 }
 
 .mm-modal-icon-btn.mm-copied {
-    background: #829067 !important;
-    border-color: #829067 !important;
+    background: #1D1E20 !important;
+    border-color: #1D1E20 !important;
     color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(29, 30, 32, 0.3) !important;
+}
+
+.mm-modal-icon-btn.mm-copied svg {
+    stroke: #ffffff !important;
+    color: #ffffff !important;
+    fill: none !important;
 }
 
 .mm-btn-tooltip {
