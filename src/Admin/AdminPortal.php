@@ -64,6 +64,9 @@ class AdminPortal
         add_action('wp_ajax_mm_count_email_recipients',   [$this, 'ajax_count_email_recipients']);
         add_action('wp_ajax_mm_send_bulk_email',          [$this, 'ajax_send_bulk_email']);
         add_action('wp_ajax_mm_save_bulk_email_default',  [$this, 'ajax_save_bulk_email_default']);
+
+        // Admin bar restrictions for restricted roles
+        add_action('admin_bar_menu',                      [$this, 'restrict_admin_bar_for_restricted_roles'], 999);
     }
 
     /**
@@ -199,8 +202,25 @@ class AdminPortal
             'pmpro-emailsettings',
             'pmpro-advancedsettings',
             'pmpro-addons',
-            'elementor',                   // Elementor
+            'elementor',                   // Elementor Core & Pro
             'edit.php?post_type=elementor_library',
+            'edit.php?post_type=e-landing-page',
+            'edit.php?post_type=elementor_snippet',
+            'edit.php?post_type=elementor_font',
+            'edit.php?post_type=elementor_icons',
+            'e-form-submissions',
+            'elementor-tools',
+            'elementor-system-info',
+            'elementor-getting-started',
+            'elementor-license',
+            'elementor-apps',
+            'elementor-home',
+            'elementor-settings',
+            'elementor-role-manager',
+            'elementor-integrations',
+            'elementor-custom-fonts',
+            'elementor-custom-icons',
+            'elementor-custom-code',
         ];
 
         if ($is_events_organizer) {
@@ -213,6 +233,65 @@ class AdminPortal
 
         foreach ($disallowed_menus as $menu_slug) {
             remove_menu_page($menu_slug);
+        }
+
+        // Dynamic $menu sweep: purge any remaining non-whitelisted top-level menu
+        global $menu;
+        if (is_array($menu)) {
+            $allowed_slug = $is_events_organizer ? ('edit.php?post_type=' . $cpt_slug) : 'matchmaking-pool';
+            foreach ($menu as $idx => $item) {
+                $slug = $item[2] ?? '';
+                $is_separator = str_contains((string) ($item[4] ?? ''), 'wp-menu-separator');
+                if ($is_separator) {
+                    continue;
+                }
+                if ($slug !== $allowed_slug && $slug !== 'profile.php') {
+                    remove_menu_page($slug);
+                    unset($menu[$idx]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Remove non-authorized items from the WordPress Admin Bar for restricted roles.
+     *
+     * @param object|null $wp_admin_bar Admin bar instance.
+     * @return void
+     */
+    public function restrict_admin_bar_for_restricted_roles($wp_admin_bar = null): void
+    {
+        if (current_user_can('manage_options')) {
+            return;
+        }
+
+        $user = function_exists('wp_get_current_user') ? wp_get_current_user() : null;
+        $roles = ($user && isset($user->roles)) ? (array) $user->roles : [];
+
+        $is_events_organizer = in_array('events_organizer', $roles, true) || current_user_can('manage_events_organizer');
+        $is_matchmaker_admin = in_array('matchmaker_admin', $roles, true) || current_user_can('manage_matchmaker');
+
+        if (!$is_events_organizer && !$is_matchmaker_admin) {
+            return;
+        }
+
+        if (!is_object($wp_admin_bar) || !method_exists($wp_admin_bar, 'remove_node')) {
+            return;
+        }
+
+        $disallowed_nodes = [
+            'elementor_edit_page',
+            'elementor_inspector',
+            'elementor_app',
+            'elementor_site_settings',
+            'elementor-license-status',
+            'comments',
+            'updates',
+            'new-content',
+        ];
+
+        foreach ($disallowed_nodes as $node_id) {
+            $wp_admin_bar->remove_node($node_id);
         }
     }
 

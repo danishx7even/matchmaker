@@ -207,11 +207,30 @@ class AdminWorkflowTest
         $GLOBALS['__mm_users'][804] = $eo_user;
         $GLOBALS['__mm_current_user_id'] = 804;
 
+        // Mock global $menu with standard items including Elementor and custom items
+        $GLOBALS['menu'] = [
+            0 => ['Dashboard', 'read', 'index.php', '', 'menu-top'],
+            1 => ['Events', 'edit_posts', 'edit.php?post_type=event', '', 'menu-top'],
+            2 => ['Elementor', 'edit_posts', 'elementor', '', 'menu-top'],
+            3 => ['Templates', 'edit_posts', 'edit.php?post_type=elementor_library', '', 'menu-top'],
+            4 => ['Submissions', 'edit_posts', 'e-form-submissions', '', 'menu-top'],
+            5 => ['ThirdParty', 'edit_posts', 'third_party_addon', '', 'menu-top'],
+            6 => ['', 'read', 'separator1', '', 'wp-menu-separator'],
+        ];
+
         $GLOBALS['admin_removed_menus'] = [];
         $this->admin->restrict_admin_menus_for_matchmaker_admin();
 
         if (empty($GLOBALS['admin_removed_menus']['index.php']) || empty($GLOBALS['admin_removed_menus']['plugins.php']) || empty($GLOBALS['admin_removed_menus']['options-general.php'])) {
             throw new \RuntimeException("Expected default WP core menus to be removed for events_organizer");
+        }
+
+        if (empty($GLOBALS['admin_removed_menus']['elementor']) || empty($GLOBALS['admin_removed_menus']['edit.php?post_type=elementor_library']) || empty($GLOBALS['admin_removed_menus']['e-form-submissions'])) {
+            throw new \RuntimeException("Expected Elementor menus (elementor, edit.php?post_type=elementor_library, e-form-submissions) to be removed for events_organizer");
+        }
+
+        if (empty($GLOBALS['admin_removed_menus']['third_party_addon'])) {
+            throw new \RuntimeException("Expected non-whitelisted third-party menus to be swept and removed for events_organizer");
         }
 
         if (empty($GLOBALS['admin_removed_menus']['matchmaking-pool'])) {
@@ -223,6 +242,7 @@ class AdminWorkflowTest
         }
 
         unset($GLOBALS['__mm_current_user_id']);
+        unset($GLOBALS['menu']);
         delete_option('mm_events_cpt_slug');
     }
 }

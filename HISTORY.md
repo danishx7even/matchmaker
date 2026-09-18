@@ -6,6 +6,18 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 103: Hide All Elementor Menus & Submenus for Events Organizer Role
+- **Objective**: Ensure all Elementor and Elementor Pro menus, submenus, and admin bar nodes are completely hidden and stripped for the `events_organizer` user role.
+- **Implemented**:
+  - `src/Admin/AdminPortal.php`:
+    - Expanded explicit disallowed menu slugs list in `restrict_admin_menus_for_matchmaker_admin()` to cover all Elementor / Elementor Pro admin slugs (`elementor`, `edit.php?post_type=elementor_library`, `edit.php?post_type=e-landing-page`, `edit.php?post_type=elementor_snippet`, `edit.php?post_type=elementor_font`, `edit.php?post_type=elementor_icons`, `e-form-submissions`, `elementor-tools`, `elementor-system-info`, `elementor-getting-started`, `elementor-license`, `elementor-apps`, `elementor-home`, `elementor-settings`, `elementor-role-manager`, `elementor-integrations`, `elementor-custom-fonts`, `elementor-custom-icons`, `elementor-custom-code`).
+    - Added dynamic global `$menu` array sweep to automatically remove any non-whitelisted top-level menus registered by Elementor add-ons or third-party plugins for `events_organizer` (and `matchmaker_admin`).
+    - Added `restrict_admin_bar_for_restricted_roles()` hook on `admin_bar_menu` (priority 999) to remove Elementor top bar nodes (`elementor_edit_page`, `elementor_inspector`, `elementor_app`, `elementor_site_settings`, `elementor-license-status`).
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Updated `test_restrict_admin_menus_for_events_organizer` with mocked global `$menu` containing Elementor, Templates, Form Submissions, and third-party plugin items to verify complete suppression.
+- **Verification**: Ran automated test suite with **172/172 tests passing** (0 failures, 0 errors).
+
+
 ### Task 102: Add "Events Organizer" Role with Restricted Admin Access
 - **Objective**: Create and register a new WordPress user role **"Events Organizer"** (`events_organizer`) with access strictly restricted to the Events custom post type menu and its submenus (including Join Click Analytics `matchmaking-event-clicks`) and the ability to edit their own user profile (`profile.php`).
 - **Implemented**:
