@@ -15,8 +15,10 @@ Replaces hardcoded page paths with WordPress Page ID settings configured in **Ma
 ---
 
 ## 2. Role-Based Login & Checkout Redirects
-- **Admin Users**: Redirected directly to `/wp-admin/`.
-- **Subscriber / Member Users**: Redirected to configured Member Dashboard (`ProfileService::get_dashboard_url()`).
+- **Full Administrators**: Redirected to `/wp-admin/`.
+- **Events Organizers**: Redirected to `admin_url('edit.php?post_type=' . $cpt_slug)`.
+- **Matchmaker Admins**: Redirected to `admin_url('admin.php?page=matchmaking-pool')`.
+- **Subscriber / Member Users**: Redirected to configured Member Dashboard (`ProfileService::get_dashboard_url()`), or questionnaire if incomplete profile.
 - **PMPro Checkout Confirmation**: Redirects newly subscribed members to the Questionnaire form (`ProfileService::get_form_url()`).
 
 ---

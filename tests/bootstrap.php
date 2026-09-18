@@ -164,8 +164,9 @@ class WP_Role {
 function get_role(string $role): ?WP_Role {
     if (!isset($GLOBALS['wp_roles'])) {
         $GLOBALS['wp_roles'] = [
-            'administrator'   => new WP_Role('administrator', ['manage_options' => true, 'manage_matchmaker' => true, 'read' => true]),
+            'administrator'   => new WP_Role('administrator', ['manage_options' => true, 'manage_matchmaker' => true, 'manage_events_organizer' => true, 'read' => true]),
             'matchmaker_admin'=> new WP_Role('matchmaker_admin', ['manage_matchmaker' => true, 'read' => true]),
+            'events_organizer'=> new WP_Role('events_organizer', ['manage_events_organizer' => true, 'manage_matchmaker' => true, 'read' => true]),
             'subscriber'      => new WP_Role('subscriber', ['read' => true]),
         ];
     }

@@ -169,5 +169,62 @@ class AdminWorkflowTest
 
         unset($GLOBALS['__mm_current_user_id']);
     }
+
+    public function test_events_organizer_role_and_capabilities_registration(): void
+    {
+        AdminPortal::register_role_and_caps();
+
+        $role = get_role('events_organizer');
+        if (!$role || !$role->has_cap('manage_events_organizer') || !$role->has_cap('edit_events') || !$role->has_cap('read')) {
+            throw new \RuntimeException("Expected events_organizer role with manage_events_organizer, edit_events, and read capabilities");
+        }
+
+        $admin_role = get_role('administrator');
+        if (!$admin_role || !$admin_role->has_cap('manage_events_organizer')) {
+            throw new \RuntimeException("Expected administrator role to have manage_events_organizer capability");
+        }
+
+        $eo_user = new \FakeWP_User(803, 'Events Lead', 'events@arabzawaj.com');
+        $eo_user->roles = ['events_organizer'];
+        $GLOBALS['__mm_users'][803] = $eo_user;
+
+        if (!user_can(803, 'manage_events_organizer')) {
+            throw new \RuntimeException("Expected events_organizer user to satisfy user_can('manage_events_organizer')");
+        }
+
+        if (user_can(803, 'manage_options')) {
+            throw new \RuntimeException("Expected events_organizer user to NOT have manage_options capability");
+        }
+    }
+
+    public function test_restrict_admin_menus_for_events_organizer(): void
+    {
+        update_option('mm_events_cpt_slug', 'event');
+        AdminPortal::register_role_and_caps();
+
+        $eo_user = new \FakeWP_User(804, 'Events Staff', 'staff_events@arabzawaj.com');
+        $eo_user->roles = ['events_organizer'];
+        $GLOBALS['__mm_users'][804] = $eo_user;
+        $GLOBALS['__mm_current_user_id'] = 804;
+
+        $GLOBALS['admin_removed_menus'] = [];
+        $this->admin->restrict_admin_menus_for_matchmaker_admin();
+
+        if (empty($GLOBALS['admin_removed_menus']['index.php']) || empty($GLOBALS['admin_removed_menus']['plugins.php']) || empty($GLOBALS['admin_removed_menus']['options-general.php'])) {
+            throw new \RuntimeException("Expected default WP core menus to be removed for events_organizer");
+        }
+
+        if (empty($GLOBALS['admin_removed_menus']['matchmaking-pool'])) {
+            throw new \RuntimeException("Expected matchmaking-pool menu to be removed for events_organizer");
+        }
+
+        if (!empty($GLOBALS['admin_removed_menus']['edit.php?post_type=event'])) {
+            throw new \RuntimeException("Expected Events CPT menu to be kept for events_organizer");
+        }
+
+        unset($GLOBALS['__mm_current_user_id']);
+        delete_option('mm_events_cpt_slug');
+    }
 }
+
 

@@ -6,6 +6,22 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 102: Add "Events Organizer" Role with Restricted Admin Access
+- **Objective**: Create and register a new WordPress user role **"Events Organizer"** (`events_organizer`) with access strictly restricted to the Events custom post type menu and its submenus (including Join Click Analytics `matchmaking-event-clicks`) and the ability to edit their own user profile (`profile.php`).
+- **Implemented**:
+  - `src/Admin/AdminPortal.php`:
+    - In `register_role_and_caps()`: Registered `events_organizer` role (`Events Organizer`) with capabilities (`read`, `manage_events_organizer`, `manage_matchmaker`, `edit_events`, `publish_events`, `delete_events`, `upload_files`, term management, etc.) and granted `manage_events_organizer` to `administrator`.
+    - In `restrict_admin_menus_for_matchmaker_admin()`: Stripped core WP menus (Dashboard, Posts, Media, Pages, Comments, Appearance, Plugins, Users, Tools, Settings), PMPro, Elementor, and Matchmaking (`matchmaking-pool`) for `events_organizer` users while preserving the Events CPT menu (`edit.php?post_type={$cpt_slug}`).
+    - In `enforce_matchmaker_admin_screen_restrictions()`: Restricted access for `events_organizer` to event CPT screens (`edit.php`, `post-new.php`, `post.php`, `edit-tags.php`, `term.php` matching `$cpt_slug`), `matchmaking-event-clicks`, and `profile.php`/`async-upload.php`. Unauthorized screens redirect to `admin_url('edit.php?post_type=' . $cpt_slug)`.
+  - `src/Frontend/AuthController.php`:
+    - In `custom_role_based_login_redirect()`: Added redirect for `events_organizer` to `admin_url('edit.php?post_type=' . $cpt_slug)`.
+  - `tests/bootstrap.php`: Added `events_organizer` default role and capabilities to test mock environment.
+  - `tests/Unit/AdminWorkflowTest.php`: Added `test_events_organizer_role_and_capabilities_registration` and `test_restrict_admin_menus_for_events_organizer`.
+  - `tests/Unit/AuthAndRedirectsTest.php`: Added `test_events_organizer_login_redirects_to_events_cpt`.
+  - `context/admin_portal.md` & `context/auth_and_routing.md`: Documented the new role, access rules, and routing behavior.
+- **Verification**: Ran automated test runner with **172/172 tests passing** (0 failures, 0 errors).
+
+
 ### Task 101: Convert Modal Actions to Anchor Tags & Redesign SVG Icons
 - **Objective**: Convert both action elements in the Event Link modal to `<a>` tags and refine the SVG icons for optimal geometric clarity.
 - **Implemented**:

@@ -67,17 +67,18 @@ class AdminPortal
     }
 
     /**
-     * Register Matchmaker Admin role and custom capabilities.
+     * Register Matchmaker Admin & Events Organizer roles and custom capabilities.
      *
      * @return void
      */
     public static function register_role_and_caps(): void
     {
-        // 1. Grant manage_matchmaker to Full Administrator
+        // 1. Grant manage_matchmaker & manage_events_organizer to Full Administrator
         if (function_exists('get_role')) {
             $admin_role = get_role('administrator');
             if ($admin_role && method_exists($admin_role, 'add_cap')) {
                 $admin_role->add_cap('manage_matchmaker', true);
+                $admin_role->add_cap('manage_events_organizer', true);
             }
         }
 
@@ -99,18 +100,74 @@ class AdminPortal
                     $mm_role->add_cap('manage_matchmaker', true);
                 }
             }
+
+            // 3. Register or update events_organizer role
+            $eo_role = get_role('events_organizer');
+            $eo_caps = [
+                'read'                    => true,
+                'manage_events_organizer' => true,
+                'manage_matchmaker'       => true, // Allows access to matchmaking-event-clicks
+                'edit_posts'              => true,
+                'edit_others_posts'       => true,
+                'publish_posts'           => true,
+                'read_private_posts'      => true,
+                'delete_posts'            => true,
+                'delete_others_posts'     => true,
+                'delete_published_posts'  => true,
+                'delete_private_posts'    => true,
+                'edit_published_posts'    => true,
+                'edit_private_posts'      => true,
+                'upload_files'            => true,
+                'edit_events'             => true,
+                'edit_others_events'      => true,
+                'publish_events'          => true,
+                'read_private_events'     => true,
+                'delete_events'           => true,
+                'delete_others_events'    => true,
+                'delete_published_events' => true,
+                'edit_published_events'   => true,
+                'manage_events'           => true,
+                'assign_event_terms'      => true,
+                'manage_event_terms'      => true,
+                'edit_event_terms'        => true,
+                'delete_event_terms'      => true,
+            ];
+
+            if (!$eo_role) {
+                add_role(
+                    'events_organizer',
+                    __('Events Organizer', 'matchmaker'),
+                    $eo_caps
+                );
+            } else {
+                if (method_exists($eo_role, 'add_cap')) {
+                    foreach ($eo_caps as $cap => $grant) {
+                        $eo_role->add_cap($cap, $grant);
+                    }
+                }
+            }
         }
     }
 
     /**
-     * Remove non-matchmaking admin menus for Matchmaker Admin users.
-     * Ensures they can only see and access matchmaking management screens (and their profile).
+     * Remove non-authorized admin menus for Matchmaker Admin and Events Organizer users.
+     * Ensures they can only see and access authorized management screens (and their profile).
      *
      * @return void
      */
     public function restrict_admin_menus_for_matchmaker_admin(): void
     {
-        if (!current_user_can('manage_matchmaker') || current_user_can('manage_options')) {
+        if (current_user_can('manage_options')) {
+            return;
+        }
+
+        $user = function_exists('wp_get_current_user') ? wp_get_current_user() : null;
+        $roles = ($user && isset($user->roles)) ? (array) $user->roles : [];
+
+        $is_events_organizer = in_array('events_organizer', $roles, true) || current_user_can('manage_events_organizer');
+        $is_matchmaker_admin = in_array('matchmaker_admin', $roles, true) || current_user_can('manage_matchmaker');
+
+        if (!$is_events_organizer && !$is_matchmaker_admin) {
             return;
         }
 
@@ -118,6 +175,9 @@ class AdminPortal
             return;
         }
 
+        $cpt_slug = (string) get_option('mm_events_cpt_slug', 'event');
+
+        // Common core and third-party disallowed menus
         $disallowed_menus = [
             'index.php',                  // Dashboard
             'edit.php',                    // Posts
@@ -143,20 +203,38 @@ class AdminPortal
             'edit.php?post_type=elementor_library',
         ];
 
+        if ($is_events_organizer) {
+            // Events Organizer only has access to Events menu & submenus + profile
+            $disallowed_menus[] = 'matchmaking-pool';
+        } else {
+            // Matchmaker Admin only has access to Matchmaking menu & submenus + profile
+            $disallowed_menus[] = 'edit.php?post_type=' . $cpt_slug;
+        }
+
         foreach ($disallowed_menus as $menu_slug) {
             remove_menu_page($menu_slug);
         }
     }
 
     /**
-     * Enforce strict page-level gating for Matchmaker Admin users.
-     * Redirects visits to wp-admin/ or index.php or other unauthorized backend screens to the Pool Browser.
+     * Enforce strict page-level gating for Matchmaker Admin and Events Organizer users.
+     * Redirects visits to wp-admin/ or index.php or other unauthorized backend screens.
      *
      * @return void
      */
     public function enforce_matchmaker_admin_screen_restrictions(): void
     {
-        if (!current_user_can('manage_matchmaker') || current_user_can('manage_options')) {
+        if (current_user_can('manage_options')) {
+            return;
+        }
+
+        $user = function_exists('wp_get_current_user') ? wp_get_current_user() : null;
+        $roles = ($user && isset($user->roles)) ? (array) $user->roles : [];
+
+        $is_events_organizer = in_array('events_organizer', $roles, true) || current_user_can('manage_events_organizer');
+        $is_matchmaker_admin = in_array('matchmaker_admin', $roles, true) || current_user_can('manage_matchmaker');
+
+        if (!$is_events_organizer && !$is_matchmaker_admin) {
             return;
         }
 
@@ -167,11 +245,50 @@ class AdminPortal
 
         global $pagenow;
 
-        // Allow user editing their own profile or submitting admin forms/actions
-        if (in_array($pagenow, ['profile.php', 'admin-post.php', 'async-upload.php'], true)) {
+        // Allow user editing their own profile or submitting admin forms/actions/uploads
+        if (in_array($pagenow, ['profile.php', 'admin-post.php', 'async-upload.php', 'media-upload.php'], true)) {
             return;
         }
 
+        $cpt_slug = (string) get_option('mm_events_cpt_slug', 'event');
+
+        if ($is_events_organizer) {
+            $is_allowed = false;
+            $post_type = isset($_GET['post_type']) ? sanitize_text_field(wp_unslash((string) $_GET['post_type'])) : (isset($_POST['post_type']) ? sanitize_text_field(wp_unslash((string) $_POST['post_type'])) : '');
+            $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
+
+            // 1. Event CPT listing, creation, and taxonomy screens
+            if (in_array($pagenow, ['edit.php', 'post-new.php', 'edit-tags.php', 'term.php'], true)) {
+                if ($post_type === $cpt_slug) {
+                    $is_allowed = true;
+                }
+            }
+
+            // 2. Event post editing (post.php)
+            if ($pagenow === 'post.php') {
+                $post_id = isset($_GET['post']) ? (int) $_GET['post'] : (isset($_POST['post_ID']) ? (int) $_POST['post_ID'] : 0);
+                if ($post_id > 0 && function_exists('get_post_type')) {
+                    if (get_post_type($post_id) === $cpt_slug) {
+                        $is_allowed = true;
+                    }
+                } elseif ($post_type === $cpt_slug) {
+                    $is_allowed = true;
+                }
+            }
+
+            // 3. Matchmaking event clicks analytics submenu under events
+            if ($page === 'matchmaking-event-clicks') {
+                $is_allowed = true;
+            }
+
+            if (!$is_allowed) {
+                wp_safe_redirect(admin_url('edit.php?post_type=' . $cpt_slug));
+                exit;
+            }
+            return;
+        }
+
+        // Matchmaker Admin restrictions
         $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
         $allowed_matchmaking_pages = [
             'matchmaking-pool',

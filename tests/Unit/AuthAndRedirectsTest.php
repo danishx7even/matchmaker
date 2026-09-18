@@ -85,6 +85,19 @@ class AuthAndRedirectsTest
         }
     }
 
+    public function test_events_organizer_login_redirects_to_events_cpt(): void
+    {
+        update_option('mm_events_cpt_slug', 'tribe_events');
+        $eo_user = new FakeWP_User(78, 'event_manager', 'manager@example.com');
+        $eo_user->roles = ['events_organizer'];
+
+        $dest = $this->auth->custom_role_based_login_redirect('https://example.com/', '', $eo_user);
+        if (!str_contains($dest, 'edit.php?post_type=tribe_events')) {
+            throw new \RuntimeException("Expected events_organizer to redirect to edit.php?post_type=tribe_events, got: " . $dest);
+        }
+        delete_option('mm_events_cpt_slug');
+    }
+
     public function test_pmpro_profile_update_redirects_to_membership_account_page(): void
     {
         $_POST['action'] = 'update-profile';

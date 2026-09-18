@@ -49,11 +49,20 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
 
 ---
 
-## 3. Matchmaker Admin Role & Access Control
-- **Role Slug**: `matchmaker_admin` (Display Name: `Matchmaker Admin`).
-- **Capability**: `manage_matchmaker` (also assigned to `administrator`).
-- **Restricted wp-admin Access**:
-  - Matchmaker Admins only see and can only access matchmaking pages (`matchmaking-pool`, `matchmaking-matches`, `matchmaking-settings`, `matchmaking-logs`) and their own profile (`profile.php`).
-  - Standard WordPress core menus (`index.php`, `plugins.php`, `themes.php`, `users.php`, `tools.php`, `options-general.php`, `edit.php`, etc.) and third-party menus (PMPro, Elementor) are stripped via `restrict_admin_menus_for_matchmaker_admin()`.
-  - Direct navigation to `wp-admin/` or `index.php` automatically redirects to `admin_url('admin.php?page=matchmaking-pool')`.
-  - Login redirect (`AuthController::custom_role_based_login_redirect`) automatically sends Matchmaker Admins to the Pool Browser.
+## 3. Matchmaker Admin & Events Organizer Roles & Access Control
+- **Matchmaker Admin**:
+  - **Role Slug**: `matchmaker_admin` (Display Name: `Matchmaker Admin`).
+  - **Capability**: `manage_matchmaker` (also assigned to `administrator`).
+  - **Restricted wp-admin Access**: Matchmaker Admins only see and can only access matchmaking pages (`matchmaking-pool`, `matchmaking-matches`, `matchmaking-settings`, `matchmaking-logs`) and their own profile (`profile.php`).
+  - Standard WordPress core menus (`index.php`, `plugins.php`, `themes.php`, `users.php`, `tools.php`, `options-general.php`, `edit.php`, etc.), Events CPT menu, and third-party menus (PMPro, Elementor) are stripped.
+  - Direct navigation to unauthorized screens redirects to `admin_url('admin.php?page=matchmaking-pool')`.
+  - Login redirect automatically sends Matchmaker Admins to the Pool Browser.
+
+- **Events Organizer**:
+  - **Role Slug**: `events_organizer` (Display Name: `Events Organizer`).
+  - **Capabilities**: `manage_events_organizer`, `manage_matchmaker` (for analytics access), standard post/event capabilities (`edit_events`, `publish_events`, `delete_events`, `upload_files`, etc.).
+  - **Restricted wp-admin Access**: Events Organizers only see and can only access the Events CPT menu (`edit.php?post_type={$cpt_slug}`), its submenus (All Events, Add New, Categories/Taxonomies, Join Click Analytics `matchmaking-event-clicks`), and edit their own profile (`profile.php`).
+  - Matchmaking top-level menu (`matchmaking-pool`), WordPress core menus, and third-party menus (PMPro, Elementor) are stripped.
+  - Direct navigation to unauthorized screens redirects to `admin_url('edit.php?post_type=' . $cpt_slug)`.
+  - Login redirect automatically sends Events Organizers to `admin_url('edit.php?post_type=' . $cpt_slug)`.
+

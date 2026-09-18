@@ -225,6 +225,14 @@ class AuthController
                 return admin_url();
             }
 
+            if (in_array('events_organizer', (array) $user->roles, true) || user_can($user, 'manage_events_organizer')) {
+                $cpt_slug = (string) get_option('mm_events_cpt_slug', 'event');
+                if (!empty($request) && strpos((string) $request, 'wp-admin') !== false) {
+                    return (string) $request;
+                }
+                return admin_url('edit.php?post_type=' . $cpt_slug);
+            }
+
             if (in_array('matchmaker_admin', (array) $user->roles, true) || user_can($user, 'manage_matchmaker')) {
                 if (!empty($request) && strpos((string) $request, 'wp-admin') !== false) {
                     return (string) $request;
