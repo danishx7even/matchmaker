@@ -413,7 +413,28 @@ class PortalController
         $recorded = \Matchmaker\Repository\MatchRepository::instance()->record_event_click($event_id, $user_id);
         if ($recorded) {
             $count = \Matchmaker\Repository\MatchRepository::instance()->get_event_click_count_for_user($event_id, $user_id);
-            wp_send_json_success(['event_id' => $event_id, 'user_id' => $user_id, 'click_count' => $count]);
+
+            // Retrieve event link from post meta / ACF field
+            $event_link = (string) (get_post_meta($event_id, 'event_link', true) ?: '');
+            if (empty($event_link) && function_exists('get_field')) {
+                $acf_link = get_field('event_link', $event_id);
+                if (!empty($acf_link)) {
+                    $event_link = is_array($acf_link) ? (string) ($acf_link['url'] ?? '') : (string) $acf_link;
+                }
+            }
+            if (empty($event_link)) {
+                $event_link = (string) (get_post_meta($event_id, '_event_link', true) ?: get_post_meta($event_id, 'zoom_link', true) ?: '');
+            }
+
+            $event_title = get_the_title($event_id) ?: __('Event', 'matchmaker');
+
+            wp_send_json_success([
+                'event_id'    => $event_id,
+                'user_id'     => $user_id,
+                'click_count' => $count,
+                'event_link'  => $event_link,
+                'event_title' => $event_title,
+            ]);
         } else {
             wp_send_json_error(['message' => __('Failed to record event click.', 'matchmaker')], 500);
         }

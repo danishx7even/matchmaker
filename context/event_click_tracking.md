@@ -7,9 +7,16 @@ This document defines the complete architecture and data flow for the **"Join Ev
 ## 1. Feature Overview
 
 When a member clicks a **"Join Event"** button on any event page, the system:
-1. **Intercepts** the click via a delegated JavaScript event listener without blocking default event propagation or page actions (e.g., opening an on-page off-canvas or modal).
-2. **Records** the click asynchronously in the background via a WordPress AJAX endpoint (with nonce verification and authentication gating).
-3. **Exposes** an admin analytics sub-menu under the Events CPT with:
+1. **Intercepts** the click via a delegated JavaScript event listener.
+2. **Records** the click asynchronously via a WordPress AJAX endpoint (with nonce verification and authentication gating).
+3. **Opens a Custom Modal Popup** titled **"Event Link"**:
+   - Shows the event join link retrieved from post meta `event_link` (or ACF `event_link` field / AJAX response).
+   - Left-aligned link box showing the link clearly.
+   - Action icon to **"Go to Link"** (opens the event URL in a new tab).
+   - Action icon to **"Copy Link"** (copies URL to clipboard with instant visual feedback).
+   - Fully responsive on mobile, tablet, and desktop screens.
+   - Dismissible via close icon (×), overlay click, or ESC key.
+4. **Exposes** an admin analytics sub-menu under the Events CPT with:
    - An **overview table** listing all events with total click counts.
    - A **detail page** per event showing each member, their click count, first clicked timestamp, and last clicked timestamp.
    - A **CSV export** of the detail data.
@@ -63,16 +70,26 @@ All DB interactions for this feature live in `src/Repository/MatchRepository.php
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `nonce` | string | WordPress nonce verified against `mm_track_event_nonce` |
+| `nonce` | string | WordPress nonce verified against `mm_portal_nonce` |
 | `event_id` | int | The WP post ID of the event |
 
 **Response** (JSON):
-- `{"success": true, "count": <new_click_count>}` on success.
-- `{"success": false, "message": "..."}` on nonce failure or unauthenticated access.
+```json
+{
+  "success": true,
+  "data": {
+    "event_id": 101,
+    "user_id": 5,
+    "click_count": 3,
+    "event_link": "https://zoom.us/j/...",
+    "event_title": "Arab Community Matrimonial Mixer"
+  }
+}
+```
 
 ---
 
-## 5. Frontend JavaScript (`assets/js/member-portal.js`)
+## 5. Frontend JavaScript (`assets/js/member-portal.js`) & Modal System
 
 ### Delegated Event Listener
 
@@ -80,32 +97,38 @@ All DB interactions for this feature live in `src/Repository/MatchRepository.php
 document.addEventListener('click', function(e) {
     var joinBtn = e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn');
     if (joinBtn) {
+        e.preventDefault();
+
         var eventCard = joinBtn.closest('[data-event-id]') || joinBtn.querySelector('[data-event-id]');
         var eventId = eventCard ? parseInt(eventCard.getAttribute('data-event-id'), 10) : 0;
 
-        if (!eventId) {
-            var directId = joinBtn.getAttribute('data-event-id');
-            if (directId) {
-                eventId = parseInt(directId, 10);
-            }
-        }
+        var cardWithLink = joinBtn.closest('[data-event-link]') || joinBtn;
+        var initialLink = cardWithLink ? cardWithLink.getAttribute('data-event-link') : '';
+        var titleEl = eventCard ? eventCard.querySelector('.mm-event-card-title, h2, h3') : null;
+        var initialTitle = titleEl ? titleEl.textContent.trim() : '';
 
-        if (eventId > 0) {
-            MM_Portal.trackEventClick(eventId);
-        }
-        // Do NOT call e.preventDefault() so off-canvas / popup triggers open uninterruptedly
+        MM_Portal.openEventLinkModal(eventId, initialLink, initialTitle);
     }
 });
 ```
 
-### `MM_Portal.trackEventClick(eventId)`
+### `MM_Portal.openEventLinkModal(eventId, initialLink, initialTitle)`
+1. Dynamically constructs `#mm-event-link-modal` if not already present in the DOM.
+2. Immediately populates with initial data attributes (if present) and opens the modal with smooth CSS animation.
+3. Dispatches background `fetch` to `mm_track_event_click` to record the click count and resolve the latest `event_link` and `event_title`.
+4. Enables the "Go to Link" button (`target="_blank"`) and configures copy-to-clipboard.
 
-1. Fires an asynchronous `fetch` POST with `keepalive: true` to `wp.ajaxurl` with `action=mm_track_event_click`, `nonce`, and `event_id`.
-2. Operates non-blockingly without delaying or preventing any DOM triggers (e.g. opening off-canvas panels).
+### `MM_Portal.copyEventLink()`
+- Copies URL to clipboard using `navigator.clipboard.writeText()` (with fallback to `document.execCommand('copy')`).
+- Provides 2-second visual feedback: button turns sage green with a checkmark icon and tooltip updates to "Copied! ✓".
 
-### `data-event-id` Convention
+### Modal Dismissal
+- Clicking the close button (`.mm-modal-close-btn`).
+- Clicking the background backdrop overlay.
+- Pressing the `Escape` key.
 
-The event card container (or the `.join-btn` wrapper itself) carries a `data-event-id` attribute with the WP post ID of the event. The JS reads this via `joinBtn.closest('[data-event-id]')?.dataset.eventId` or `joinBtn.getAttribute('data-event-id')`.
+### `data-event-id` & `data-event-link` Conventions
+Event containers carry `data-event-id` (WordPress event post ID) and optional `data-event-link` attributes. The JS reads these via `.closest()`.
 
 ---
 

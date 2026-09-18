@@ -263,6 +263,250 @@
         },
 
         /**
+         * Initialize Event Link Modal in DOM if not already present
+         */
+        initEventLinkModal: function () {
+            var existingModal = document.getElementById('mm-event-link-modal');
+            if (existingModal) return existingModal;
+
+            var modalHtml = [
+                '<div id="mm-event-link-modal" class="mm-modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="mm-event-modal-title">',
+                '    <div class="mm-modal-dialog">',
+                '        <div class="mm-modal-header">',
+                '            <h3 id="mm-event-modal-title" class="mm-modal-title">',
+                '                <span class="mm-modal-title-icon">',
+                '                    <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">',
+                '                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>',
+                '                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>',
+                '                    </svg>',
+                '                </span>',
+                '                Event Link',
+                '            </h3>',
+                '            <button type="button" class="mm-modal-close-btn" id="mm-modal-close-btn" aria-label="Close modal">&times;</button>',
+                '        </div>',
+                '        <div class="mm-modal-body">',
+                '            <div class="mm-modal-event-name" id="mm-event-modal-name" style="display:none;"></div>',
+                '            <div class="mm-event-link-container">',
+                '                <input type="text" readonly class="mm-event-link-input" id="mm-event-link-val" value="" placeholder="Loading link...">',
+                '                <div class="mm-event-link-actions">',
+                '                    <a href="#" target="_blank" rel="noopener noreferrer" class="mm-modal-icon-btn mm-btn-open-link" id="mm-event-open-link-btn" title="Go to Link" aria-label="Go to Link">',
+                '                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">',
+                '                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>',
+                '                            <polyline points="15 3 21 3 21 9"></polyline>',
+                '                            <line x1="10" y1="14" x2="21" y2="3"></line>',
+                '                        </svg>',
+                '                        <span class="mm-btn-tooltip">Go to Link</span>',
+                '                    </a>',
+                '                    <button type="button" class="mm-modal-icon-btn mm-btn-copy-link" id="mm-event-copy-link-btn" title="Copy Link" aria-label="Copy Link">',
+                '                        <svg id="mm-copy-icon-svg" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">',
+                '                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>',
+                '                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>',
+                '                        </svg>',
+                '                        <span class="mm-btn-tooltip" id="mm-event-copy-tooltip">Copy Link</span>',
+                '                    </button>',
+                '                </div>',
+                '            </div>',
+                '            <p class="mm-modal-hint" id="mm-event-modal-hint">Click the external icon to open the link or copy it directly.</p>',
+                '        </div>',
+                '    </div>',
+                '</div>'
+            ].join('\n');
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            var modal = document.getElementById('mm-event-link-modal');
+
+            // Close on overlay click
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) {
+                    MM_Portal.closeEventLinkModal();
+                }
+            });
+
+            // Close on close button click
+            var closeBtn = document.getElementById('mm-modal-close-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function () {
+                    MM_Portal.closeEventLinkModal();
+                });
+            }
+
+            // Copy button click
+            var copyBtn = document.getElementById('mm-event-copy-link-btn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', function () {
+                    MM_Portal.copyEventLink();
+                });
+            }
+
+            // Escape key closes modal
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    MM_Portal.closeEventLinkModal();
+                }
+            });
+
+            return modal;
+        },
+
+        /**
+         * Open the custom Event Link modal and record the click.
+         *
+         * @param {number} eventId Event post ID.
+         * @param {string} [initialLink] Immediate link if available in DOM.
+         * @param {string} [initialTitle] Event title if available.
+         */
+        openEventLinkModal: function (eventId, initialLink, initialTitle) {
+            var modal = MM_Portal.initEventLinkModal();
+            if (!modal) return;
+
+            var linkInput = document.getElementById('mm-event-link-val');
+            var openBtn = document.getElementById('mm-event-open-link-btn');
+            var nameEl = document.getElementById('mm-event-modal-name');
+            var hintEl = document.getElementById('mm-event-modal-hint');
+
+            // Populate initial state
+            if (initialTitle) {
+                nameEl.textContent = initialTitle;
+                nameEl.style.display = 'block';
+            } else {
+                nameEl.style.display = 'none';
+            }
+
+            var cleanInitial = (initialLink && initialLink !== '#' && !initialLink.startsWith('javascript:')) ? initialLink : '';
+            if (cleanInitial) {
+                linkInput.value = cleanInitial;
+                if (openBtn) {
+                    openBtn.href = cleanInitial;
+                    openBtn.style.pointerEvents = 'auto';
+                    openBtn.style.opacity = '1';
+                }
+                if (hintEl) hintEl.textContent = 'Click the external icon to open the link or copy it directly.';
+            } else {
+                linkInput.value = 'Loading event link...';
+                if (openBtn) {
+                    openBtn.href = '#';
+                    openBtn.style.pointerEvents = 'none';
+                    openBtn.style.opacity = '0.5';
+                }
+                if (hintEl) hintEl.textContent = 'Retrieving event join details...';
+            }
+
+            // Open modal immediately
+            modal.classList.add('mm-modal-active');
+            modal.setAttribute('aria-hidden', 'false');
+
+            // Record click and fetch full link via AJAX
+            if (eventId && eventId > 0) {
+                var ajaxUrl = (window.mmPortalData && window.mmPortalData.ajaxUrl)
+                    ? window.mmPortalData.ajaxUrl
+                    : '/wp-admin/admin-ajax.php';
+                var nonce = (window.mmPortalData && window.mmPortalData.nonce)
+                    ? window.mmPortalData.nonce
+                    : '';
+
+                var data = new FormData();
+                data.append('action', 'mm_track_event_click');
+                data.append('event_id', eventId);
+                data.append('nonce', nonce);
+
+                fetch(ajaxUrl, {
+                    method: 'POST',
+                    body: data,
+                    credentials: 'same-origin',
+                    keepalive: true
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (json) {
+                    if (json && json.success && json.data) {
+                        var resolvedLink = json.data.event_link || cleanInitial || '';
+                        if (resolvedLink) {
+                            linkInput.value = resolvedLink;
+                            if (openBtn) {
+                                openBtn.href = resolvedLink;
+                                openBtn.style.pointerEvents = 'auto';
+                                openBtn.style.opacity = '1';
+                            }
+                            if (hintEl) hintEl.textContent = 'Click the external icon to open the link or copy it directly.';
+                        } else {
+                            linkInput.value = 'Link not available yet';
+                            if (openBtn) {
+                                openBtn.href = '#';
+                                openBtn.style.pointerEvents = 'none';
+                                openBtn.style.opacity = '0.5';
+                            }
+                            if (hintEl) hintEl.textContent = 'The link for this event will be published closer to the scheduled time.';
+                        }
+
+                        if (json.data.event_title && !initialTitle) {
+                            nameEl.textContent = json.data.event_title;
+                            nameEl.style.display = 'block';
+                        }
+                    }
+                })
+                .catch(function () {
+                    if (!cleanInitial) {
+                        linkInput.value = 'Link not available yet';
+                    }
+                });
+            }
+        },
+
+        /**
+         * Close Event Link Modal
+         */
+        closeEventLinkModal: function () {
+            var modal = document.getElementById('mm-event-link-modal');
+            if (modal) {
+                modal.classList.remove('mm-modal-active');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+        },
+
+        /**
+         * Copy Event Link to Clipboard
+         */
+        copyEventLink: function () {
+            var linkInput = document.getElementById('mm-event-link-val');
+            if (!linkInput || !linkInput.value || linkInput.value.indexOf('http') === -1) {
+                return;
+            }
+
+            var url = linkInput.value.trim();
+            var copyBtn = document.getElementById('mm-event-copy-link-btn');
+            var tooltip = document.getElementById('mm-event-copy-tooltip');
+            var iconSvg = document.getElementById('mm-copy-icon-svg');
+
+            var showCopiedState = function () {
+                if (copyBtn) copyBtn.classList.add('mm-copied');
+                if (tooltip) tooltip.textContent = 'Copied! ✓';
+                if (iconSvg) {
+                    iconSvg.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+                }
+
+                setTimeout(function () {
+                    if (copyBtn) copyBtn.classList.remove('mm-copied');
+                    if (tooltip) tooltip.textContent = 'Copy Link';
+                    if (iconSvg) {
+                        iconSvg.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+                    }
+                }, 2000);
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(showCopiedState).catch(function () {
+                    // Fallback
+                    linkInput.select();
+                    document.execCommand('copy');
+                    showCopiedState();
+                });
+            } else {
+                linkInput.select();
+                document.execCommand('copy');
+                showCopiedState();
+            }
+        },
+
+        /**
          * Track "Join Event" click and record click asynchronously in the background.
          *
          * @param {number} eventId Event post ID.
@@ -289,9 +533,7 @@
                 body: data,
                 credentials: 'same-origin',
                 keepalive: true
-            }).catch(function () {
-                // Silently handle any network errors so off-canvas / UI is never blocked
-            });
+            }).catch(function () {});
         }
     };
 
@@ -344,9 +586,11 @@
                 return;
             }
 
-            // 3. Event "Join Event" Click Tracking — Record click in background without blocking off-canvas
+            // 3. Event "Join Event" Click Tracking — Open custom Event Link modal popup & save click data
             var joinBtn = e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn');
             if (joinBtn) {
+                e.preventDefault();
+
                 var eventCard = joinBtn.closest('[data-event-id]') || joinBtn.querySelector('[data-event-id]');
                 var eventId = eventCard ? parseInt(eventCard.getAttribute('data-event-id'), 10) : 0;
 
@@ -357,10 +601,21 @@
                     }
                 }
 
-                if (eventId > 0) {
-                    MM_Portal.trackEventClick(eventId);
+                // Resolve immediate link from dataset or child link
+                var cardWithLink = joinBtn.closest('[data-event-link]') || joinBtn;
+                var initialLink = cardWithLink ? cardWithLink.getAttribute('data-event-link') : '';
+                if (!initialLink) {
+                    var linkEl = joinBtn.querySelector('a') || (joinBtn.tagName === 'A' ? joinBtn : null);
+                    if (linkEl) {
+                        initialLink = linkEl.getAttribute('href') || linkEl.href || '';
+                    }
                 }
-                // Do NOT call e.preventDefault() so off-canvas / popup triggers open uninterruptedly
+
+                // Resolve event title if available
+                var titleEl = eventCard ? eventCard.querySelector('.mm-event-card-title, h2, h3, .elementor-heading-title') : null;
+                var initialTitle = titleEl ? titleEl.textContent.trim() : '';
+
+                MM_Portal.openEventLinkModal(eventId, initialLink, initialTitle);
             }
         });
 

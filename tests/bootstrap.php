@@ -617,6 +617,18 @@ function wp_verify_nonce($nonce, $action = -1) {
     return !empty($nonce);
 }
 
+function check_ajax_referer($action = -1, $query_arg = false, $die = true) {
+    $nonce = '';
+    if ($query_arg && isset($_REQUEST[$query_arg])) {
+        $nonce = $_REQUEST[$query_arg];
+    } elseif (isset($_REQUEST['_ajax_nonce'])) {
+        $nonce = $_REQUEST['_ajax_nonce'];
+    } elseif (isset($_REQUEST['_wpnonce'])) {
+        $nonce = $_REQUEST['_wpnonce'];
+    }
+    return !empty($nonce);
+}
+
 function wp_trim_words($text, $num_words = 55, $more = null) {
     $words = explode(' ', (string) $text);
     if (count($words) > $num_words) {

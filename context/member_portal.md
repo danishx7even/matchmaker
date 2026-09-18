@@ -77,9 +77,9 @@ The **Profile tab** (`tab-profile.php`) renders all member self criteria and pre
 
 ---
 
-## 5. Join Event Click Tracking
+## 5. Join Event Click Tracking & Event Link Modal
 
-The `member-portal.js` file includes a delegated event listener that tracks clicks on **"Join Event"** buttons across the site asynchronously in the background, allowing on-page off-canvas or popups to open without interference.
+The `member-portal.js` file includes a delegated event listener that handles clicks on **"Join Event"** buttons across the site, recording analytics in the database and presenting a responsive "Event Link" custom modal.
 
 ### Selector
 ```javascript
@@ -87,16 +87,18 @@ e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-ac
 ```
 The primary selector is `.join-btn` — the Elementor widget class applied to the Join Event button widget.
 
-### Background Tracking Flow
-1. The delegated listener detects a click on `.join-btn` or related selectors.
-2. `e.preventDefault()` is **not** called, allowing default browser/theme event handlers (such as opening an off-canvas drawer or modal on the page) to run without interruption.
-3. `MM_Portal.trackEventClick(eventId)` sends an asynchronous `fetch` POST with `keepalive: true` to `wp_ajax_mm_track_event_click`.
-4. The click count is recorded for the user and event in `wp_matchmaker_event_clicks`.
+### Interactive Modal Flow
+1. Clicking `.join-btn` intercepts the default click and immediately opens the custom `#mm-event-link-modal` popup.
+2. The modal displays the event title, the event join link (from meta field `event_link` or ACF), and two interactive action icons:
+   - **Go to Link (↗)**: Opens the event URL directly in a new tab.
+   - **Copy Link (📋)**: Copies the URL to clipboard with 2-second "Copied! ✓" visual feedback.
+3. In the background, `MM_Portal.openEventLinkModal()` sends a `fetch` POST to `wp_ajax_mm_track_event_click`, saving the click count to `wp_matchmaker_event_clicks` and confirming the URL.
+4. The modal is responsive and dismissible via the close button (×), background overlay click, or ESC key.
 
-### `data-event-id` Attribute Convention
-The event card container (or the `.join-btn` wrapper) carries a `data-event-id` attribute with the WordPress post ID of the event. This is read by the JS via `joinBtn.closest('[data-event-id]')?.dataset.eventId` or `joinBtn.getAttribute('data-event-id')`.
+### `data-event-id` & `data-event-link` Attribute Conventions
+The event card container (or the `.join-btn` wrapper) carries `data-event-id` and `data-event-link` attributes. This is read by the JS via `joinBtn.closest('[data-event-id]')?.dataset.eventId`.
 
 ### Nonce
-`mm_track_event_nonce` is localized via `wp_localize_script` in `PortalController`.
+`nonce` is validated against `mm_portal_nonce` in `PortalController`.
 
 For the complete event click tracking reference, see [`context/event_click_tracking.md`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/context/event_click_tracking.md).

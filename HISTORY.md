@@ -6,6 +6,19 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 99: Custom "Event Link" Modal Popup & Click Tracking Action Icons
+- **Objective**: Implement a custom responsive modal popup titled "Event Link" when `.join-btn` is clicked, displaying the event link (from `event_link` post meta/ACF) with interactive "Go to Link" and "Copy Link" action icons, while tracking the click in the database.
+- **Implemented**:
+  - `src/Frontend/PortalController.php`: Enhanced `handle_ajax_track_event_click()` to retrieve `event_link` from `event_link` post meta / ACF field and return it alongside `event_title` in the JSON response.
+  - `src/View/frontend/portal/tab-events.php`: Added `data-event-link` attribute to `.mm-event-loop-item` and `.mm-event-card` containers for instant client-side rendering.
+  - `assets/css/member-portal.css`: Created responsive modal styles for `#mm-event-link-modal` with glassmorphic dark backdrop, luxury card layout, left-aligned link box, action buttons, tooltips, and mobile responsiveness.
+  - `assets/js/member-portal.js`: Implemented `MM_Portal.initEventLinkModal()`, `openEventLinkModal()`, `closeEventLinkModal()`, and `copyEventLink()` with clipboard API + fallback, 2-second visual feedback ("Copied! ✓"), overlay click-to-close, close button (×), and ESC key handling.
+  - `tests/bootstrap.php`: Added `check_ajax_referer` mock stub.
+  - `tests/Unit/EventClickTrackingTest.php`: Added `test_ajax_track_event_click_returns_event_link` test case.
+  - `context/event_click_tracking.md` & `context/member_portal.md`: Updated feature documentation.
+- **Verification**: Ran automated test suite with **169/169 tests passing** (0 failures, 0 errors).
+
+
 ### Task 98: Non-Blocking "Join Event" Click Tracking for Off-Canvas
 - **Objective**: Adapt `.join-btn` click tracking in `member-portal.js` to support on-page off-canvas triggers without calling `e.preventDefault()`, without locking pointer events, and without performing page redirections.
 - **Implemented**:

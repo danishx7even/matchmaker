@@ -1749,4 +1749,246 @@ a.az-edit-btn:hover {
     }
 }
 
+/* ----------------------------------------------------
+   Custom Event Link Modal Popup & Actions
+---------------------------------------------------- */
+.mm-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.mm-modal-overlay.mm-modal-active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.mm-modal-dialog {
+    background: #ffffff;
+    border-radius: 20px;
+    max-width: 520px;
+    width: 100%;
+    padding: 28px 28px 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(204, 114, 63, 0.2);
+    transform: scale(0.94) translateY(8px);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+    position: relative;
+}
+
+.mm-modal-overlay.mm-modal-active .mm-modal-dialog {
+    transform: scale(1) translateY(0);
+}
+
+.mm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f0ede6;
+}
+
+.mm-modal-title {
+    font-family: 'Cormorant SC', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1D1E20;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mm-modal-title-icon {
+    display: inline-flex;
+    color: #CC723F;
+}
+
+.mm-modal-close-btn {
+    background: #f8f6f2;
+    border: 1px solid #e8e3da;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #64748b;
+    font-size: 20px;
+    line-height: 1;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.mm-modal-close-btn:hover {
+    background: #1D1E20;
+    border-color: #1D1E20;
+    color: #ffffff;
+    transform: rotate(90deg);
+}
+
+.mm-modal-event-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+
+.mm-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mm-event-link-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fbfaf8;
+    border: 1.5px solid #e8e3da;
+    border-radius: 12px;
+    padding: 8px 10px 8px 14px;
+    transition: border-color 0.2s ease;
+}
+
+.mm-event-link-container:focus-within {
+    border-color: #CC723F;
+    box-shadow: 0 0 0 3px rgba(204, 114, 63, 0.15);
+}
+
+.mm-event-link-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Inter', monospace, sans-serif;
+    font-size: 13.5px;
+    color: #1e293b;
+    width: 100%;
+    padding: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.mm-event-link-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.mm-modal-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid #e2ddd3;
+    background: #ffffff;
+    color: #1D1E20;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    padding: 0;
+    position: relative;
+}
+
+.mm-modal-icon-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.mm-modal-icon-btn:hover {
+    background: #CC723F;
+    border-color: #CC723F;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(204, 114, 63, 0.25);
+}
+
+.mm-modal-icon-btn.mm-copied {
+    background: #829067 !important;
+    border-color: #829067 !important;
+    color: #ffffff !important;
+}
+
+.mm-btn-tooltip {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1D1E20;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 10;
+}
+
+.mm-modal-icon-btn:hover .mm-btn-tooltip,
+.mm-modal-icon-btn.mm-copied .mm-btn-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.mm-modal-hint {
+    font-size: 12px;
+    color: #94a3b8;
+    margin: 4px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+@media (max-width: 480px) {
+    .mm-modal-dialog {
+        padding: 20px 18px;
+        border-radius: 16px;
+    }
+
+    .mm-modal-title {
+        font-size: 20px;
+    }
+
+    .mm-event-link-container {
+        padding: 6px 8px 6px 10px;
+    }
+
+    .mm-modal-icon-btn {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+
 

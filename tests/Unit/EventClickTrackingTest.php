@@ -296,4 +296,36 @@ final class EventClickTrackingTest extends TestCase
         $this->assertEquals('+1 (555) 234-5678', $clicks[0]['phone']);
         $this->assertEquals(3, $clicks[0]['click_count']);
     }
+
+    public function test_ajax_track_event_click_returns_event_link(): void
+    {
+        // Set up post meta for event link
+        $GLOBALS['__mm_postmeta'][101]['event_link'] = 'https://zoom.us/j/123456789';
+
+        $portal = PortalController::instance();
+
+        $_POST['nonce'] = 'valid_nonce';
+        $_POST['event_id'] = 101;
+        $GLOBALS['__mm_current_user_id'] = 5;
+
+        $sql = "SELECT click_count FROM wp_matchmaker_event_clicks WHERE event_id = 101 AND user_id = 5";
+        $GLOBALS['wpdb']->mock_vars[$sql] = '1';
+
+        // Capture output from handle_ajax_track_event_click
+        ob_start();
+        $caught = false;
+        try {
+            $portal->handle_ajax_track_event_click();
+        } catch (\RuntimeException $e) {
+            $caught = true;
+        }
+        $output = (string) ob_get_clean();
+
+        $this->assertTrue($caught, 'Expected wp_send_json_success RuntimeException');
+        $response = json_decode($output, true);
+        $this->assertIsArray($response);
+        $this->assertTrue($response['success']);
+        $this->assertEquals(101, $response['data']['event_id']);
+        $this->assertEquals('https://zoom.us/j/123456789', $response['data']['event_link']);
+    }
 }

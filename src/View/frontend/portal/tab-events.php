@@ -64,6 +64,18 @@ $total_pages  = (int) $events_query->max_num_pages;
                     }
                 }
 
+                // Resolve event link from meta / ACF
+                $event_link = (string) (get_post_meta($event_id, 'event_link', true) ?: '');
+                if (empty($event_link) && function_exists('get_field')) {
+                    $acf_link = get_field('event_link', $event_id);
+                    if (!empty($acf_link)) {
+                        $event_link = is_array($acf_link) ? (string) ($acf_link['url'] ?? '') : (string) $acf_link;
+                    }
+                }
+                if (empty($event_link)) {
+                    $event_link = (string) (get_post_meta($event_id, '_event_link', true) ?: get_post_meta($event_id, 'zoom_link', true) ?: '');
+                }
+
                 // Render via Elementor Loop Template if available
                 if (class_exists('\Elementor\Plugin') && $template_id > 0) {
                     global $post;
@@ -86,7 +98,7 @@ $total_pages  = (int) $events_query->max_num_pages;
                                 }
 
                                 $loop_content = trim($loop_content);
-                                echo '<div class="mm-event-loop-item" data-event-id="' . esc_attr((string) $event_id) . '">' . $loop_content . '</div>';
+                                echo '<div class="mm-event-loop-item" data-event-id="' . esc_attr((string) $event_id) . '" data-event-link="' . esc_url($event_link) . '">' . $loop_content . '</div>';
                                 $rendered = true;
                             }
                         }
@@ -95,7 +107,7 @@ $total_pages  = (int) $events_query->max_num_pages;
 
                 // Fallback native event card matching design system
                 if (!$rendered) : ?>
-                    <div class="mm-event-card az-card" data-event-id="<?php echo esc_attr((string) $event_id); ?>">
+                    <div class="mm-event-card az-card" data-event-id="<?php echo esc_attr((string) $event_id); ?>" data-event-link="<?php echo esc_url($event_link); ?>">
                         <?php if (!empty($thumb_url)) : ?>
                             <div class="mm-event-thumb-wrap">
                                 <a href="<?php the_permalink(); ?>">
