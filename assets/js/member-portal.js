@@ -263,28 +263,12 @@
         },
 
         /**
-         * Track "Join Event" click and then navigate user to destination URL.
+         * Track "Join Event" click and record click asynchronously in the background.
          *
          * @param {number} eventId Event post ID.
-         * @param {string} [redirectUrl] Destination link URL.
-         * @param {string} [target] Window target (_blank, etc.).
          */
-        trackEventClick: function (eventId, redirectUrl, target) {
-            var redirected = false;
-            var performRedirect = function () {
-                if (redirected) return;
-                redirected = true;
-                if (redirectUrl) {
-                    if (target === '_blank') {
-                        window.open(redirectUrl, '_blank');
-                    } else {
-                        window.location.href = redirectUrl;
-                    }
-                }
-            };
-
+        trackEventClick: function (eventId) {
             if (!eventId || eventId <= 0) {
-                performRedirect();
                 return;
             }
 
@@ -300,22 +284,13 @@
             data.append('event_id', eventId);
             data.append('nonce', nonce);
 
-            // Set safety fallback timer (600ms) so user is never stuck if network is slow
-            var safetyTimer = redirectUrl ? setTimeout(performRedirect, 600) : null;
-
             fetch(ajaxUrl, {
                 method: 'POST',
                 body: data,
                 credentials: 'same-origin',
                 keepalive: true
-            })
-            .then(function (res) {
-                if (safetyTimer) clearTimeout(safetyTimer);
-                performRedirect();
-            })
-            .catch(function () {
-                if (safetyTimer) clearTimeout(safetyTimer);
-                performRedirect();
+            }).catch(function () {
+                // Silently handle any network errors so off-canvas / UI is never blocked
             });
         }
     };
@@ -369,30 +344,23 @@
                 return;
             }
 
-            // 3. Event "Join Event" Click Tracking — Record click FIRST, then redirect
+            // 3. Event "Join Event" Click Tracking — Record click in background without blocking off-canvas
             var joinBtn = e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn');
             if (joinBtn) {
-                var eventCard = joinBtn.closest('[data-event-id]');
+                var eventCard = joinBtn.closest('[data-event-id]') || joinBtn.querySelector('[data-event-id]');
                 var eventId = eventCard ? parseInt(eventCard.getAttribute('data-event-id'), 10) : 0;
 
-                // Find destination link URL and target
-                var linkEl = e.target.closest('a') || joinBtn.querySelector('a') || (joinBtn.tagName === 'A' ? joinBtn : null);
-                var href = linkEl ? (linkEl.getAttribute('href') || linkEl.href || '') : '';
-                var target = linkEl ? (linkEl.getAttribute('target') || '') : '';
+                if (!eventId) {
+                    var directId = joinBtn.getAttribute('data-event-id');
+                    if (directId) {
+                        eventId = parseInt(directId, 10);
+                    }
+                }
 
-                var isValidUrl = href && href !== '#' && !href.startsWith('javascript:');
-
-                if (isValidUrl) {
-                    e.preventDefault();
-                    // Provide temporary feedback state
-                    joinBtn.style.pointerEvents = 'none';
-                    joinBtn.style.opacity = '0.7';
-
-                    MM_Portal.trackEventClick(eventId, href, target);
-                    return;
-                } else if (eventId > 0) {
+                if (eventId > 0) {
                     MM_Portal.trackEventClick(eventId);
                 }
+                // Do NOT call e.preventDefault() so off-canvas / popup triggers open uninterruptedly
             }
         });
 

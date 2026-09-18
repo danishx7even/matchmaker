@@ -79,7 +79,7 @@ The **Profile tab** (`tab-profile.php`) renders all member self criteria and pre
 
 ## 5. Join Event Click Tracking
 
-The `member-portal.js` file includes a delegated event listener that intercepts clicks on **"Join Event"** buttons across the site before the browser navigates to the external link (e.g. Zoom).
+The `member-portal.js` file includes a delegated event listener that tracks clicks on **"Join Event"** buttons across the site asynchronously in the background, allowing on-page off-canvas or popups to open without interference.
 
 ### Selector
 ```javascript
@@ -87,14 +87,14 @@ e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-ac
 ```
 The primary selector is `.join-btn` — the Elementor widget class applied to the Join Event button widget.
 
-### Record-Before-Redirect Flow
-1. `e.preventDefault()` stops immediate navigation.
-2. `MM_Portal.trackEventClick(eventId, redirectUrl, target)` fires a `fetch` POST to `wp_ajax_mm_track_event_click`.
-3. On AJAX response **or** 600ms safety timeout, the user is redirected via `window.open()` or `window.location.href`.
-4. A temporary visual lock (`pointer-events: none; opacity: 0.7`) is applied to the button while pending.
+### Background Tracking Flow
+1. The delegated listener detects a click on `.join-btn` or related selectors.
+2. `e.preventDefault()` is **not** called, allowing default browser/theme event handlers (such as opening an off-canvas drawer or modal on the page) to run without interruption.
+3. `MM_Portal.trackEventClick(eventId)` sends an asynchronous `fetch` POST with `keepalive: true` to `wp_ajax_mm_track_event_click`.
+4. The click count is recorded for the user and event in `wp_matchmaker_event_clicks`.
 
 ### `data-event-id` Attribute Convention
-The event card container (or the `.join-btn` wrapper) must carry a `data-event-id` attribute with the WordPress post ID of the event. This is read by the JS via `joinBtn.closest('[data-event-id]')?.dataset.eventId`.
+The event card container (or the `.join-btn` wrapper) carries a `data-event-id` attribute with the WordPress post ID of the event. This is read by the JS via `joinBtn.closest('[data-event-id]')?.dataset.eventId` or `joinBtn.getAttribute('data-event-id')`.
 
 ### Nonce
 `mm_track_event_nonce` is localized via `wp_localize_script` in `PortalController`.

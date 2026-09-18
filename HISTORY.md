@@ -6,6 +6,16 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 98: Non-Blocking "Join Event" Click Tracking for Off-Canvas
+- **Objective**: Adapt `.join-btn` click tracking in `member-portal.js` to support on-page off-canvas triggers without calling `e.preventDefault()`, without locking pointer events, and without performing page redirections.
+- **Implemented**:
+  - `assets/js/member-portal.js`: Simplified `MM_Portal.trackEventClick(eventId)` to send an asynchronous background `fetch` with `keepalive: true` to `wp_ajax_mm_track_event_click`.
+  - Removed `e.preventDefault()`, visual button lock (`pointerEvents = 'none'`), and navigation timeout from the delegated click handler so off-canvas/modal triggers on the page open seamlessly and uninterruptedly.
+  - Sourced event post ID flexibly from `joinBtn.closest('[data-event-id]')`, `joinBtn.querySelector('[data-event-id]')`, or `joinBtn.getAttribute('data-event-id')`.
+  - Updated `context/event_click_tracking.md` and `context/member_portal.md` to document the non-blocking background tracking pattern.
+- **Verification**: Ran CLI test runner with all 168 tests passing (0 failures, 0 errors).
+
+
 ### Task 97: Documentation Update — README & Context Files
 - **Objective**: Create a comprehensive `README.md` for the plugin root; update all relevant `context/` files to reflect every feature built in the plugin; add a new dedicated context file for the Event Click Tracking feature; update `AGENTS.md` directory map and context index.
 - **Constraint**: Documentation-only update. Zero changes to any feature implementation code (`.php`, `.js`, `.css`, test files).

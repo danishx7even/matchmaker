@@ -7,10 +7,9 @@ This document defines the complete architecture and data flow for the **"Join Ev
 ## 1. Feature Overview
 
 When a member clicks a **"Join Event"** button on any event page, the system:
-1. **Intercepts** the click via a delegated JavaScript event listener before the browser navigates to the Zoom/external link.
-2. **Records** the click asynchronously via a WordPress AJAX endpoint (with nonce verification and authentication gating).
-3. **Redirects** the user to the external link after recording (or after a 600ms safety timeout if the AJAX call stalls).
-4. **Exposes** an admin analytics sub-menu under the Events CPT with:
+1. **Intercepts** the click via a delegated JavaScript event listener without blocking default event propagation or page actions (e.g., opening an on-page off-canvas or modal).
+2. **Records** the click asynchronously in the background via a WordPress AJAX endpoint (with nonce verification and authentication gating).
+3. **Exposes** an admin analytics sub-menu under the Events CPT with:
    - An **overview table** listing all events with total click counts.
    - A **detail page** per event showing each member, their click count, first clicked timestamp, and last clicked timestamp.
    - A **CSV export** of the detail data.
@@ -79,27 +78,34 @@ All DB interactions for this feature live in `src/Repository/MatchRepository.php
 
 ```javascript
 document.addEventListener('click', function(e) {
-    const joinBtn = e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn');
-    if (!joinBtn) return;
+    var joinBtn = e.target.closest('.join-btn, #join-btn, [data-event-action="join"], .mm-event-action-btn');
+    if (joinBtn) {
+        var eventCard = joinBtn.closest('[data-event-id]') || joinBtn.querySelector('[data-event-id]');
+        var eventId = eventCard ? parseInt(eventCard.getAttribute('data-event-id'), 10) : 0;
 
-    const link = e.target.closest('a') || joinBtn.querySelector('a');
-    if (!link) return;
+        if (!eventId) {
+            var directId = joinBtn.getAttribute('data-event-id');
+            if (directId) {
+                eventId = parseInt(directId, 10);
+            }
+        }
 
-    e.preventDefault();
-    MM_Portal.trackEventClick(eventId, link.href, link.target);
-}, true);  // capture phase to ensure we intercept before navigation
+        if (eventId > 0) {
+            MM_Portal.trackEventClick(eventId);
+        }
+        // Do NOT call e.preventDefault() so off-canvas / popup triggers open uninterruptedly
+    }
+});
 ```
 
-### `MM_Portal.trackEventClick(eventId, redirectUrl, target)`
+### `MM_Portal.trackEventClick(eventId)`
 
-1. Sets `pointer-events: none; opacity: 0.7` on the button (visual lock).
-2. Fires a `fetch` POST to `wp.ajaxurl` with `action=mm_track_event_click`, `nonce`, `event_id`.
-3. On `.then()` **or** after a 600ms safety timeout: performs `window.open(redirectUrl, target)` / `window.location.href = redirectUrl`.
-4. Removes the visual lock after redirect is initiated.
+1. Fires an asynchronous `fetch` POST with `keepalive: true` to `wp.ajaxurl` with `action=mm_track_event_click`, `nonce`, and `event_id`.
+2. Operates non-blockingly without delaying or preventing any DOM triggers (e.g. opening off-canvas panels).
 
 ### `data-event-id` Convention
 
-The event card container (or the `.join-btn` wrapper itself) must carry a `data-event-id` attribute with the WP post ID of the event. The JS reads this via `joinBtn.closest('[data-event-id]')?.dataset.eventId`.
+The event card container (or the `.join-btn` wrapper itself) carries a `data-event-id` attribute with the WP post ID of the event. The JS reads this via `joinBtn.closest('[data-event-id]')?.dataset.eventId` or `joinBtn.getAttribute('data-event-id')`.
 
 ---
 
