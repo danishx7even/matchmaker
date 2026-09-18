@@ -6,6 +6,18 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 101: Convert Modal Actions to Anchor Tags & Redesign SVG Icons
+- **Objective**: Convert both action elements in the Event Link modal to `<a>` tags and refine the SVG icons for optimal geometric clarity.
+- **Implemented**:
+  - `assets/js/member-portal.js`: Converted the copy action from `<button>` to `<a href="#" role="button" class="mm-modal-icon-btn mm-btn-copy-link">`, with `e.preventDefault()` in the click event listener.
+  - Redesigned SVG icons with modern stroke-based paths:
+    - Launch/External Link: Clean square box with diagonal arrow (`<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line>`).
+    - Copy: Overlapping documents geometry (`<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`).
+    - Copied: Clean checkmark outline (`<polyline points="20 6 9 17 4 12"></polyline>`).
+  - `assets/css/member-portal.css`: Normalized `a.mm-modal-icon-btn` with `text-decoration: none !important;` across all normal, hover, active, and copied states.
+- **Verification**: Ran automated test suite with **169/169 tests passing** (0 failures, 0 errors).
+
+
 ### Task 100: Event Link Modal Icon Design & Active State Styling Refinement
 - **Objective**: Fix SVG icon styling in `member-portal.css` so outline icons are crisp and clean (`fill: none; stroke: currentColor;`), ensure hover states turn icons to pure white, and eliminate green background colors on active/copied states.
 - **Implemented**:
