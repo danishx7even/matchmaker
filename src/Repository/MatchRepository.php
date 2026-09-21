@@ -434,6 +434,93 @@ class MatchRepository
         return (int) get_user_meta($user_id, 'cycle_matches_count', true);
     }
 
+    /**
+     * Recalculate and update the active monthly cycle match count for a user based on actual matches.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return int Recalculated match count.
+     */
+    public function recalculate_user_quota(int $user_id): int
+    {
+        global $wpdb;
+        $pool_table    = $wpdb->prefix . 'matchmaking_pool';
+        $matches_table = $wpdb->prefix . 'matches';
+
+        // Check user type
+        $pool = $this->get_user_pool($user_id);
+        $user_type = is_array($pool) ? ($pool['user_type'] ?? '') : '';
+        if (empty($user_type)) {
+            $user_type = (string) $wpdb->get_var($wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $user_id));
+        }
+        if (empty($user_type)) {
+            $user_type = (string) get_user_meta($user_id, 'user_type', true);
+        }
+
+        // Free and Event users have no monthly quota restriction
+        if (in_array($user_type, ['free', 'event'], true)) {
+            delete_user_meta($user_id, 'cycle_matches_count');
+            return 0;
+        }
+
+        $current_month = gmdate('Y-m');
+
+        // Count approved/matched/rejected/expired matches approved or created in the active cycle month
+        $count = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$matches_table}
+             WHERE (user_one_id = %d OR user_two_id = %d)
+               AND status IN ('approved', 'matched', 'rejected', 'expired')
+               AND (
+                   (approved_at IS NOT NULL AND DATE_FORMAT(approved_at, '%%Y-%%m') = %s)
+                   OR (approved_at IS NULL AND DATE_FORMAT(created_at, '%%Y-%%m') = %s)
+               )",
+            $user_id,
+            $user_id,
+            $current_month,
+            $current_month
+        ));
+
+        update_user_meta($user_id, 'cycle_matches_count', $count);
+        update_user_meta($user_id, 'mm_cycle_month', $current_month);
+
+        return $count;
+    }
+
+    /**
+     * Recalculate monthly cycle quota counters for all active monthly members.
+     *
+     * @return array<string, mixed> Summary of updated members and counts.
+     */
+    public function recalculate_all_user_quotas(): array
+    {
+        global $wpdb;
+        $pool_table = $wpdb->prefix . 'matchmaking_pool';
+
+        $monthly_user_ids = $wpdb->get_col("SELECT user_id FROM {$pool_table} WHERE user_type = 'monthly'");
+        if (empty($monthly_user_ids)) {
+            $usermeta_table   = $wpdb->usermeta;
+            $monthly_user_ids = $wpdb->get_col($wpdb->prepare(
+                "SELECT user_id FROM {$usermeta_table} WHERE meta_key = 'user_type' AND meta_value = %s",
+                'monthly'
+            ));
+        }
+
+        $results = [];
+        $updated = 0;
+        if (!empty($monthly_user_ids)) {
+            $monthly_user_ids = array_unique(array_map('intval', (array) $monthly_user_ids));
+            foreach ($monthly_user_ids as $uid) {
+                $count = $this->recalculate_user_quota($uid);
+                $results[$uid] = $count;
+                $updated++;
+            }
+        }
+
+        return [
+            'updated_count' => $updated,
+            'user_quotas'   => $results,
+        ];
+    }
+
     // =========================================================================
     // POOL METHODS (wp_matchmaking_pool)
     // =========================================================================

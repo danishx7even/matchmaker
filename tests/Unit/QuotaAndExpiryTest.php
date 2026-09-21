@@ -258,5 +258,77 @@ final class QuotaAndExpiryTest extends TestCase
         $this->assertFalse($block_result['success']);
         $this->assertStringContainsString('10-match monthly quota', $block_result['message']);
     }
+
+    public function test_recalculate_user_quota_and_all_quotas(): void
+    {
+        $repo = MatchRepository::instance();
+        $cur_month = gmdate('Y-m');
+
+        // Setup 1: Monthly User 801 who had 0 counter in meta due to historical bug, but has 3 approved/matched matches
+        $u801 = 801;
+        update_user_meta($u801, 'cycle_matches_count', 0);
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 801"] = [
+            'user_id'   => 801,
+            'user_type' => 'monthly',
+        ];
+
+        $sql801 = $GLOBALS['wpdb']->prepare(
+            "SELECT COUNT(*) FROM wp_matches
+             WHERE (user_one_id = %d OR user_two_id = %d)
+               AND status IN ('approved', 'matched', 'rejected', 'expired')
+               AND (
+                   (approved_at IS NOT NULL AND DATE_FORMAT(approved_at, '%%Y-%%m') = %s)
+                   OR (approved_at IS NULL AND DATE_FORMAT(created_at, '%%Y-%%m') = %s)
+               )",
+            801,
+            801,
+            $cur_month,
+            $cur_month
+        );
+        $GLOBALS['wpdb']->mock_vars[$sql801] = 3;
+
+        $count801 = $repo->recalculate_user_quota(801);
+        $this->assertEquals(3, $count801);
+        $this->assertEquals(3, (int) get_user_meta(801, 'cycle_matches_count', true));
+        $this->assertEquals($cur_month, get_user_meta(801, 'mm_cycle_month', true));
+
+        // Setup 2: Free User 802 - should return 0 and delete quota meta
+        update_user_meta(802, 'cycle_matches_count', 5);
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 802"] = [
+            'user_id'   => 802,
+            'user_type' => 'free',
+        ];
+        $count802 = $repo->recalculate_user_quota(802);
+        $this->assertEquals(0, $count802);
+        $this->assertEquals('', get_user_meta(802, 'cycle_matches_count', true));
+
+        // Setup 3: Recalculate all monthly users
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 803"] = [
+            'user_id'   => 803,
+            'user_type' => 'monthly',
+        ];
+        $sql803 = $GLOBALS['wpdb']->prepare(
+            "SELECT COUNT(*) FROM wp_matches
+             WHERE (user_one_id = %d OR user_two_id = %d)
+               AND status IN ('approved', 'matched', 'rejected', 'expired')
+               AND (
+                   (approved_at IS NOT NULL AND DATE_FORMAT(approved_at, '%%Y-%%m') = %s)
+                   OR (approved_at IS NULL AND DATE_FORMAT(created_at, '%%Y-%%m') = %s)
+               )",
+            803,
+            803,
+            $cur_month,
+            $cur_month
+        );
+        $GLOBALS['wpdb']->mock_vars[$sql803] = 1;
+
+        $GLOBALS['wpdb']->mock_cols["SELECT user_id FROM wp_matchmaking_pool WHERE user_type = 'monthly'"] = [801, 803];
+
+        $summary = $repo->recalculate_all_user_quotas();
+        $this->assertEquals(2, $summary['updated_count']);
+        $this->assertEquals(3, $summary['user_quotas'][801]);
+        $this->assertEquals(1, $summary['user_quotas'][803]);
+    }
 }
+
 

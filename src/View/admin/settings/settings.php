@@ -391,6 +391,24 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                 </table>
             </div>
 
+            <!-- Quota Reconciliation & Counter Sync Tool -->
+            <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
+                <h2 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px; display:flex; align-items:center; gap:8px;">
+                    🔄 <?php esc_html_e('Quota Counter Reconciliation & Synchronization', 'matchmaker'); ?>
+                </h2>
+                <p style="color:#555; font-size:13px; line-height:1.5;">
+                    <?php esc_html_e('Recalculates and synchronizes the active monthly cycle match counter (cycle_matches_count) for all monthly tier members based on their actual approved, matched, and active matches in the current cycle month. Free and Event tier members remain uncounted and unconstrained.', 'matchmaker'); ?>
+                </p>
+                <div style="margin:12px 0 16px; padding:12px 16px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:13px; color:#0369a1; line-height:1.5;">
+                    ℹ️ <strong><?php esc_html_e('How Quota is Counted:', 'matchmaker'); ?></strong> <?php esc_html_e('Quota is incremented whenever an admin approves a match for a monthly user. When members accept and transition to a mutual match, the quota remains counted for that monthly cycle. Running this tool heals and recalculates counters from historical match records.', 'matchmaker'); ?>
+                </div>
+                <div>
+                    <button type="button" class="button button-secondary" onclick="if(confirm('<?php echo esc_js(__('Are you sure you want to recalculate quota counters for all monthly members from active match records?', 'matchmaker')); ?>')) { document.getElementById('mm_recalculate_quotas_form').submit(); }" style="font-weight:600; padding:4px 16px; height:auto; line-height:28px;">
+                        🔄 <?php esc_html_e('Recalculate & Sync All Member Quotas', 'matchmaker'); ?>
+                    </button>
+                </div>
+            </div>
+
             <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
                 <h2 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">
                     <?php esc_html_e('Member Portal Events Configuration', 'matchmaker'); ?>
@@ -775,6 +793,11 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <input type="hidden" name="mm_reset_test_data" value="1">
         </form>
     <?php endif; ?>
+
+    <form method="post" action="" id="mm_recalculate_quotas_form" style="display:none;">
+        <?php wp_nonce_field('mm_recalculate_quotas_nonce'); ?>
+        <input type="hidden" name="mm_recalculate_quotas" value="1">
+    </form>
 </div>
 
 <script>

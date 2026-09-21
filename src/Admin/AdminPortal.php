@@ -552,6 +552,18 @@ class AdminPortal
             return;
         }
 
+        // 1b. Recalculate Quotas POST action
+        if (isset($_POST['mm_recalculate_quotas'])) {
+            check_admin_referer('mm_recalculate_quotas_nonce');
+            $stats = $repo->recalculate_all_user_quotas();
+            $msg   = sprintf(
+                __('Successfully recalculated and synchronized monthly match counters for %d monthly members.', 'matchmaker'),
+                $stats['updated_count']
+            );
+            add_settings_error('mm_admin_notices', 'quotas_recalculated_success', $msg, 'updated');
+            return;
+        }
+
         // 2. Save settings POST action
         if (isset($_POST['mm_save_settings'])) {
             check_admin_referer('mm_save_settings_nonce');

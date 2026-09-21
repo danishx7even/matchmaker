@@ -6,6 +6,26 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 107: Match Quota Counter Reconciliation Tool, CLI Script & Counter Architecture Clarification
+- **Objective**:
+  1. Clarify how match counters are tracked across match states (pending review -> approved -> matched / rejected / expired).
+  2. Implement a reconciliation engine in `MatchRepository` to recalculate and synchronize `cycle_matches_count` for all monthly members from actual matches delivered/approved in the active billing cycle month.
+  3. Expose the reconciliation tool in the Admin Settings UI under the "Quotas & Matching" tab.
+  4. Provide a standalone CLI script (`scripts/reconcile_quotas.php`) callable via `php` or `wp eval-file`.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Added `recalculate_user_quota(int $user_id): int`: Accurately queries `wp_matches` for all matches approved or matched in the active cycle month for a monthly user and updates `cycle_matches_count` and `mm_cycle_month`. For Free/Event users, clears any stale quota meta.
+    - Added `recalculate_all_user_quotas(): array`: Iterates over all active monthly members in the candidate pool, recalculates their quota, and returns a detailed summary array.
+  - `src/Admin/AdminPortal.php`:
+    - Added POST handler for `mm_recalculate_quotas` with nonce verification and admin notice feedback.
+  - `src/View/admin/settings/settings.php`:
+    - Added "Quota Counter Reconciliation & Synchronization" tool card in Tab 3 ("Quotas & Matching") with confirmation prompt and submission trigger.
+  - `scripts/reconcile_quotas.php`:
+    - Created standalone CLI script with automatic WordPress bootstrap fallback and formatted terminal table output.
+  - `tests/Unit/QuotaAndExpiryTest.php`:
+    - Added `test_recalculate_user_quota_and_all_quotas` verifying single-user recalculation, Free/Event bypass/meta cleanup, and full batch sync.
+- **Verification**: Ran full automated test suite with **186/186 tests passing** (0 failures, 0 errors).
+
 ### Task 106: Action Scheduler Initialization Lifecycle Audit & Direct Admin Access Integration
 - **Objective**: Verify that Action Scheduler is loaded at the correct initialization timing in WordPress and make it directly accessible from wp-admin.
 - **Implemented**:
