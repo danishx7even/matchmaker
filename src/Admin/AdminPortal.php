@@ -64,6 +64,8 @@ class AdminPortal
         add_action('wp_ajax_mm_count_email_recipients',   [$this, 'ajax_count_email_recipients']);
         add_action('wp_ajax_mm_send_bulk_email',          [$this, 'ajax_send_bulk_email']);
         add_action('wp_ajax_mm_save_bulk_email_default',  [$this, 'ajax_save_bulk_email_default']);
+        add_action('wp_ajax_mm_get_file_log',             [$this, 'ajax_get_file_log']);
+        add_action('wp_ajax_mm_clear_file_log',           [$this, 'ajax_clear_file_log']);
 
         // Admin bar restrictions for restricted roles
         add_action('admin_bar_menu',                      [$this, 'restrict_admin_bar_for_restricted_roles'], 999);
@@ -762,6 +764,15 @@ class AdminPortal
                 }
             }
         }
+
+        // --- DOWNLOAD FILE LOG ---
+        if ($action === 'download_file_log' && $nonce !== '') {
+            if (wp_verify_nonce($nonce, 'mm_download_file_log')) {
+                $log_type = sanitize_key($_GET['log_type'] ?? 'info');
+                $this->download_file_log($log_type);
+                exit;
+            }
+        }
     }
 
     /**
@@ -1094,6 +1105,23 @@ class AdminPortal
             . "Date: {purchase_date}</p>\n"
             . "<p><a href=\"{admin_profile_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;\">View Member in Candidate Pool &rarr;</a></p>";
         $admin_service_template          = (string) get_option('mm_email_admin_service_purchase_template', $default_admin_service_template);
+
+        // 7. File Logs Stats & Initial Content
+        $info_log_stats = [
+            'path'    => \Matchmaker\Service\FileLoggerService::get_log_file_path('info'),
+            'size'    => \Matchmaker\Service\FileLoggerService::get_log_file_size('info'),
+            'lines'   => \Matchmaker\Service\FileLoggerService::get_log_line_count('info'),
+            'mtime'   => \Matchmaker\Service\FileLoggerService::get_log_file_mtime('info'),
+            'content' => \Matchmaker\Service\FileLoggerService::get_log_content('info', 300),
+        ];
+
+        $error_log_stats = [
+            'path'    => \Matchmaker\Service\FileLoggerService::get_log_file_path('error'),
+            'size'    => \Matchmaker\Service\FileLoggerService::get_log_file_size('error'),
+            'lines'   => \Matchmaker\Service\FileLoggerService::get_log_line_count('error'),
+            'mtime'   => \Matchmaker\Service\FileLoggerService::get_log_file_mtime('error'),
+            'content' => \Matchmaker\Service\FileLoggerService::get_log_content('error', 300),
+        ];
 
         require dirname(__DIR__) . '/View/admin/settings/settings.php';
     }
@@ -1490,5 +1518,106 @@ class AdminPortal
 
         fclose($out);
         exit;
+    }
+
+    /**
+     * Download the selected log file as an attachment.
+     *
+     * @param string $log_type 'info' | 'error'
+     * @return void
+     */
+    public function download_file_log(string $log_type = 'info'): void
+    {
+        if (!current_user_can('manage_matchmaker')) {
+            wp_die(__('Unauthorized.', 'matchmaker'), 403);
+        }
+
+        $log_type  = ($log_type === 'error' || $log_type === 'errors') ? 'error' : 'info';
+        $file_path = \Matchmaker\Service\FileLoggerService::get_log_file_path($log_type);
+        $filename  = $log_type === 'error' ? 'matchmaker-error.log' : 'matchmaker-info.log';
+
+        if (!file_exists($file_path) || !is_readable($file_path)) {
+            wp_die(__('Log file does not exist or is empty.', 'matchmaker'), 404);
+        }
+
+        if (function_exists('nocache_headers')) {
+            nocache_headers();
+        }
+
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . esc_attr($filename) . '"');
+        header('Content-Length: ' . (int) filesize($file_path));
+
+        readfile($file_path);
+        exit;
+    }
+
+    /**
+     * AJAX handler: Get contents and statistics of the specified log file.
+     *
+     * @return void
+     */
+    public function ajax_get_file_log(): void
+    {
+        check_ajax_referer('mm_file_logs_nonce', 'nonce');
+
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized.', 'matchmaker')], 403);
+        }
+
+        $type      = sanitize_key($_POST['log_type'] ?? 'info');
+        $type      = ($type === 'error' || $type === 'errors') ? 'error' : 'info';
+        $max_lines = max(10, min(2000, (int) ($_POST['max_lines'] ?? 500)));
+
+        $content = \Matchmaker\Service\FileLoggerService::get_log_content($type, $max_lines);
+        $size    = \Matchmaker\Service\FileLoggerService::get_log_file_size($type);
+        $lines   = \Matchmaker\Service\FileLoggerService::get_log_line_count($type);
+        $mtime   = \Matchmaker\Service\FileLoggerService::get_log_file_mtime($type);
+        $path    = \Matchmaker\Service\FileLoggerService::get_log_file_path($type);
+
+        wp_send_json_success([
+            'type'    => $type,
+            'content' => $content,
+            'size'    => $size,
+            'lines'   => $lines,
+            'mtime'   => $mtime,
+            'path'    => $path,
+        ]);
+    }
+
+    /**
+     * AJAX handler: Clear the specified log file.
+     *
+     * @return void
+     */
+    public function ajax_clear_file_log(): void
+    {
+        check_ajax_referer('mm_file_logs_nonce', 'nonce');
+
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized.', 'matchmaker')], 403);
+        }
+
+        $type = sanitize_key($_POST['log_type'] ?? 'info');
+        $type = ($type === 'error' || $type === 'errors') ? 'error' : 'info';
+
+        $cleared = \Matchmaker\Service\FileLoggerService::clear_log($type);
+
+        if ($cleared) {
+            \Matchmaker\Service\FileLoggerService::info("Log file {$type}.log was cleared by admin user #" . get_current_user_id() . ".", ['admin_id' => get_current_user_id()], 'admin');
+            wp_send_json_success([
+                'message' => sprintf(__('%s.log has been cleared successfully.', 'matchmaker'), $type),
+                'type'    => $type,
+                'size'    => '0 B',
+                'lines'   => 0,
+                'mtime'   => __('Just now', 'matchmaker'),
+            ]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to clear log file.', 'matchmaker')]);
+        }
     }
 }

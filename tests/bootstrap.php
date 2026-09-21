@@ -325,6 +325,21 @@ function wp_kses_post($val) {
     return $val;
 }
 
+function trailingslashit($string) {
+    return untrailingslashit($string) . '/';
+}
+
+function untrailingslashit($string) {
+    return rtrim((string)$string, '/\\');
+}
+
+function wp_mkdir_p($target) {
+    if (is_dir($target)) {
+        return true;
+    }
+    return @mkdir($target, 0755, true);
+}
+
 function wp_specialchars_decode($string, $quote_style = ENT_NOQUOTES) {
     return htmlspecialchars_decode((string)$string, $quote_style);
 }

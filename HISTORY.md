@@ -6,6 +6,35 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 104: Dual File Logging System (info.log & error.log), Settings Logs Tab & Matchmaking Engine Audit
+- **Objective**: 
+  1. Add dedicated file-based logging with two separate log files (`info.log` for general info/events and `error.log` for errors/failures/exceptions) stored securely with `.htaccess` and `index.php` guards.
+  2. Expose the log viewer on the **Settings page** in a dedicated **System Logs** tab (`#tab-file-logs`), featuring dual-log switching, real-time client-side filtering, line limit selection (100–1000/All), auto-scroll, AJAX log refresh, log clear, and direct `.log` file download.
+  3. Audit automatic matchmaking behavior on questionnaire submission and profile update, clarify Action Scheduler job locations and schedules, and verify matchmaking logic and hard gates.
+- **Implemented**:
+  - `src/Service/FileLoggerService.php`:
+    - Secure storage in `wp-content/uploads/matchmaker-logs/` with `.htaccess` (`Require all denied` / `Deny from all`) and `index.php`.
+    - Implemented `info()`, `warning()`, `error()`, `debug()`, `get_log_content()`, `clear_log()`, `get_log_file_size()`, `get_log_file_mtime()`, `get_log_line_count()`, and `get_log_file_path()`.
+  - `src/Repository/MatchRepository.php`:
+    - Updated `log_event()` to automatically stream all database-logged events to `FileLoggerService` (`info.log` for success/info/notices, `error.log` for errors/warnings).
+  - `src/functions.php`:
+    - Updated `mm_enqueue_user_matching_job()` to log all Action Scheduler job dispatches and in-process fallback runs to `FileLoggerService::info()`.
+  - `src/Admin/AdminPortal.php`:
+    - Registered AJAX actions `wp_ajax_mm_get_file_log` and `wp_ajax_mm_clear_file_log`.
+    - Added `download_file_log()` and GET handler for direct log file downloads with nonce verification.
+    - Updated `render_settings_page()` to pass pre-computed log statistics (`info_log_stats`, `error_log_stats`) for seamless initial rendering.
+  - `src/View/admin/settings/settings.php`:
+    - Added 7th nav tab `📜 System Logs` (`tab-file-logs`).
+    - Added `mm-panel-file-logs` tab panel with metadata stats (file path, size, total lines, last modified), interactive log type switcher, search filter, max lines selector, auto-scroll checkbox, refresh button, download button, and clear log button.
+    - Added full client-side JavaScript for AJAX log fetching, switching, color-coded level badges (`[INFO]`, `[WARNING]`, `[ERROR]`, `[DEBUG]`), and smooth tab switching.
+  - `tests/Unit/FileLoggerTest.php`:
+    - Created unit tests verifying security barriers, file writing, info/error separation, tail read limits, log clearing, and `MatchRepository::log_event()` integration.
+  - `tests/bootstrap.php` & `tests/run_tests.php`:
+    - Added string/directory helper stubs and registered `FileLoggerTest` in test suite.
+  - `context/admin_portal.md`:
+    - Updated settings page documentation to include the System Logs tab.
+- **Verification**: Ran automated test suite with **178/178 tests passing** (0 failures, 0 errors).
+
 ### Task 103: Hide All Elementor Menus & Submenus for Events Organizer Role
 - **Objective**: Ensure all Elementor and Elementor Pro menus, submenus, and admin bar nodes are completely hidden and stripped for the `events_organizer` user role.
 - **Implemented**:

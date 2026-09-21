@@ -1770,6 +1770,31 @@ class MatchRepository
         $format = ['%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s'];
 
         $inserted = $wpdb->insert($table, $data, $format);
+
+        // Stream event to file-based logs (info.log and error.log)
+        if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+            $context_data = is_array($details) ? $details : [];
+            if ($reference_id !== null) {
+                $context_data['reference_id'] = $reference_id;
+            }
+            if ($user_id !== null) {
+                $context_data['user_id'] = $user_id;
+            }
+            if ($recipient !== null) {
+                $context_data['recipient'] = $recipient;
+            }
+
+            $log_msg = "[{$log_type}:{$event_type}] {$title}" . ($message ? " - {$message}" : "");
+
+            if ($status === 'error') {
+                \Matchmaker\Service\FileLoggerService::error($log_msg, $context_data, $log_type);
+            } elseif ($status === 'warning') {
+                \Matchmaker\Service\FileLoggerService::warning($log_msg, $context_data, $log_type);
+            } else {
+                \Matchmaker\Service\FileLoggerService::info($log_msg, $context_data, $log_type);
+            }
+        }
+
         return $inserted ? (int) $wpdb->insert_id : 0;
     }
 

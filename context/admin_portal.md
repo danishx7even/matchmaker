@@ -23,7 +23,9 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
    - **PMPro Membership Plan Connector**: Live matrix mapping PMPro levels to Matchmaker tiers.
    - **Quota & Expiration Rules**: `mm_max_cycle_matches`, `mm_match_expiry_days`, `mm_auto_match_recurrence_days`, `mm_max_candidates_per_run`.
    - **Page Routing & Elementor Integration**: `wp_dropdown_pages()` selectors for Dashboard, Questionnaire, Account, Checkout, Events pages, and Elementor Free Registration Form ID.
-   - **Approval Email Template**: WYSIWYG editor with dynamic tags (`{user_name}`, `{candidate_name}`, `{candidate_age}`, `{candidate_location}`, `{dashboard_url}`).
+   - **Approval Email & Verification Templates**: WYSIWYG editors with dynamic placeholders and sender parameters.
+   - **Bulk Email System**: Dynamic recipient filtering, message composition, and batched dispatch.
+   - **System Logs Viewer (`#tab-file-logs`)**: Dedicated dual-view log inspector for `info.log` (general events, matching jobs, emails) and `error.log` (failures, exceptions). Features real-time line filtering, line limits (100–1000/All), auto-scroll, AJAX log refresh, log clear, and direct `.log` file downloads. Logs are stored securely in `wp-content/uploads/matchmaker-logs/` with `.htaccess` and `index.php` guards.
 
 4. **Match Logs, Notifications & Diagnostics (`page=matchmaking-logs`)** — Template: `src/View/admin/logs/logs.php`:
    - **Tab 1: Match Logs** (`tab=match_logs`, template: `src/View/admin/logs/tab-match-logs.php`): Match lifecycle and background engine events with event type filters, search, pagination, and JSON metadata inspection modal.

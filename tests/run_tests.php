@@ -21,6 +21,7 @@ require_once __DIR__ . '/Unit/EmailVerificationTest.php';
 require_once __DIR__ . '/Unit/LocationCascadeTest.php';
 require_once __DIR__ . '/Unit/ExportAndBulkEmailTest.php';
 require_once __DIR__ . '/Unit/EventClickTrackingTest.php';
+require_once __DIR__ . '/Unit/FileLoggerTest.php';
 require_once __DIR__ . '/Integration/EndToEndFlowTest.php';
 require_once __DIR__ . '/Integration/FullMemberLifecycleFlowTest.php';
 require_once __DIR__ . '/Integration/ComprehensiveRegressionAndEdgeCaseTest.php';
@@ -32,6 +33,7 @@ $test_classes = [
     \Matchmaker\Tests\Unit\MatchingEngineTest::class,
     \Matchmaker\Tests\Unit\ModeAndResetTest::class,
     \Matchmaker\Tests\Unit\LoggingTest::class,
+    \Matchmaker\Tests\Unit\FileLoggerTest::class,
     \Matchmaker\Tests\Unit\ManualMatchmakerTest::class,
     \Matchmaker\Tests\Unit\NotificationAndApprovalTest::class,
     \Matchmaker\Tests\Unit\FormWizardAndShortcodesTest::class,

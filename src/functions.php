@@ -44,14 +44,23 @@ if (!function_exists('mm_enqueue_user_matching_job')) {
 
             as_schedule_single_action(time(), $hook, $args, $group);
             error_log("[Matchmaker] Scheduled Action Scheduler job for user #{$user_id} (trigger={$trigger}).");
+            if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+                \Matchmaker\Service\FileLoggerService::info("Scheduled Action Scheduler matching job for user #{$user_id} (trigger={$trigger}).", ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
+            }
 
         } elseif (function_exists('as_enqueue_async_action')) {
             as_enqueue_async_action($hook, $args, $group);
             error_log("[Matchmaker] Enqueued async AS job for user #{$user_id} (trigger={$trigger}).");
+            if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+                \Matchmaker\Service\FileLoggerService::info("Enqueued async Action Scheduler job for user #{$user_id} (trigger={$trigger}).", ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
+            }
 
         } else {
             // Action Scheduler not available — run synchronously.
             error_log("[Matchmaker] Action Scheduler unavailable. Running matching synchronously for user #{$user_id} (trigger={$trigger}).");
+            if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+                \Matchmaker\Service\FileLoggerService::info("Action Scheduler unavailable. Running matching synchronously for user #{$user_id} (trigger={$trigger}).", ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
+            }
             \Matchmaker\Core\MatchingEngine::instance()->run_matching_for_user($user_id, $trigger);
         }
     }

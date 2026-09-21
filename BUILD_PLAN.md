@@ -2,11 +2,15 @@
 
 **Status**: `IDLE`
 **Active Task**: None
-**Current Phase**: Idle / Ready for next task
+**Current Phase**: N/A
 
 ---
 
+### Objectives & Scope
+*No active tasks. Awaiting instructions.*
+
 ### Step-by-Step Checklist
-- [ ] No active task in progress.
+*No active checklist.*
+
 
 
