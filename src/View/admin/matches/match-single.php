@@ -16,6 +16,7 @@
  *   @var string               $back_url
  *   @var string               $approve_url
  *   @var string               $reject_url
+ *   @var string               $cancel_url
  *   @var string               $st
  *
  * @package Matchmaker\Admin
@@ -43,6 +44,8 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <?php if ($st === 'pending_review') : ?>
             <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-hero" style="margin-right:8px;"><?php esc_html_e('Approve Match', 'matchmaker'); ?></a>
             <a href="<?php echo esc_url($reject_url); ?>" class="button button-secondary button-hero mm-reject-link"><?php esc_html_e('Reject Match', 'matchmaker'); ?></a>
+        <?php elseif ($st === 'approved') : ?>
+            <a href="<?php echo esc_url($cancel_url); ?>" class="button button-secondary button-hero" style="color:#b91c1c;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to cancel this approved match and revert it to pending review? Member quotas will be restored.', 'matchmaker')); ?>');"><?php esc_html_e('Cancel Approval', 'matchmaker'); ?></a>
         <?php endif; ?>
     </div>
 </div>

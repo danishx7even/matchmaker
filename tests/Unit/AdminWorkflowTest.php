@@ -245,6 +245,115 @@ class AdminWorkflowTest
         unset($GLOBALS['menu']);
         delete_option('mm_events_cpt_slug');
     }
+
+    public function test_admin_handle_cancel_approved_action(): void
+    {
+        $admin_id = 1;
+        $GLOBALS['__mm_current_user_id'] = $admin_id;
+
+        $match_id = 77;
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 77"] = [
+            'id'                => 77,
+            'user_one_id'       => 501,
+            'user_two_id'       => 502,
+            'initiator_user_id' => 501,
+            'status'            => 'approved',
+            'approved_by'       => 1,
+            'approved_at'       => current_time('mysql'),
+            'user_one_response' => 'pending',
+            'user_two_response' => 'pending',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 501"] = [
+            'user_id'   => 501,
+            'user_type' => 'monthly',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 502"] = [
+            'user_id'   => 502,
+            'user_type' => 'free',
+        ];
+
+        $_GET['page']      = 'matchmaking-matches';
+        $_GET['mm_action'] = 'cancel_approved';
+        $_GET['match_id']  = '77';
+        $_GET['_wpnonce']  = wp_create_nonce('mm_cancel_approved_77');
+
+        $this->admin->handle_admin_actions();
+
+        $errors = \get_settings_errors('mm_admin_notices');
+        if (empty($errors)) {
+            throw new \RuntimeException("Expected settings error notice for cancelled_approved");
+        }
+        if (($errors[0]['code'] ?? '') !== 'cancelled_approved') {
+            throw new \RuntimeException("Expected code 'cancelled_approved', got " . ($errors[0]['code'] ?? ''));
+        }
+        if (!str_contains($errors[0]['message'] ?? '', 'Match #77 approval cancelled')) {
+            throw new \RuntimeException("Expected success message for Match #77, got " . ($errors[0]['message'] ?? ''));
+        }
+
+        unset($_GET['page'], $_GET['mm_action'], $_GET['match_id'], $_GET['_wpnonce'], $GLOBALS['__mm_current_user_id']);
+    }
+
+    public function test_matches_list_view_renders_unified_approve_reject_and_cancel_cta(): void
+    {
+        $repo = MatchRepository::instance();
+        $search = '';
+        $status = '';
+        $source = '';
+
+        $matches = [
+            [
+                'id'                => 10,
+                'user_one_id'       => 601,
+                'user_two_id'       => 602,
+                'score'             => 5,
+                'status'            => 'pending_review',
+                'match_source'      => 'auto',
+                'user_one_response' => 'pending',
+                'user_two_response' => 'pending',
+                'created_at'        => '2026-09-21 12:00:00',
+            ],
+            [
+                'id'                => 11,
+                'user_one_id'       => 601,
+                'user_two_id'       => 603,
+                'score'             => 6,
+                'status'            => 'approved',
+                'match_source'      => 'auto',
+                'user_one_response' => 'pending',
+                'user_two_response' => 'pending',
+                'created_at'        => '2026-09-21 12:00:00',
+            ],
+        ];
+
+        // User 601 is monthly, User 602 is free (previously triggered is_foe)
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 601"] = [
+            'user_id'   => 601,
+            'user_type' => 'monthly',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 602"] = [
+            'user_id'   => 602,
+            'user_type' => 'free',
+        ];
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/matches-list.php';
+        $html = (string) ob_get_clean();
+
+        // Must NOT contain Free/Event warning
+        if (str_contains($html, '⚠️ Free/Event')) {
+            throw new \RuntimeException("Expected matches list to not contain Free/Event warning badge");
+        }
+
+        // Pending match #10 must render Approve and Reject buttons
+        if (!str_contains($html, 'mm_action=approve') || !str_contains($html, 'match_id=10') || !str_contains($html, 'mm_action=reject')) {
+            throw new \RuntimeException("Expected pending match #10 to render Approve and Reject buttons");
+        }
+
+        // Approved match #11 must render View and Cancel buttons
+        if (!str_contains($html, 'view_match=11') || !str_contains($html, 'mm_action=cancel_approved') || !str_contains($html, 'mm-cancel-approval-link')) {
+            throw new \RuntimeException("Expected approved match #11 to render View and Cancel buttons");
+        }
+    }
 }
 
 

@@ -236,4 +236,36 @@ class MatchService {
 
         return $res;
     }
+
+    /**
+     * Process admin cancellation of an approved match (revert back to pending).
+     *
+     * @param int $match_id The match ID.
+     * @param int $admin_id The admin ID performing the cancellation.
+     * @return array<string, mixed> Result array.
+     */
+    public function process_admin_cancel_approved(int $match_id, int $admin_id): array
+    {
+        $repo   = MatchRepository::instance();
+        $result = $repo->cancel_approved_match($match_id, $admin_id);
+
+        if (!empty($result['success'])) {
+            $repo->log_event(
+                'match_lifecycle',
+                'admin_cancel_approved',
+                sprintf(__('Admin Cancelled Approved Match #%d', 'matchmaker'), $match_id),
+                sprintf(__('Match #%d approval was cancelled and reverted to pending review by Admin #%d. Member quotas restored.', 'matchmaker'), $match_id, $admin_id),
+                [
+                    'match_id' => $match_id,
+                    'admin_id' => $admin_id,
+                ],
+                $match_id,
+                $admin_id,
+                null,
+                'warning'
+            );
+        }
+
+        return $result;
+    }
 }

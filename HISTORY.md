@@ -2132,7 +2132,34 @@ This document maintains a chronological, step-by-step history of all features, a
   - `tests/Unit/EventClickTrackingTest.php`:
     - Added `test_export_event_clicks_csv_generation()` verifying single event CSV export data structure.
 - **Verification**:
-  - Executed automated test runner (`tests/run_tests.php`) — **all 168 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+## 2026-09-21 — Task 97: Approved Match Cancellation (Revert to Pending & Quota Rollback) & Unified Free/Event Matches Queue CTAs
+
+- **Objective**:
+  - Implement a cancellation/revert capability for approved matches so admins can safely revert accidentally approved matches back to `pending_review`.
+  - Ensure that cancelling an approved match rolls back (decrements) the monthly quota counter (`cycle_matches_count`) for both users if they are on paid/monthly tiers, clears approval metadata, and invalidates active unread approval notifications.
+  - Remove the `⚠️ Free/Event` warning badge and blockade from the Matches Queue (`matches-list.php`), rendering the standard `Approve` and `Reject` CTAs across all tiers (Monthly, Free, Event) without restrictions.
+- **Changes**:
+  - `src/Repository/MatchRepository.php`:
+    - Added `decrement_quota(int $user_id): void` to safely reduce `cycle_matches_count` down to a minimum of 0.
+    - Added `cancel_approved_match(int $match_id, int $admin_id): array` to update `status = 'pending_review'`, clear approval metadata (`approved_by`, `approved_at`, reset responses to `pending`), dismiss `match_approved` notifications, and restore quotas for both users.
+  - `src/Service/MatchService.php`:
+    - Added `process_admin_cancel_approved(int $match_id, int $admin_id): array` with structured event logging (`admin_cancel_approved`) in `wp_matchmaker_logs`.
+  - `src/Admin/AdminPortal.php`:
+    - Handled `cancel_approved` / `revert_approved` actions in `handle_admin_actions()` with nonce validation and admin settings notices.
+    - Added `$cancel_url` definition in `render_single_match_view()`.
+  - `src/View/admin/matches/matches-list.php`:
+    - Removed `is_foe` badge/blockade; unified `Approve` and `Reject` CTAs for all tiers in `pending_review`.
+    - Added `Cancel` CTA for `approved` matches with confirmation prompt.
+  - `src/View/admin/matches/match-single.php`:
+    - Added `Cancel Approval` button in the header action bar for approved matches.
+  - `src/View/admin/pool/user-single.php`:
+    - Added `Cancel` CTA alongside `View Comparison` in the candidate match history table for approved matches.
+  - `context/admin_portal.md`:
+    - Updated documentation for unified CTAs and match cancellation rules.
+  - `tests/Unit/QuotaAndExpiryTest.php` & `tests/Unit/AdminWorkflowTest.php` & `tests/bootstrap.php`:
+    - Added automated unit tests for `decrement_quota()`, `cancel_approved_match()`, `handle_admin_actions()`, and unified CTA view rendering.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 183 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
 ---
 

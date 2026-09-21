@@ -712,6 +712,19 @@ class AdminPortal
             return;
         }
 
+        // --- CANCEL APPROVED MATCH (REVERT TO PENDING) ---
+        if (($action === 'cancel_approved' || $action === 'revert_approved') && $match_id > 0 && wp_verify_nonce($nonce, 'mm_cancel_approved_' . $match_id)) {
+            $admin_id = get_current_user_id();
+            $result   = MatchService::instance()->process_admin_cancel_approved($match_id, $admin_id);
+
+            if (!empty($result['success'])) {
+                add_settings_error('mm_admin_notices', 'cancelled_approved', $result['message'] ?? sprintf(__('Match #%d approval cancelled and reverted to pending review.', 'matchmaker'), $match_id), 'updated');
+            } else {
+                add_settings_error('mm_admin_notices', 'cancel_approved_failed', $result['message'] ?? __('Failed to cancel approved match.', 'matchmaker'), 'error');
+            }
+            return;
+        }
+
         // --- CREATE MANUAL MATCH PAIR ---
         if ($action === 'create_manual_match' && wp_verify_nonce($nonce, 'mm_manual_match')) {
             $u1 = (int) ($_GET['u1'] ?? 0);
@@ -1017,6 +1030,7 @@ class AdminPortal
         $back_url    = admin_url('admin.php?page=matchmaking-matches');
         $approve_url = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&mm_action=approve&match_id=' . $match_id), 'mm_approve_' . $match_id);
         $reject_url  = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&mm_action=reject&match_id=' . $match_id), 'mm_reject_' . $match_id);
+        $cancel_url  = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&view_match=' . $match_id . '&mm_action=cancel_approved&match_id=' . $match_id), 'mm_cancel_approved_' . $match_id);
         $st          = (string) $match['status'];
 
         require dirname(__DIR__) . '/View/admin/matches/match-single.php';

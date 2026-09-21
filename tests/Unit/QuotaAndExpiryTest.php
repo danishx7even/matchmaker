@@ -122,5 +122,86 @@ final class QuotaAndExpiryTest extends TestCase
         $this->assertGreaterThanOrEqual(6, $stats['days_remaining']);
         $this->assertLessThanOrEqual(7, $stats['days_remaining']);
     }
+
+    public function test_decrement_quota_reduces_counter_and_stops_at_zero(): void
+    {
+        $repo = MatchRepository::instance();
+        $user_id = 301;
+        update_user_meta($user_id, 'mm_cycle_month', gmdate('Y-m'));
+        update_user_meta($user_id, 'cycle_matches_count', 3);
+
+        $repo->decrement_quota($user_id);
+        $this->assertEquals(2, (int) get_user_meta($user_id, 'cycle_matches_count', true));
+
+        $repo->decrement_quota($user_id);
+        $this->assertEquals(1, (int) get_user_meta($user_id, 'cycle_matches_count', true));
+
+        $repo->decrement_quota($user_id);
+        $this->assertEquals(0, (int) get_user_meta($user_id, 'cycle_matches_count', true));
+
+        // Decrementing when 0 should remain 0
+        $repo->decrement_quota($user_id);
+        $this->assertEquals(0, (int) get_user_meta($user_id, 'cycle_matches_count', true));
+    }
+
+    public function test_cancel_approved_match_reverts_status_and_rolls_back_quota(): void
+    {
+        $repo    = MatchRepository::instance();
+        $service = MatchService::instance();
+        $u1_id   = 401;
+        $u2_id   = 402;
+        $admin_id= 1;
+        $match_id= 99;
+
+        // Set monthly cycle quota for both users
+        update_user_meta($u1_id, 'mm_cycle_month', gmdate('Y-m'));
+        update_user_meta($u1_id, 'cycle_matches_count', 4);
+        update_user_meta($u2_id, 'mm_cycle_month', gmdate('Y-m'));
+        update_user_meta($u2_id, 'cycle_matches_count', 2);
+
+        // Mock pool records (both monthly tier)
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 401"] = [
+            'user_id'   => 401,
+            'user_type' => 'monthly',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 402"] = [
+            'user_id'   => 402,
+            'user_type' => 'monthly',
+        ];
+
+        // Mock approved match
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 99"] = [
+            'id'                    => 99,
+            'user_one_id'           => 401,
+            'user_two_id'           => 402,
+            'initiator_user_id'     => 401,
+            'status'                => 'approved',
+            'approved_by'           => 1,
+            'approved_at'           => current_time('mysql'),
+            'user_one_response'     => 'pending',
+            'user_two_response'     => 'pending',
+        ];
+
+        // Attempt cancel through MatchService
+        $result = $service->process_admin_cancel_approved(99, $admin_id);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('reverted to pending review', $result['message']);
+
+        // Check that quotas are decremented
+        $this->assertEquals(3, (int) get_user_meta($u1_id, 'cycle_matches_count', true));
+        $this->assertEquals(1, (int) get_user_meta($u2_id, 'cycle_matches_count', true));
+
+        // Test cancelling a non-approved match fails
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 100"] = [
+            'id'          => 100,
+            'user_one_id' => 401,
+            'user_two_id' => 402,
+            'status'      => 'pending_review',
+        ];
+        $fail_result = $service->process_admin_cancel_approved(100, $admin_id);
+        $this->assertFalse($fail_result['success']);
+        $this->assertStringContainsString('Only approved matches can be cancelled', $fail_result['message']);
+    }
 }
 

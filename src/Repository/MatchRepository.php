@@ -401,6 +401,20 @@ class MatchRepository
     }
 
     /**
+     * Decrement the cycle_matches_count counter for a user (e.g. when an approved match is cancelled).
+     *
+     * @param int $user_id WordPress user ID.
+     * @return void
+     */
+    public function decrement_quota(int $user_id): void
+    {
+        $current_val = $this->maybe_reset_monthly_quota($user_id);
+        if ($current_val > 0) {
+            update_user_meta($user_id, 'cycle_matches_count', $current_val - 1);
+        }
+    }
+
+    /**
      * Check and reset monthly quota if user has entered a new PMPro cycle month.
      *
      * @param int $user_id WordPress user ID.
@@ -1475,6 +1489,82 @@ class MatchRepository
             return true;
         }
         return false;
+    }
+
+    /**
+     * Cancel an approved match and revert it back to pending_review (admin action).
+     *
+     * Resets status, clears approval metadata, dismisses notifications, and restores quotas.
+     *
+     * @param int $match_id Match record ID.
+     * @param int $admin_id The admin user ID performing the cancellation.
+     * @return array<string, mixed> Result array with success flag, message, match_id, u1_id, u2_id.
+     */
+    public function cancel_approved_match(int $match_id, int $admin_id): array
+    {
+        global $wpdb;
+        $table      = $wpdb->prefix . 'matches';
+        $pool_table = $wpdb->prefix . 'matchmaking_pool';
+
+        $match = $this->find_match_by_id($match_id);
+        if (!$match) {
+            return ['success' => false, 'message' => __('Match record not found.', 'matchmaker')];
+        }
+
+        if (($match['status'] ?? '') !== 'approved') {
+            return [
+                'success' => false,
+                'message' => sprintf(__('Only approved matches can be cancelled and reverted to pending. Current status: %s.', 'matchmaker'), (string) ($match['status'] ?? 'unknown')),
+            ];
+        }
+
+        $u1_id = (int) $match['user_one_id'];
+        $u2_id = (int) $match['user_two_id'];
+
+        $updated = $wpdb->update(
+            $table,
+            [
+                'status'                => 'pending_review',
+                'approved_by'           => null,
+                'approved_at'           => null,
+                'user_one_response'     => 'pending',
+                'user_two_response'     => 'pending',
+                'user_one_responded_at' => null,
+                'user_two_responded_at' => null,
+                'updated_at'            => current_time('mysql'),
+            ],
+            ['id' => $match_id],
+            ['%s', null, null, '%s', '%s', null, null, '%s'],
+            ['%d']
+        );
+
+        if ($updated === false) {
+            return ['success' => false, 'message' => __('Database error while cancelling match.', 'matchmaker')];
+        }
+
+        // Dismiss unread match_approved notifications
+        $this->dismiss_notifications_for_match($match_id, 'match_approved');
+
+        // Roll back / decrement quota for both members if they are on paid/monthly tiers
+        $p1 = $this->get_user_pool($u1_id);
+        $p2 = $this->get_user_pool($u2_id);
+        $t1 = is_array($p1) ? ($p1['user_type'] ?? 'free') : 'free';
+        $t2 = is_array($p2) ? ($p2['user_type'] ?? 'free') : 'free';
+
+        if (!in_array($t1, ['free', 'event'], true)) {
+            $this->decrement_quota($u1_id);
+        }
+        if (!in_array($t2, ['free', 'event'], true)) {
+            $this->decrement_quota($u2_id);
+        }
+
+        return [
+            'success'  => true,
+            'message'  => sprintf(__('Match #%d approval cancelled and reverted to pending review. Member quotas restored.', 'matchmaker'), $match_id),
+            'match_id' => $match_id,
+            'u1_id'    => $u1_id,
+            'u2_id'    => $u2_id,
+        ];
     }
 
     /**

@@ -558,6 +558,23 @@ function the_title_attribute(array|string $args = ''): void {
     echo esc_attr($GLOBALS['post']->post_title ?? '');
 }
 
+function add_settings_error(string $setting, string $code, string $message, string $type = 'error'): void {
+    $GLOBALS['__mm_settings_errors'][] = [
+        'setting' => $setting,
+        'code'    => $code,
+        'message' => $message,
+        'type'    => $type,
+    ];
+}
+
+function get_settings_errors(string $setting = '', bool $sanitize = false): array {
+    $errors = $GLOBALS['__mm_settings_errors'] ?? [];
+    if (empty($setting)) {
+        return $errors;
+    }
+    return array_values(array_filter($errors, fn($err) => ($err['setting'] ?? '') === $setting));
+}
+
 function has_post_thumbnail($post = null): bool {
     return !empty($GLOBALS['__mm_mock_post_thumbnail']);
 }

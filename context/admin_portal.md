@@ -41,12 +41,16 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
 
 ---
 
-## 2. Match Approval & Quota Enforcement Rules
-- **Approve Action**: Transitions status to `approved`, sets `approved_at` timestamp, increments initiator's `cycle_matches_count` by 1, logs persistent notification and structured log event, and dispatches approval email.
-- **Quota Limit Gate**: If initiator's `cycle_matches_count >= mm_max_cycle_matches` (default: 10), approval is blocked with an admin warning notice.
-- **Info-Only Gating (Free / Event Tiers)**:
-  - If **either** User 1 or User 2 is in `free` or `event` tier, the match is rendered for information only.
-  - The Approve button is replaced with an `Info Only (Free/Event)` badge to prevent free users from consuming paid match workflows.
+## 2. Match Approval, Cancellation & Quota Enforcement Rules
+- **Approve Action**: Transitions status to `approved`, sets `approved_at` timestamp, increments initiator's `cycle_matches_count` by 1 (for monthly/paid tiers), logs persistent notification and structured log event, and dispatches approval email.
+- **Quota Limit Gate**: For paid monthly tiers, if initiator's `cycle_matches_count >= mm_max_cycle_matches` (default: 10), approval is blocked with an admin warning notice.
+- **Unified CTAs Across Tiers (Free, Monthly, Event)**:
+  - Matches for Free and Event tiers display the standard `Approve` and `Reject` buttons, allowing admins to deliver matches to basic and event members as desired without quota gating.
+- **Cancel Approval Action (`cancel_approved`)**:
+  - Reverts an `approved` match back to `pending_review`.
+  - Clears approval metadata (`approved_by = NULL`, `approved_at = NULL`) and resets user responses to `pending`.
+  - Automatically invalidates active unread `match_approved` notifications for both users.
+  - Decrements / restores the monthly quota (`cycle_matches_count`) for both users if they are on monthly paid tiers.
 - **Reject Action**: Sets status to `admin_rejected`. Preserves initiator quota.
 
 ---
