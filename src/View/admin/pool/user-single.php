@@ -58,8 +58,10 @@ $photo3 = $meta['user_photo3'] ?? '';
         </h2>
         <p class="description" style="margin:0;">
             <strong><?php esc_html_e('Email:', 'matchmaker'); ?></strong> <?php echo esc_html($user_obj->user_email); ?> &nbsp;|&nbsp; 
-            <strong><?php esc_html_e('Phone:', 'matchmaker'); ?></strong> <?php echo esc_html($meta['phone_number'] ?: 'N/A'); ?> &nbsp;|&nbsp; 
-            <strong><?php esc_html_e('Monthly Quota Used:', 'matchmaker'); ?></strong> <?php echo (int) $quota_used; ?> / <?php echo (int) $repo->get_max_cycle_matches(); ?>
+            <strong><?php esc_html_e('Phone:', 'matchmaker'); ?></strong> <?php echo esc_html($meta['phone_number'] ?: 'N/A'); ?>
+            <?php if (($pool['user_type'] ?? 'free') === 'monthly') : ?>
+                &nbsp;|&nbsp; <strong><?php esc_html_e('Monthly Quota Used:', 'matchmaker'); ?></strong> <?php echo (int) $quota_used; ?> / <?php echo (int) $repo->get_max_cycle_matches(); ?>
+            <?php endif; ?>
         </p>
     </div>
     <div>

@@ -354,6 +354,62 @@ class AdminWorkflowTest
             throw new \RuntimeException("Expected approved match #11 to render View and Cancel buttons");
         }
     }
+
+    public function test_pool_list_view_renders_quota_column(): void
+    {
+        $repo = MatchRepository::instance();
+        $search = '';
+        $gender = '';
+        $tier = '';
+
+        $u_monthly = 901;
+        $u_free    = 902;
+
+        update_user_meta($u_monthly, 'mm_cycle_month', gmdate('Y-m'));
+        update_user_meta($u_monthly, 'cycle_matches_count', 4);
+
+        $candidates = [
+            [
+                'user_id'          => $u_monthly,
+                'birth_date'       => '1992-04-12',
+                'gender'           => 'female',
+                'user_type'        => 'monthly',
+                'city'             => 'Dubai',
+                'country'          => 'UAE',
+                'approved_matches' => 2,
+                'pending_matches'  => 1,
+            ],
+            [
+                'user_id'          => $u_free,
+                'birth_date'       => '1995-08-20',
+                'gender'           => 'male',
+                'user_type'        => 'free',
+                'city'             => 'Riyadh',
+                'country'          => 'Saudi Arabia',
+                'approved_matches' => 0,
+                'pending_matches'  => 0,
+            ],
+        ];
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/pool/pool-list.php';
+        $html = (string) ob_get_clean();
+
+        // Must contain Quota column header
+        if (!str_contains($html, '>Quota<')) {
+            throw new \RuntimeException("Expected pool-list.php to contain 'Quota' column header");
+        }
+
+        // Monthly user 901 must show '4 / 10'
+        if (!str_contains($html, '4 / 10')) {
+            throw new \RuntimeException("Expected pool-list.php to show '4 / 10' for monthly user");
+        }
+
+        // Free user 902 must show '—'
+        if (!str_contains($html, '—')) {
+            throw new \RuntimeException("Expected pool-list.php to show '—' for free user");
+        }
+    }
 }
 
 

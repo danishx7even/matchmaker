@@ -60,8 +60,10 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
             <strong><?php esc_html_e('Gender:', 'matchmaker'); ?></strong> <?php echo esc_html(ucfirst($pool['gender'])); ?> &nbsp;|&nbsp; 
             <strong><?php esc_html_e('Age:', 'matchmaker'); ?></strong> <?php echo esc_html($user_age . ' yrs'); ?> &nbsp;|&nbsp; 
             <strong><?php esc_html_e('Location:', 'matchmaker'); ?></strong> <?php echo esc_html($user_country_disp); ?> &nbsp;|&nbsp; 
-            <strong><?php esc_html_e('Citizenship:', 'matchmaker'); ?></strong> <?php echo esc_html($meta['user_citizenship'] ?? '—'); ?> &nbsp;|&nbsp; 
-            <strong><?php esc_html_e('Quota Used:', 'matchmaker'); ?></strong> <?php echo $quota_used; ?> / <?php echo (int) $repo->get_max_cycle_matches(); ?>
+            <strong><?php esc_html_e('Citizenship:', 'matchmaker'); ?></strong> <?php echo esc_html($meta['user_citizenship'] ?? '—'); ?>
+            <?php if (($pool['user_type'] ?? 'free') === 'monthly') : ?>
+                &nbsp;|&nbsp; <strong><?php esc_html_e('Quota Used:', 'matchmaker'); ?></strong> <?php echo $quota_used; ?> / <?php echo (int) $repo->get_max_cycle_matches(); ?>
+            <?php endif; ?>
         </p>
     </div>
 </div>

@@ -130,13 +130,14 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
             <th><?php esc_html_e('Age', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Location', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Tier & Services', 'matchmaker'); ?></th>
+            <th style="width:80px; text-align:center;"><?php esc_html_e('Quota', 'matchmaker'); ?></th>
             <th><?php esc_html_e('Active Matches', 'matchmaker'); ?></th>
             <th style="width:100px; text-align:center;"><?php esc_html_e('Actions', 'matchmaker'); ?></th>
         </tr>
     </thead>
     <tbody>
         <?php if (empty($candidates)) : ?>
-            <tr><td colspan="8"><?php esc_html_e('No candidates found in pool.', 'matchmaker'); ?></td></tr>
+            <tr><td colspan="9"><?php esc_html_e('No candidates found in pool.', 'matchmaker'); ?></td></tr>
         <?php else : ?>
             <?php foreach ($candidates as $c) :
                 $uid = (int) ($c['user_id'] ?? 0);
@@ -193,6 +194,16 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
                                 </div>
                             <?php endif; ?>
                         </div>
+                    </td>
+                    <td style="text-align:center;">
+                        <?php if (($c['user_type'] ?? 'free') === 'monthly') : 
+                            $user_quota = $repo->maybe_reset_monthly_quota($uid);
+                            $max_quota  = (int) $repo->get_max_cycle_matches();
+                        ?>
+                            <span style="font-weight:600; color:#0f172a;"><?php echo $user_quota; ?> / <?php echo $max_quota; ?></span>
+                        <?php else : ?>
+                            <span style="color:#94a3b8;">—</span>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <span class="mm-count-approved"><?php echo $approved_cnt; ?> <?php esc_html_e('approved', 'matchmaker'); ?></span> / 

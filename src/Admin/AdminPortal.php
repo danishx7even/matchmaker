@@ -882,7 +882,7 @@ class AdminPortal
 
         $age          = $repo->calc_age($pool['birth_date'] ?? '');
         $height       = $repo->cm_to_feet((int) ($pool['height_cm'] ?? 0));
-        $quota_used   = (int) get_user_meta($user_id, 'cycle_matches_count', true);
+        $quota_used   = $repo->maybe_reset_monthly_quota($user_id);
         $has_mutual   = $repo->has_mutual_match_this_month($user_id);
 
         $back_url     = admin_url('admin.php?page=matchmaking-pool');
@@ -914,7 +914,7 @@ class AdminPortal
         }
 
         $user_age   = $repo->calc_age($pool['birth_date'] ?? '');
-        $quota_used = (int) get_user_meta($user_id, 'cycle_matches_count', true);
+        $quota_used = $repo->maybe_reset_monthly_quota($user_id);
 
         // Smart default candidate gender (opposite of user gender if pref_gender not specified)
         $pref_g = trim((string)($pool['pref_gender'] ?? ''));

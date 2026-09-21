@@ -1421,19 +1421,51 @@ class MatchRepository
             return ['success' => false, 'message' => __('Match record not found.', 'matchmaker')];
         }
 
-        // Quota gate: Only paid users (monthly/1-on-1) have monthly cycle quota limits
-        $initiator_id   = (int) $match['initiator_user_id'];
-        $initiator_type = (string) $wpdb->get_var(
-            $wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $initiator_id)
-        );
+        $u1_id = (int) $match['user_one_id'];
+        $u2_id = (int) $match['user_two_id'];
 
-        $current_quota = 0;
-        if (!in_array($initiator_type, ['free', 'event'], true)) {
-            $current_quota = $this->maybe_reset_monthly_quota($initiator_id);
-            $max_quota     = $this->get_max_cycle_matches();
+        $p1 = $this->get_user_pool($u1_id);
+        $p2 = $this->get_user_pool($u2_id);
+        $t1 = is_array($p1) ? ($p1['user_type'] ?? '') : '';
+        if (empty($t1)) {
+            $t1 = (string) $wpdb->get_var($wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $u1_id));
+        }
+        if (empty($t1)) {
+            $t1 = (string) get_user_meta($u1_id, 'user_type', true);
+        }
+        if (empty($t1)) {
+            $t1 = 'free';
+        }
 
-            if ($current_quota >= $max_quota) {
-                return ['success' => false, 'message' => sprintf(__('Approval blocked: This user has already used their %d-match monthly quota.', 'matchmaker'), $max_quota)];
+        $t2 = is_array($p2) ? ($p2['user_type'] ?? '') : '';
+        if (empty($t2)) {
+            $t2 = (string) $wpdb->get_var($wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $u2_id));
+        }
+        if (empty($t2)) {
+            $t2 = (string) get_user_meta($u2_id, 'user_type', true);
+        }
+        if (empty($t2)) {
+            $t2 = 'free';
+        }
+
+        $max_quota = $this->get_max_cycle_matches();
+
+        // Quota gate: Validate monthly cycle quota for both members if they are on paid/monthly tiers
+        if (!in_array($t1, ['free', 'event'], true)) {
+            $q1 = $this->maybe_reset_monthly_quota($u1_id);
+            if ($q1 >= $max_quota) {
+                $u1_obj  = get_userdata($u1_id);
+                $u1_name = $u1_obj ? $u1_obj->display_name : "User #{$u1_id}";
+                return ['success' => false, 'message' => sprintf(__('Approval blocked: %s has already used their %d-match monthly quota.', 'matchmaker'), $u1_name, $max_quota)];
+            }
+        }
+
+        if (!in_array($t2, ['free', 'event'], true)) {
+            $q2 = $this->maybe_reset_monthly_quota($u2_id);
+            if ($q2 >= $max_quota) {
+                $u2_obj  = get_userdata($u2_id);
+                $u2_name = $u2_obj ? $u2_obj->display_name : "User #{$u2_id}";
+                return ['success' => false, 'message' => sprintf(__('Approval blocked: %s has already used their %d-match monthly quota.', 'matchmaker'), $u2_name, $max_quota)];
             }
         }
 
@@ -1453,17 +1485,21 @@ class MatchRepository
             return ['success' => false, 'message' => __('Database error. Please try again.', 'matchmaker')];
         }
 
-        if (!in_array($initiator_type, ['free', 'event'], true)) {
-            $this->increment_quota($initiator_id);
+        // Increment quota for each member on a paid/monthly tier (skips free and event members)
+        if (!in_array($t1, ['free', 'event'], true)) {
+            $this->increment_quota($u1_id);
+        }
+
+        if (!in_array($t2, ['free', 'event'], true)) {
+            $this->increment_quota($u2_id);
         }
 
         return [
             'success'       => true,
             'message'       => sprintf(__('Match #%d approved successfully. Member notifications dispatched.', 'matchmaker'), $match_id),
-            'quota_used'    => $current_quota + 1,
             'match_id'      => $match_id,
-            'u1_id'         => (int) $match['user_one_id'],
-            'u2_id'         => (int) $match['user_two_id'],
+            'u1_id'         => $u1_id,
+            'u2_id'         => $u2_id,
         ];
     }
 
@@ -1548,8 +1584,27 @@ class MatchRepository
         // Roll back / decrement quota for both members if they are on paid/monthly tiers
         $p1 = $this->get_user_pool($u1_id);
         $p2 = $this->get_user_pool($u2_id);
-        $t1 = is_array($p1) ? ($p1['user_type'] ?? 'free') : 'free';
-        $t2 = is_array($p2) ? ($p2['user_type'] ?? 'free') : 'free';
+        $t1 = is_array($p1) ? ($p1['user_type'] ?? '') : '';
+        if (empty($t1)) {
+            $t1 = (string) $wpdb->get_var($wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $u1_id));
+        }
+        if (empty($t1)) {
+            $t1 = (string) get_user_meta($u1_id, 'user_type', true);
+        }
+        if (empty($t1)) {
+            $t1 = 'free';
+        }
+
+        $t2 = is_array($p2) ? ($p2['user_type'] ?? '') : '';
+        if (empty($t2)) {
+            $t2 = (string) $wpdb->get_var($wpdb->prepare("SELECT user_type FROM {$pool_table} WHERE user_id = %d", $u2_id));
+        }
+        if (empty($t2)) {
+            $t2 = (string) get_user_meta($u2_id, 'user_type', true);
+        }
+        if (empty($t2)) {
+            $t2 = 'free';
+        }
 
         if (!in_array($t1, ['free', 'event'], true)) {
             $this->decrement_quota($u1_id);

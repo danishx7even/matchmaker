@@ -203,5 +203,60 @@ final class QuotaAndExpiryTest extends TestCase
         $this->assertFalse($fail_result['success']);
         $this->assertStringContainsString('Only approved matches can be cancelled', $fail_result['message']);
     }
+
+    public function test_approve_match_increments_quota_for_monthly_user_when_paired_with_free_or_event(): void
+    {
+        $repo = MatchRepository::instance();
+        update_option('mm_max_cycle_matches', 10);
+
+        // Case 1: User 1 is Free (Initiator), User 2 is Monthly (Candidate)
+        $free_user_id    = 701;
+        $monthly_user_id = 702;
+
+        update_user_meta($free_user_id, 'mm_cycle_month', gmdate('Y-m'));
+        update_user_meta($free_user_id, 'cycle_matches_count', 0);
+        update_user_meta($monthly_user_id, 'mm_cycle_month', gmdate('Y-m'));
+        update_user_meta($monthly_user_id, 'cycle_matches_count', 0);
+
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 701"] = [
+            'user_id'   => 701,
+            'user_type' => 'free',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 702"] = [
+            'user_id'   => 702,
+            'user_type' => 'monthly',
+        ];
+
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 120"] = [
+            'id'                => 120,
+            'user_one_id'       => 701,
+            'user_two_id'       => 702,
+            'initiator_user_id' => 701, // Free user is initiator
+            'status'            => 'pending_review',
+        ];
+
+        $result = $repo->approve_match(120, 1);
+        $this->assertTrue($result['success']);
+
+        // Monthly user quota must be incremented to 1
+        $this->assertEquals(1, (int) get_user_meta($monthly_user_id, 'cycle_matches_count', true));
+        // Free user quota must remain 0
+        $this->assertEquals(0, (int) get_user_meta($free_user_id, 'cycle_matches_count', true));
+
+        // Case 2: Candidate (User 2) is Monthly and has reached max quota (10)
+        update_user_meta($monthly_user_id, 'cycle_matches_count', 10);
+
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 121"] = [
+            'id'                => 121,
+            'user_one_id'       => 701,
+            'user_two_id'       => 702,
+            'initiator_user_id' => 701,
+            'status'            => 'pending_review',
+        ];
+
+        $block_result = $repo->approve_match(121, 1);
+        $this->assertFalse($block_result['success']);
+        $this->assertStringContainsString('10-match monthly quota', $block_result['message']);
+    }
 }
 

@@ -2163,6 +2163,31 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-21 — Task 98: Matchmaking Quota Dual-Party Increment Bugfix, Quota Visibility Gating & Pool Browser Quota Column
+
+- **Objective**:
+  - Resolve bug where monthly users had 0 monthly quota used despite receiving approved matches (previously only `$initiator_user_id` was incremented, causing candidate monthly users paired with Free or Event initiators to never increment).
+  - Enforce dual-party quota evaluation and incrementing: upon match approval, check and increment quota for each user independently if they are on a paid/monthly tier (skipping Free and Event users).
+  - Hide matchmaking quota display for Free and Event users across admin screens (`user-single.php`, `manual-match.php`), showing it only for Monthly tier members.
+  - Add a dedicated "Quota" column to Candidate Pool Browser (`pool-list.php`), displaying `X / max_quota` for Monthly members and `—` for Free/Event members.
+  - Clarify and verify monthly quota reset lifecycle (lazy reset on new calendar month via `maybe_reset_monthly_quota()` and on PMPro subscription renewals).
+- **Changes**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `approve_match()`: resolves tiers for both `user_one_id` and `user_two_id`, enforces monthly quota limits for each paid member, and increments quota for every member on a paid/monthly tier (`!in_array($tier, ['free', 'event'])`).
+    - Updated `cancel_approved_match()`: robust fallback tier resolution for rolling back quotas.
+  - `src/Admin/AdminPortal.php`:
+    - Updated `render_pool_user_single()` and `render_manual_match_view()` to call `maybe_reset_monthly_quota()` for up-to-date counts.
+  - `src/View/admin/pool/user-single.php` & `src/View/admin/pool/manual-match.php`:
+    - Gated `Monthly Quota Used` display strictly to `user_type === 'monthly'`, hiding it for Free and Event members.
+  - `src/View/admin/pool/pool-list.php`:
+    - Added "Quota" table header (`<th style="width:80px; text-align:center;">Quota</th>`) and column rendering `X / 10` for Monthly and `—` for Free/Event.
+  - `tests/Unit/QuotaAndExpiryTest.php` & `tests/Unit/AdminWorkflowTest.php`:
+    - Added unit tests for dual-party quota increment (Free initiator + Monthly candidate, Monthly + Monthly), quota blockade on candidate reaching limit, and pool browser quota column rendering.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 185 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
 
 
 
