@@ -24,7 +24,13 @@ $is_test_mode = $repo->is_test_mode();
                 <?php esc_html_e('Audit match lifecycle events, review in-app alerts and transactional email dispatches, and inspect live candidate rejection hard gates.', 'matchmaker'); ?>
             </p>
         </div>
-        <div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <?php if (current_user_can('manage_options')) : ?>
+                <a href="<?php echo esc_url(admin_url('tools.php?page=action-scheduler&s=matchmaker')); ?>" class="button button-secondary" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; padding:4px 12px; height:auto; line-height:26px;">
+                    ⏱️ <?php esc_html_e('Scheduled Actions Queue', 'matchmaker'); ?>
+                </a>
+            <?php endif; ?>
+
             <?php if ($is_test_mode) : ?>
                 <span style="background:#fef3c7; color:#92400e; border:1px solid #f59e0b; font-weight:700; padding:6px 14px; border-radius:20px; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
                     🧪 <?php esc_html_e('Test Mode Active', 'matchmaker'); ?>

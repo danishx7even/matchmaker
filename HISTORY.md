@@ -6,6 +6,16 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 106: Action Scheduler Initialization Lifecycle Audit & Direct Admin Access Integration
+- **Objective**: Verify that Action Scheduler is loaded at the correct initialization timing in WordPress and make it directly accessible from wp-admin.
+- **Implemented**:
+  - Verified loading lifecycle in `matchmaker.php`: `vendor/woocommerce/action-scheduler/action-scheduler.php` is loaded at top-level before `plugins_loaded` fires. Action Scheduler registers its version on `plugins_loaded` priority 0 and initializes on priority 1 (`ActionScheduler::init()`), while plugin components initialize on priority 10.
+  - `src/Admin/AdminPortal.php`:
+    - Added direct `Scheduled Actions` submenu under the `Matchmaking` top-level menu in wp-admin (`tools.php?page=action-scheduler&s=matchmaker`) for administrators.
+  - `src/View/admin/logs/logs.php`:
+    - Added quick-access button `⏱️ Scheduled Actions Queue` in the header linking directly to Action Scheduler filtered for Matchmaker jobs.
+- **Verification**: Ran full automated test suite with **179/179 tests passing** (0 failures, 0 errors).
+
 ### Task 105: Clickable Social Media Links in New Tab Across Pool Browser & Member Dashboard
 - **Objective**: Make all social media links/handles clickable across the plugin so clicking opens the corresponding profile in a new tab (`target="_blank"`, `rel="noopener noreferrer"`).
 - **Implemented**:

@@ -495,6 +495,16 @@ class AdminPortal
             [$this, 'render_logs_page']
         );
 
+        if (current_user_can('manage_options')) {
+            add_submenu_page(
+                'matchmaking-pool',
+                __('Scheduled Actions', 'matchmaker'),
+                __('Scheduled Actions', 'matchmaker'),
+                'manage_options',
+                'tools.php?page=action-scheduler&s=matchmaker'
+            );
+        }
+
         $cpt_slug = (string) get_option('mm_events_cpt_slug', 'event');
         add_submenu_page(
             'edit.php?post_type=' . $cpt_slug,
