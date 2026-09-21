@@ -6,6 +6,25 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 105: Clickable Social Media Links in New Tab Across Pool Browser & Member Dashboard
+- **Objective**: Make all social media links/handles clickable across the plugin so clicking opens the corresponding profile in a new tab (`target="_blank"`, `rel="noopener noreferrer"`).
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Added `format_social_links_html(?string $raw_links)`: Intelligently parses URLs, domain-only links (`instagram.com/user`), handles (`@user`), platform prefixes (`Snapchat: user`, `IG: @user`, `LinkedIn: url`, `TikTok: @user`, `X: user`, `WhatsApp: 123456`, `Telegram: @user`), and comma/newline/semicolon-separated multi-links.
+    - Generates clickable `<a>` elements with `target="_blank" rel="noopener noreferrer"`, styled with brand `#CC723F` color and external link arrow icon.
+  - `src/View/admin/pool/user-single.php`:
+    - Formatted Social Links row in Candidate Pool profile details view.
+  - `src/View/admin/matches/match-single.php`:
+    - Added formatted Social Links row for both User 1 and User 2.
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Added formatted Social Links row to the "About Myself" card in the Member Profile dashboard.
+  - `src/View/frontend/portal/steps/step-5-contact.php`:
+    - Updated revealed Social / Handle row in the Mutual Match Step 5 celebration view to render clickable external links.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added unit test `test_format_social_links_html` covering empty states, full URLs, domain-only links, `@handles`, platform prefixes, and multi-links.
+    - Updated `test_step_5_renders_pause_subscription_cta_with_membership_url` to assert clickable `target="_blank"` link attributes.
+- **Verification**: Ran full automated test suite with **179/179 tests passing** (0 failures, 0 errors).
+
 ### Task 104: Dual File Logging System (info.log & error.log), Settings Logs Tab & Matchmaking Engine Audit
 - **Objective**: 
   1. Add dedicated file-based logging with two separate log files (`info.log` for general info/events and `error.log` for errors/failures/exceptions) stored securely with `.htaccess` and `index.php` guards.

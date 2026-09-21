@@ -72,7 +72,7 @@ if (!defined('ABSPATH')) {
                 </div>
                 <div class="contact-data-text">
                     <div class="label"><?php esc_html_e('Social / Handle', 'matchmaker'); ?></div>
-                    <div class="val"><?php echo esc_html($active_match['social_links'] ?: '—'); ?></div>
+                    <div class="val"><?php echo \Matchmaker\Repository\MatchRepository::instance()->format_social_links_html($active_match['social_links'] ?? ''); ?></div>
                 </div>
             </div>
         </div>

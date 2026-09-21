@@ -102,6 +102,109 @@ class MatchRepository
     }
 
     /**
+     * Format raw social media links or handles into clickable HTML anchor tags opening in a new tab.
+     *
+     * @param string|null $raw_links Raw text from user_social_links / social_links.
+     * @return string Sanitized HTML string of clickable link(s) or '—' if empty.
+     */
+    public function format_social_links_html(?string $raw_links): string
+    {
+        if ($raw_links === null || trim($raw_links) === '' || trim($raw_links) === '—') {
+            return '—';
+        }
+
+        // Split by newlines, commas, or semicolons
+        $tokens = preg_split('/[\r\n,;]+/', trim($raw_links));
+        if (!is_array($tokens) || empty($tokens)) {
+            $tokens = [trim($raw_links)];
+        }
+
+        $formatted_links = [];
+
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+            if ($token === '') {
+                continue;
+            }
+
+            $url   = '';
+            $label = $token;
+
+            // 1. Check if platform prefix is present (e.g. "Instagram: @user", "IG: user", "Snapchat: user", "LinkedIn: https://...")
+            if (preg_match('/^(instagram|ig|facebook|fb|linkedin|tiktok|twitter|x|snapchat|telegram|tg|youtube|whatsapp)[\s:\-]+(.*)$/i', $token, $m)) {
+                $platform = strtolower(trim($m[1]));
+                $rest     = trim($m[2]);
+
+                if (preg_match('/^https?:\/\//i', $rest)) {
+                    $url   = $rest;
+                    $label = $token;
+                } else {
+                    $clean_handle = ltrim($rest, '@');
+                    $base_url = match ($platform) {
+                        'instagram', 'ig' => 'https://instagram.com/',
+                        'facebook', 'fb'  => 'https://facebook.com/',
+                        'linkedin'        => 'https://linkedin.com/in/',
+                        'tiktok'          => 'https://tiktok.com/@',
+                        'twitter', 'x'    => 'https://x.com/',
+                        'snapchat'        => 'https://snapchat.com/add/',
+                        'telegram', 'tg'  => 'https://t.me/',
+                        'youtube'         => 'https://youtube.com/@',
+                        'whatsapp'        => 'https://wa.me/',
+                        default           => 'https://instagram.com/',
+                    };
+                    $url = $base_url . $clean_handle;
+                    $label = $token;
+                }
+            } elseif (preg_match('/^https?:\/\//i', $token)) {
+                // 2. Full URL (e.g. https://instagram.com/user)
+                $url = $token;
+                $label = $token;
+            } elseif (preg_match('/^(?:www\.)?(instagram\.com|facebook\.com|fb\.com|linkedin\.com|twitter\.com|x\.com|tiktok\.com|snapchat\.com|t\.me|telegram\.me|youtube\.com|wa\.me)\b/i', $token)) {
+                // 3. Known social domain without http(s)
+                $url = 'https://' . ltrim($token, '/');
+                $label = $token;
+            } elseif (str_starts_with($token, '@')) {
+                // 4. Handle starting with @ -> default to Instagram profile
+                $clean_handle = ltrim($token, '@');
+                $url = 'https://instagram.com/' . $clean_handle;
+                $label = $token;
+            } elseif (preg_match('/^[a-zA-Z0-9_.]+\.[a-zA-Z]{2,}(\/.*)?$/', $token)) {
+                // 5. Generic domain (e.g. "mysite.com/profile")
+                $url = 'https://' . $token;
+                $label = $token;
+            } else {
+                // 6. Plain alphanumeric handle
+                if (preg_match('/^[a-zA-Z0-9._]+$/', $token)) {
+                    $url = 'https://instagram.com/' . $token;
+                    $label = '@' . $token;
+                } else {
+                    $formatted_links[] = esc_html($token);
+                    continue;
+                }
+            }
+
+            $safe_url   = esc_url($url);
+            $safe_label = esc_html($label);
+
+            if (!empty($safe_url)) {
+                $formatted_links[] = sprintf(
+                    '<a href="%s" target="_blank" rel="noopener noreferrer" class="mm-social-link" style="color:#CC723F;text-decoration:underline;font-weight:600;display:inline-flex;align-items:center;gap:4px;word-break:break-all;">%s <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.8;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>',
+                    $safe_url,
+                    $safe_label
+                );
+            } else {
+                $formatted_links[] = $safe_label;
+            }
+        }
+
+        if (empty($formatted_links)) {
+            return '—';
+        }
+
+        return implode(', ', $formatted_links);
+    }
+
+    /**
      * Format a membership tier slug into a human-readable label.
      *
      * @param string $user_type e.g. 'monthly', 'one_on_one', 'free', 'event'.

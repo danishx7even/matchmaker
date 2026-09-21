@@ -147,6 +147,9 @@ $badge_label = $repo->format_tier_label($user_type);
             <div class="az-row"><span class="az-label"><?php esc_html_e('Career', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($pool['job'] ?? '—'); ?></span></div>
             <div class="az-row"><span class="az-label"><?php esc_html_e('Lifestyle', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html("{$smoking}, {$drinking}"); ?></span></div>
             <div class="az-row"><span class="az-label"><?php esc_html_e('Prayer Habits', 'matchmaker'); ?></span><span class="az-value"><?php echo esc_html($meta['user_prayer'] ?? '—'); ?></span></div>
+            <?php if (!empty($meta['user_social_links'])) : ?>
+                <div class="az-row"><span class="az-label"><?php esc_html_e('Social Links', 'matchmaker'); ?></span><span class="az-value"><?php echo $repo->format_social_links_html($meta['user_social_links']); ?></span></div>
+            <?php endif; ?>
         </div>
     </div>
 

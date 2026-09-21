@@ -121,7 +121,7 @@ $photo3 = $meta['user_photo3'] ?? '';
             <tr><th><?php esc_html_e('Children', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_children'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Education Level', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_education'] ?: '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Yearly Income Range', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_income'] ?: '—'); ?></td></tr>
-            <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo esc_html($meta['user_social_links'] ?: '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo $repo->format_social_links_html($meta['user_social_links'] ?? ''); ?></td></tr>
         </table>
 
         <?php if (!empty($meta['user_about_me'])) : ?>

@@ -258,6 +258,9 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Back to Profile Dashboard', $html);
         $this->assertStringContainsString('Direct Contact Information', $html);
         $this->assertStringContainsString('You will get a new match next month.', $html);
+        $this->assertStringContainsString('href="https://instagram.com/fatima_dxb"', $html);
+        $this->assertStringContainsString('target="_blank"', $html);
+        $this->assertStringContainsString('rel="noopener noreferrer"', $html);
     }
 
     public function test_portal_renders_dynamic_service_tag_and_removes_vip_banner(): void
@@ -598,7 +601,49 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Mutual Match', $html);
         $this->assertStringContainsString('mm-status-matched', $html);
     }
+
+    public function test_format_social_links_html(): void
+    {
+        $repo = MatchRepository::instance();
+
+        // 1. Empty / null / dash
+        $this->assertEquals('—', $repo->format_social_links_html(null));
+        $this->assertEquals('—', $repo->format_social_links_html(''));
+        $this->assertEquals('—', $repo->format_social_links_html('—'));
+
+        // 2. Full URL
+        $out = $repo->format_social_links_html('https://instagram.com/layla');
+        $this->assertStringContainsString('href="https://instagram.com/layla"', $out);
+        $this->assertStringContainsString('target="_blank"', $out);
+        $this->assertStringContainsString('rel="noopener noreferrer"', $out);
+
+        // 3. Domain only
+        $out_domain = $repo->format_social_links_html('facebook.com/layla.profile');
+        $this->assertStringContainsString('href="https://facebook.com/layla.profile"', $out_domain);
+        $this->assertStringContainsString('target="_blank"', $out_domain);
+
+        // 4. Handle with @
+        $out_handle = $repo->format_social_links_html('@layla_dxb');
+        $this->assertStringContainsString('href="https://instagram.com/layla_dxb"', $out_handle);
+        $this->assertStringContainsString('target="_blank"', $out_handle);
+
+        // 5. Platform prefix (Snapchat, LinkedIn, TikTok, X)
+        $out_snap = $repo->format_social_links_html('Snapchat: layla_snap');
+        $this->assertStringContainsString('href="https://snapchat.com/add/layla_snap"', $out_snap);
+
+        $out_li = $repo->format_social_links_html('LinkedIn: https://linkedin.com/in/layla-career');
+        $this->assertStringContainsString('href="https://linkedin.com/in/layla-career"', $out_li);
+
+        $out_tt = $repo->format_social_links_html('TikTok: @layla_official');
+        $this->assertStringContainsString('href="https://tiktok.com/@layla_official"', $out_tt);
+
+        // 6. Multi-link comma separated
+        $out_multi = $repo->format_social_links_html('https://instagram.com/user1, https://facebook.com/user2');
+        $this->assertStringContainsString('href="https://instagram.com/user1"', $out_multi);
+        $this->assertStringContainsString('href="https://facebook.com/user2"', $out_multi);
+    }
 }
+
 
 
 

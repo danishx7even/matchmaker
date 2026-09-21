@@ -66,6 +66,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <tr><th><?php esc_html_e('Origin', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['origin'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['religion'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['modesty'] ?? '—') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo $repo->format_social_links_html($m1['user_social_links'] ?? ''); ?></td></tr>
             <tr><th><?php esc_html_e('Response', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($match['user_one_response'] ?? 'pending')); ?></strong></td></tr>
         </table>
     </div>
@@ -88,6 +89,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <tr><th><?php esc_html_e('Origin', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['origin'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['religion'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['modesty'] ?? '—') : '—'); ?></td></tr>
+            <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo $repo->format_social_links_html($m2['user_social_links'] ?? ''); ?></td></tr>
             <tr><th><?php esc_html_e('Response', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($match['user_two_response'] ?? 'pending')); ?></strong></td></tr>
         </table>
     </div>
