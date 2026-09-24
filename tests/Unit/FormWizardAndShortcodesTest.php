@@ -140,22 +140,19 @@ class FormWizardAndShortcodesTest
 
     public function test_photo_fields_and_yearly_income_labels(): void
     {
-        // 1. Photo 1 upload has required star, required attribute, accept attribute and allowed formats hint
+        // 1. Photo 1 upload has required star, required attribute and accept attribute
         $photo1_html = $this->field_generator->render_single_field('user_photo1');
         if (!str_contains($photo1_html, 'mm-required-star') || !str_contains($photo1_html, 'Photo 1') || !str_contains($photo1_html, 'required')) {
             throw new \RuntimeException("Expected user_photo1 to have Photo 1 label and required star indicator: " . $photo1_html);
         }
-        if (!str_contains($photo1_html, '.webp') || !str_contains($photo1_html, 'Allowed formats: PNG, JPG, JPEG, WEBP')) {
-            throw new \RuntimeException("Expected user_photo1 to declare allowed formats (PNG, JPG, JPEG, WEBP): " . $photo1_html);
+        if (!str_contains($photo1_html, '.webp') || !str_contains($photo1_html, 'accept=')) {
+            throw new \RuntimeException("Expected user_photo1 to declare accept attribute with allowed formats (.webp): " . $photo1_html);
         }
 
         // 2. Photo 2 and 3 are Optional and do not have required star or required attribute
         $photo2_html = $this->field_generator->render_single_field('user_photo2');
         if (str_contains($photo2_html, 'mm-required-star') || str_contains($photo2_html, 'required>')) {
             throw new \RuntimeException("Expected user_photo2 to have no required star or required attribute: " . $photo2_html);
-        }
-        if (!str_contains($photo2_html, 'Allowed formats: PNG, JPG, JPEG, WEBP')) {
-            throw new \RuntimeException("Expected user_photo2 to declare allowed formats: " . $photo2_html);
         }
 
         $photo3_html = $this->field_generator->render_single_field('user_photo3');

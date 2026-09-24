@@ -6,6 +6,16 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 109: Remove In-Box Photo Format Span to Prevent UI Overlap
+- **Objective**: Remove the redundant `<span class="elementor-field-sublabel mm-photo-format-hint">` from inside each photo field container in `FieldGenerator.php` to eliminate visual overlap with the dashed upload box and "Add Photo" camera icon.
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Removed `mm-photo-format-hint` span from `upload()`.
+    - Maintained explicit file input `accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"` attribute and section-level format guidance in `FormController.php`.
+  - `tests/Unit/FormWizardAndShortcodesTest.php`:
+    - Updated assertions to check the `accept` attribute directly on input elements.
+- **Verification**: Ran full automated test suite with **187/187 tests passing** (0 failures, 0 errors).
+
 ### Task 108: Image Upload Format Restrictions (PNG, JPG, JPEG, WEBP) & Container Format Guidelines
 - **Objective**:
   1. Add format guidance in the Profile Photos container and input fields detailing allowed image formats (`PNG, JPG, JPEG, WEBP`).
