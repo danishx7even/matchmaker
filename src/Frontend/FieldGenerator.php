@@ -632,7 +632,8 @@ class FieldGenerator {
             $html .= ' <span class="mm-required-star" style="color:#e11d48;font-weight:700;">*</span>';
         }
         $html .= '</label>';
-        $html .= '<input type="file" accept="image/*" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field"' . (($is_mandatory && !$has_preview) ? ' required' : '') . '>';
+        $html .= '<input type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" name="form_fields[' . esc_attr($name) . ']" id="form-field-' . esc_attr($name) . '" class="elementor-field elementor-size-sm elementor-upload-field"' . (($is_mandatory && !$has_preview) ? ' required' : '') . '>';
+        $html .= '<span class="elementor-field-sublabel mm-photo-format-hint" style="font-size:11px;color:#64748b;display:block;margin-top:4px;">' . esc_html__('Allowed formats: PNG, JPG, JPEG, WEBP', 'matchmaker') . '</span>';
         if ($has_preview) { $html .= '<img src="' . esc_url($preview_url) . '" class="upload-preview-img" alt="Photo Preview">'; }
         $html .= '</div>';
         return $html;

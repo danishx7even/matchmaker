@@ -34,7 +34,7 @@ Fields collected in Step 1 (personal information):
 | Smoking Habits | Optional |
 | Drinking Habits | Optional |
 | **About Myself** | Free-text biographical description; stored in `user_about_me` usermeta |
-| **Profile Photos** | Up to 3 photos. **First photo is mandatory**; second and third are optional. Section description: *"Upload 3 clear, recent photos. Only first one is mandatory and additional photos are optional."* |
+| **Profile Photos** | Up to 3 photos. **First photo is mandatory**; second and third are optional. Allowed formats: `PNG, JPG, JPEG, WEBP`. Section description: *"Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP). Only first one is mandatory and additional photos are optional."* |
 
 ### Step 2: Partner Preferences
 Fields collected in Step 2 (ideal partner criteria):

@@ -272,6 +272,27 @@ function sanitize_title($title, $fallback_title = '', $context = 'save') {
     return strtolower(trim(preg_replace('/[^a-zA-Z0-9_\-]+/', '-', (string)$title), '-'));
 }
 
+function sanitize_file_name(string $filename): string {
+    return preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename);
+}
+
+function wp_check_filetype(string $filename, ?array $mimes = null): array {
+    $ext = pathinfo($filename, PATHINFO_EXTENSION);
+    $mime_map = [
+        'jpg'  => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png'  => 'image/png',
+        'webp' => 'image/webp',
+        'gif'  => 'image/gif',
+        'pdf'  => 'application/pdf',
+    ];
+    $ext_lower = strtolower($ext);
+    return [
+        'ext'  => $ext_lower,
+        'type' => $mime_map[$ext_lower] ?? false,
+    ];
+}
+
 function clean_user_cache($user_id) {
     return true;
 }

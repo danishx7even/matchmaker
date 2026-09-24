@@ -140,10 +140,13 @@ class FormWizardAndShortcodesTest
 
     public function test_photo_fields_and_yearly_income_labels(): void
     {
-        // 1. Photo 1 upload has required star and required attribute
+        // 1. Photo 1 upload has required star, required attribute, accept attribute and allowed formats hint
         $photo1_html = $this->field_generator->render_single_field('user_photo1');
         if (!str_contains($photo1_html, 'mm-required-star') || !str_contains($photo1_html, 'Photo 1') || !str_contains($photo1_html, 'required')) {
             throw new \RuntimeException("Expected user_photo1 to have Photo 1 label and required star indicator: " . $photo1_html);
+        }
+        if (!str_contains($photo1_html, '.webp') || !str_contains($photo1_html, 'Allowed formats: PNG, JPG, JPEG, WEBP')) {
+            throw new \RuntimeException("Expected user_photo1 to declare allowed formats (PNG, JPG, JPEG, WEBP): " . $photo1_html);
         }
 
         // 2. Photo 2 and 3 are Optional and do not have required star or required attribute
@@ -151,16 +154,22 @@ class FormWizardAndShortcodesTest
         if (str_contains($photo2_html, 'mm-required-star') || str_contains($photo2_html, 'required>')) {
             throw new \RuntimeException("Expected user_photo2 to have no required star or required attribute: " . $photo2_html);
         }
+        if (!str_contains($photo2_html, 'Allowed formats: PNG, JPG, JPEG, WEBP')) {
+            throw new \RuntimeException("Expected user_photo2 to declare allowed formats: " . $photo2_html);
+        }
 
         $photo3_html = $this->field_generator->render_single_field('user_photo3');
         if (str_contains($photo3_html, 'mm-required-star') || str_contains($photo3_html, 'required>')) {
             throw new \RuntimeException("Expected user_photo3 to have no required star or required attribute: " . $photo3_html);
         }
 
-        // 3. Photo section open has required star
-        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. Only first one is mandatory and additional photos are optional.', 'upload-section', true);
+        // 3. Photo section open has required star and format hint
+        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP). Only first one is mandatory and additional photos are optional.', 'upload-section', true);
         if (!str_contains($section_html, 'mm-required-star') || !str_contains($section_html, '*')) {
             throw new \RuntimeException("Expected photo section header to have required star indicator: " . $section_html);
+        }
+        if (!str_contains($section_html, 'Allowed formats: PNG, JPG, JPEG, WEBP')) {
+            throw new \RuntimeException("Expected photo section header to include format hint: " . $section_html);
         }
 
         // 4. Yearly Income Range labels
@@ -248,6 +257,46 @@ class FormWizardAndShortcodesTest
         if (!in_array('No Preference', $pref_prayer_options, true)) {
             throw new \RuntimeException("Expected options_pref_prayer to contain 'No Preference'");
         }
+    }
+
+    public function test_disallowed_image_formats_rejected(): void
+    {
+        // Set current user
+        $GLOBALS['__mm_current_user_id'] = 100;
+        update_user_meta(100, 'mm_email_verified', 1);
+
+        $_POST['mmf_nonce'] = 'dummy_nonce';
+        $_POST['form_fields'] = [
+            'full_name' => 'John Doe',
+            'email'     => 'john@example.com',
+            'user_gender' => 'Male',
+            'pref_gender' => 'Female',
+        ];
+
+        // Upload a disallowed .gif or .pdf file
+        $_FILES['form_fields'] = [
+            'name'     => ['user_photo1' => 'avatar.gif'],
+            'type'     => ['user_photo1' => 'image/gif'],
+            'tmp_name' => ['user_photo1' => '/tmp/avatar.gif'],
+            'error'    => ['user_photo1' => UPLOAD_ERR_OK],
+            'size'     => ['user_photo1' => 1024],
+        ];
+
+        $caught = false;
+        ob_start();
+        try {
+            $this->form_controller->handle_ajax();
+        } catch (\RuntimeException $e) {
+            $caught = ($e->getMessage() === 'wp_send_json_error');
+        }
+        $out = ob_get_clean();
+
+        if (!$caught || !str_contains($out, 'Only PNG, JPG, JPEG, and WEBP formats are allowed')) {
+            throw new \RuntimeException("Expected disallowed file format .gif to be rejected with format error message. Output: " . $out);
+        }
+
+        // Clean up
+        unset($_FILES['form_fields'], $_POST['form_fields'], $_POST['mmf_nonce']);
     }
 }
 

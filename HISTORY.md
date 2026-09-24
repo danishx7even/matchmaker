@@ -6,6 +6,29 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 108: Image Upload Format Restrictions (PNG, JPG, JPEG, WEBP) & Container Format Guidelines
+- **Objective**:
+  1. Add format guidance in the Profile Photos container and input fields detailing allowed image formats (`PNG, JPG, JPEG, WEBP`).
+  2. Enforce strict client-side validation in `matchmaking-form.js` to immediately reject and clear any selected files that do not match allowed formats, displaying clear error messaging.
+  3. Enforce strict server-side validation in `FormController.php` during submission to block and discard any disallowed file types/MIMEs.
+- **Implemented**:
+  - `src/Frontend/FieldGenerator.php`:
+    - Updated `upload()` method with explicit `accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"`.
+    - Added helper sublabel below each photo field: `Allowed formats: PNG, JPG, JPEG, WEBP`.
+  - `src/Frontend/FormController.php`:
+    - Updated Profile Photos section description to include `(Allowed formats: PNG, JPG, JPEG, WEBP)`.
+    - Added server-side validation in `handle_ajax()` rejecting files with disallowed extensions (`!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])`) or MIME types, returning an immediate descriptive JSON error.
+    - Protected media library upload loop to only process allowed image formats.
+  - `assets/js/matchmaking-form.js`:
+    - Added `isValidImageFile()` helper verifying both file extension and MIME type against allowed list.
+    - Updated file `change` event listener to immediately clear invalid files, remove previews, and alert the user with an error notice.
+    - Updated `validateStep(1)` to verify that any uploaded file adheres to allowed image formats before proceeding.
+  - `context/form_handler.md`:
+    - Updated photo section rules and guidelines.
+  - `tests/Unit/FormWizardAndShortcodesTest.php` & `tests/bootstrap.php`:
+    - Added `test_disallowed_image_formats_rejected` and verified format markup hints in unit tests.
+- **Verification**: Ran full automated test suite with **187/187 tests passing** (0 failures, 0 errors).
+
 ### Task 107: Match Quota Counter Reconciliation Tool, CLI Script & Counter Architecture Clarification
 - **Objective**:
   1. Clarify how match counters are tracked across match states (pending review -> approved -> matched / rejected / expired).

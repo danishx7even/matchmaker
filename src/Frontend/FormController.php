@@ -307,7 +307,7 @@ class FormController {
                         <?php echo $this->fg->render_single_field('user_income', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
-                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos. Only first one is mandatory and additional photos are optional.', 'upload-section', true); ?>
+                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP). Only first one is mandatory and additional photos are optional.', 'upload-section', true); ?>
                         <?php echo $this->fg->render_single_field('user_photo1', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo2', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo3', $v); ?>
@@ -482,6 +482,37 @@ class FormController {
             wp_send_json_error(['message' => __('Photo 1 is mandatory. Please provide your main profile photo.', 'matchmaker')]);
         }
 
+        // 4b. Validate image formats (Allowed: PNG, JPG, JPEG, WEBP)
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'webp'];
+        $allowed_mimes      = ['image/jpeg', 'image/png', 'image/webp', 'image/pjpeg'];
+
+        if (!empty($_FILES['form_fields']) && is_array($_FILES['form_fields']['name'] ?? null)) {
+            foreach (['user_photo1', 'user_photo2', 'user_photo3'] as $photo_k) {
+                $has_f = !empty($_FILES['form_fields']['name'][$photo_k])
+                    && (int) ($_FILES['form_fields']['error'][$photo_k] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+
+                if (!$has_f) {
+                    continue;
+                }
+
+                $filename  = sanitize_file_name((string) $_FILES['form_fields']['name'][$photo_k]);
+                $file_type = wp_check_filetype($filename, null);
+                $ext       = strtolower((string) ($file_type['ext'] ?? ''));
+                $mime      = strtolower((string) ($file_type['type'] ?? ''));
+
+                if (!in_array($ext, $allowed_extensions, true) || (!empty($mime) && !in_array($mime, $allowed_mimes, true))) {
+                    $photo_num = preg_replace('/\D/', '', $photo_k);
+                    $photo_label = $photo_num ? sprintf(__('Photo %s', 'matchmaker'), $photo_num) : __('Profile Photo', 'matchmaker');
+                    wp_send_json_error([
+                        'message' => sprintf(
+                            __('Invalid file format for %s. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'matchmaker'),
+                            $photo_label
+                        )
+                    ]);
+                }
+            }
+        }
+
         // 5. Helpers
         $sanitize_select = static function (?string $raw): string {
             if (empty($raw)) {
@@ -644,6 +675,15 @@ class FormController {
                     && (int) ($_FILES['form_fields']['error'][$photo_key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
 
                 if (!$has_file) {
+                    continue;
+                }
+
+                $filename  = sanitize_file_name((string) $_FILES['form_fields']['name'][$photo_key]);
+                $file_type = wp_check_filetype($filename, null);
+                $ext       = strtolower((string) ($file_type['ext'] ?? ''));
+                $mime      = strtolower((string) ($file_type['type'] ?? ''));
+
+                if (!in_array($ext, $allowed_extensions, true) || (!empty($mime) && !in_array($mime, $allowed_mimes, true))) {
                     continue;
                 }
 

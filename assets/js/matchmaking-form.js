@@ -695,13 +695,45 @@
     });
 
     /* -------------------------------------------------------
-       Photo file preview
+       Photo file preview & format validation
     ------------------------------------------------------- */
+    var ALLOWED_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
+    var ALLOWED_IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'image/pjpeg'];
+
+    function isValidImageFile(file) {
+        if (!file || !file.name) return false;
+        var parts = file.name.split('.');
+        if (parts.length < 2) return false;
+        var ext = parts.pop().toLowerCase();
+        if (ALLOWED_IMAGE_EXTS.indexOf(ext) === -1) {
+            return false;
+        }
+        if (file.type && ALLOWED_IMAGE_MIMES.indexOf(file.type.toLowerCase()) === -1) {
+            return false;
+        }
+        return true;
+    }
+
     form.querySelectorAll('input[type="file"]').forEach(function (input) {
         input.addEventListener('change', function () {
             var box  = input.closest('.elementor-field-group');
             var file = input.files && input.files[0];
-            if (!box || !file) return;
+            if (!box) return;
+
+            if (!file) return;
+
+            if (!isValidImageFile(file)) {
+                input.value = '';
+                var oldImg = box.querySelector('.upload-preview-img');
+                if (oldImg) oldImg.remove();
+                box.classList.remove('has-preview');
+
+                var label = box.querySelector('.elementor-field-label');
+                var photoName = label ? label.textContent.replace('*', '').trim() : 'Photo';
+                showMessage('Invalid file format for ' + photoName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'error');
+                return;
+            }
+
             var old = box.querySelector('.upload-preview-img');
             if (old) old.remove();
             var reader = new FileReader();
@@ -783,7 +815,7 @@
             }
         }
 
-        // Step 1: Validate Photo 1 only
+        // Step 1: Validate Photo 1 only and check all photo formats
         if (stepNumber == 1) {
             var pInput = form.querySelector('[name="form_fields[user_photo1]"]');
             var pBox = pInput ? pInput.closest('.elementor-field-group') : null;
@@ -792,6 +824,21 @@
             if (!hasFile && !hasPreview) {
                 showMessage('Photo 1 is mandatory. Please provide your main profile photo.', 'error');
                 return false;
+            }
+
+            var fileInputs = form.querySelectorAll('.upload-section input[type="file"], .elementor-field-type-upload input[type="file"]');
+            for (var fIdx = 0; fIdx < fileInputs.length; fIdx++) {
+                var fIn = fileInputs[fIdx];
+                if (fIn.files && fIn.files.length > 0) {
+                    var fFile = fIn.files[0];
+                    if (!isValidImageFile(fFile)) {
+                        var fBox = fIn.closest('.elementor-field-group');
+                        var fLabel = fBox ? fBox.querySelector('.elementor-field-label') : null;
+                        var fName = fLabel ? fLabel.textContent.replace('*', '').trim() : 'Photo';
+                        showMessage('Invalid file format for ' + fName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'error');
+                        return false;
+                    }
+                }
             }
         }
 
