@@ -713,16 +713,11 @@ class FormController {
             }
         }
 
-        // 11. Enqueue async matching job (for monthly/one_on_one users or admins upon profile form submit/update)
-        $user_type_meta = (string) get_user_meta($user_id, 'user_type', true);
-        $effective_type = !empty($user_type_meta) ? $user_type_meta : $user_type;
-
-        if (in_array($effective_type, ['monthly', 'one_on_one'], true) || current_user_can('manage_options')) {
-            if (function_exists('mm_enqueue_user_matching_job')) {
-                $is_update = !empty(get_user_meta($user_id, 'mm_last_match_run', true));
-                $trigger   = $is_update ? 'form_update' : 'form_submit';
-                mm_enqueue_user_matching_job($user_id, $trigger);
-            }
+        // 11. Enqueue async matching job upon profile form submit/update
+        if (function_exists('mm_enqueue_user_matching_job')) {
+            $is_update = !empty(get_user_meta($user_id, 'mm_last_match_run', true));
+            $trigger   = $is_update ? 'form_update' : 'form_submit';
+            mm_enqueue_user_matching_job($user_id, $trigger);
         }
 
         $response_data = [

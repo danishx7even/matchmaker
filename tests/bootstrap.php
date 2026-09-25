@@ -1168,7 +1168,9 @@ class Fakewpdb {
     }
 
     public function insert($table, $data, $format = null): int {
-        $this->queries[] = "INSERT INTO {$table}";
+        $cols = implode(', ', array_keys((array)$data));
+        $vals = implode(', ', array_map(static fn($v) => is_numeric($v) ? (string)$v : "'" . addslashes((string)$v) . "'", array_values((array)$data)));
+        $this->queries[] = "INSERT INTO {$table} ({$cols}) VALUES ({$vals})";
         return 1;
     }
 
@@ -1178,7 +1180,9 @@ class Fakewpdb {
     }
 
     public function replace($table, $data, $format = null): int {
-        $this->queries[] = "REPLACE INTO {$table}";
+        $cols = implode(', ', array_keys((array)$data));
+        $vals = implode(', ', array_map(static fn($v) => is_numeric($v) ? (string)$v : "'" . addslashes((string)$v) . "'", array_values((array)$data)));
+        $this->queries[] = "REPLACE INTO {$table} ({$cols}) VALUES ({$vals})";
         return 1;
     }
 }

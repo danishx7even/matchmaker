@@ -68,7 +68,7 @@ $matches_table = $wpdb->prefix . 'matches';
                     <tr><th><?php esc_html_e('Active Status:', 'matchmaker'); ?></th><td><?php echo ((int)($target_user['is_active'] ?? 1) === 1) ? '<span style="color:#16a34a; font-weight:bold;">Active (1)</span>' : '<span style="color:#dc2626; font-weight:bold;">Inactive (0)</span>'; ?></td></tr>
                     <tr><th><?php esc_html_e('Gender & Preferred:', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($target_user['gender'] ?? '—')); ?></strong> seeking <strong><?php echo esc_html(ucfirst($target_user['pref_gender'] ?? 'Any')); ?></strong></td></tr>
                     <tr><th><?php esc_html_e('Age & Preferred Range:', 'matchmaker'); ?></th><td>Age <strong><?php echo esc_html($target_age); ?></strong> (Birth: <?php echo esc_html($target_user['birth_date'] ?? '—'); ?>) | Prefers Age <strong><?php echo (int)($target_user['preferred_age_min'] ?? 18); ?> - <?php echo (int)($target_user['preferred_age_max'] ?? 99); ?></strong></td></tr>
-                    <tr><th><?php esc_html_e('Location & Preferred:', 'matchmaker'); ?></th><td>Loc: <strong><?php echo esc_html($target_user['location'] ?? '—'); ?></strong> | Pref: <strong><?php echo esc_html($target_user['pref_location'] ?? 'Any'); ?></strong></td></tr>
+                    <tr><th><?php esc_html_e('Location & Preferred:', 'matchmaker'); ?></th><td>Loc: <strong><?php echo esc_html(implode(', ', array_filter([$target_user['city'] ?? '', $target_user['state'] ?? '', $target_user['country'] ?? ''])) ?: ($target_user['location'] ?? '—')); ?></strong> | Pref Country: <strong><?php echo esc_html($target_user['pref_country'] ?? ($target_user['pref_location'] ?? 'Any')); ?></strong>, State: <strong><?php echo esc_html($target_user['pref_state'] ?? 'Any'); ?></strong>, City: <strong><?php echo esc_html($target_user['pref_city'] ?? 'Any'); ?></strong></td></tr>
                 </table>
             </div>
             <div>
@@ -98,20 +98,24 @@ $matches_table = $wpdb->prefix . 'matches';
         if (empty($candidates)) : ?>
             <p><?php esc_html_e('No other candidate profiles exist in the pool to check.', 'matchmaker'); ?></p>
         <?php else :
-            $target_gender   = strtolower(trim((string)($target_user['gender'] ?? '')));
-            $target_pref_g   = strtolower(trim((string)($target_user['pref_gender'] ?? '')));
-            $target_loc      = trim((string)($target_user['location'] ?? ''));
-            $target_pref_loc = trim((string)($target_user['pref_location'] ?? ''));
-            $target_rel      = trim((string)($target_user['religion'] ?? ''));
-            $target_pref_rel = trim((string)($target_user['pref_religion'] ?? ''));
-            $target_mod      = trim((string)($target_user['modesty'] ?? ''));
-            $target_pref_mod = trim((string)($target_user['pref_modesty'] ?? ''));
-            $target_age_min  = (int)($target_user['preferred_age_min'] ?? 18);
-            $target_age_max  = (int)($target_user['preferred_age_max'] ?? 99);
+            $target_gender       = strtolower(trim((string)($target_user['gender'] ?? '')));
+            $target_pref_g       = strtolower(trim((string)($target_user['pref_gender'] ?? '')));
+            $target_country      = trim((string)($target_user['country'] ?? ($target_user['location'] ?? '')));
+            $target_pref_country = trim((string)($target_user['pref_country'] ?? ($target_user['pref_location'] ?? '')));
+            $target_state        = trim((string)($target_user['state'] ?? ''));
+            $target_pref_state   = trim((string)($target_user['pref_state'] ?? ''));
+            $target_city         = trim((string)($target_user['city'] ?? ''));
+            $target_pref_city    = trim((string)($target_user['pref_city'] ?? ''));
+            $target_rel          = trim((string)($target_user['religion'] ?? ''));
+            $target_pref_rel     = trim((string)($target_user['pref_religion'] ?? ''));
+            $target_mod          = trim((string)($target_user['modesty'] ?? ''));
+            $target_pref_mod     = trim((string)($target_user['pref_modesty'] ?? ''));
+            $target_age_min      = (int)($target_user['preferred_age_min'] ?? 18);
+            $target_age_max      = (int)($target_user['preferred_age_max'] ?? 99);
 
             $split = static fn(?string $v) => empty($v) ? [] : array_filter(array_map('trim', explode(',', $v)));
             $in_list_ci = static fn(?string $n, ?string $h) => !empty($n) && !empty($h) && in_array(strtolower(trim($n)), array_map('strtolower', $split($h)), true);
-            $like_match = static fn(?string $v, ?string $list) => empty($v) || empty($list) || strtolower($list) === 'any' || str_contains(strtolower($list), strtolower($v));
+            $like_match = static fn(?string $v, ?string $list) => empty($v) || empty($list) || strtolower($list) === 'any' || strtolower($list) === 'any country' || strtolower($list) === 'any state' || strtolower($list) === 'any city' || str_contains(strtolower($list), strtolower($v));
 
             foreach ($candidates as $cand) :
                 $cid   = (int) $cand['user_id'];
@@ -151,15 +155,42 @@ $matches_table = $wpdb->prefix . 'matches';
                     $rejection_reasons[] = sprintf(__('Age Gate: Candidate #%d age (%d) is outside User #%d preferred age range (%d-%d)', 'matchmaker'), $cid, $cand_age_num, $selected_user_id, $target_age_min, $target_age_max);
                 }
 
-                // Gate 4: Location Bi-directional
-                $g4a_pass = empty($target_pref_loc) || strtolower($target_pref_loc) === 'any' || empty($cand['location']) || $in_list_ci($cand['location'], $target_pref_loc) || $like_match($cand['location'], $target_pref_loc);
-                $g4b_pass = empty($cand['pref_location']) || strtolower($cand['pref_location']) === 'any' || empty($target_loc) || $in_list_ci($target_loc, $cand['pref_location']) || $like_match($target_loc, $cand['pref_location']);
-                $g4_pass  = $g4a_pass && $g4b_pass;
-                if (!$g4a_pass) {
-                    $rejection_reasons[] = sprintf(__('Location Gate: Candidate location "%s" is not in User preferred locations "%s"', 'matchmaker'), $cand['location'], $target_pref_loc);
+                // Gate 4: Location Bi-directional (Country, State, City)
+                $c_country = trim((string)($cand['country'] ?? ($cand['location'] ?? '')));
+                $c_pref_country = trim((string)($cand['pref_country'] ?? ($cand['pref_location'] ?? '')));
+                $c_state = trim((string)($cand['state'] ?? ''));
+                $c_pref_state = trim((string)($cand['pref_state'] ?? ''));
+                $c_city = trim((string)($cand['city'] ?? ''));
+                $c_pref_city = trim((string)($cand['pref_city'] ?? ''));
+
+                $g4_country_a = empty($target_pref_country) || strtolower($target_pref_country) === 'any' || strtolower($target_pref_country) === 'any country' || empty($c_country) || $in_list_ci($c_country, $target_pref_country) || $like_match($c_country, $target_pref_country);
+                $g4_country_b = empty($c_pref_country) || strtolower($c_pref_country) === 'any' || strtolower($c_pref_country) === 'any country' || empty($target_country) || $in_list_ci($target_country, $c_pref_country) || $like_match($target_country, $c_pref_country);
+                
+                $g4_state_a = empty($target_pref_state) || strtolower($target_pref_state) === 'any' || strtolower($target_pref_state) === 'any state' || empty($c_state) || $in_list_ci($c_state, $target_pref_state) || $like_match($c_state, $target_pref_state);
+                $g4_state_b = empty($c_pref_state) || strtolower($c_pref_state) === 'any' || strtolower($c_pref_state) === 'any state' || empty($target_state) || $in_list_ci($target_state, $c_pref_state) || $like_match($target_state, $c_pref_state);
+
+                $g4_city_a = empty($target_pref_city) || strtolower($target_pref_city) === 'any' || strtolower($target_pref_city) === 'any city' || empty($c_city) || $in_list_ci($c_city, $target_pref_city) || $like_match($c_city, $target_pref_city);
+                $g4_city_b = empty($c_pref_city) || strtolower($c_pref_city) === 'any' || strtolower($c_pref_city) === 'any city' || empty($target_city) || $in_list_ci($target_city, $c_pref_city) || $like_match($target_city, $c_pref_city);
+
+                $g4_pass = ($g4_country_a && $g4_country_b && $g4_state_a && $g4_state_b && $g4_city_a && $g4_city_b);
+
+                if (!$g4_country_a) {
+                    $rejection_reasons[] = sprintf(__('Location Gate: Candidate country "%s" is not in User preferred countries "%s"', 'matchmaker'), $c_country, $target_pref_country);
                 }
-                if (!$g4b_pass) {
-                    $rejection_reasons[] = sprintf(__('Location Gate: User location "%s" is not in Candidate preferred locations "%s"', 'matchmaker'), $target_loc, $cand['pref_location']);
+                if (!$g4_country_b) {
+                    $rejection_reasons[] = sprintf(__('Location Gate: User country "%s" is not in Candidate preferred countries "%s"', 'matchmaker'), $target_country, $c_pref_country);
+                }
+                if (!$g4_state_a) {
+                    $rejection_reasons[] = sprintf(__('Location Gate: Candidate state "%s" is not in User preferred states "%s"', 'matchmaker'), $c_state, $target_pref_state);
+                }
+                if (!$g4_state_b) {
+                    $rejection_reasons[] = sprintf(__('Location Gate: User state "%s" is not in Candidate preferred states "%s"', 'matchmaker'), $target_state, $c_pref_state);
+                }
+                if (!$g4_city_a) {
+                    $rejection_reasons[] = sprintf(__('Location Gate: Candidate city "%s" is not in User preferred cities "%s"', 'matchmaker'), $c_city, $target_pref_city);
+                }
+                if (!$g4_city_b) {
+                    $rejection_reasons[] = sprintf(__('Location Gate: User city "%s" is not in Candidate preferred cities "%s"', 'matchmaker'), $target_city, $c_pref_city);
                 }
 
                 // Gate 5: Religion Bi-directional
@@ -247,8 +278,8 @@ $matches_table = $wpdb->prefix . 'matches';
                                 </tr>
                                 <tr>
                                     <td><strong>4. Location Gate</strong></td>
-                                    <td>Loc: <strong><?php echo esc_html($target_loc); ?></strong> | Pref: <strong><?php echo esc_html($target_pref_loc); ?></strong></td>
-                                    <td>Loc: <strong><?php echo esc_html($cand['location'] ?? '—'); ?></strong> | Pref: <strong><?php echo esc_html($cand['pref_location'] ?? 'Any'); ?></strong></td>
+                                    <td>Country: <strong><?php echo esc_html($target_country ?: '—'); ?></strong> (Pref: <?php echo esc_html($target_pref_country ?: 'Any'); ?>)<br>State: <strong><?php echo esc_html($target_state ?: '—'); ?></strong> (Pref: <?php echo esc_html($target_pref_state ?: 'Any'); ?>)<br>City: <strong><?php echo esc_html($target_city ?: '—'); ?></strong> (Pref: <?php echo esc_html($target_pref_city ?: 'Any'); ?>)</td>
+                                    <td>Country: <strong><?php echo esc_html($c_country ?: '—'); ?></strong> (Pref: <?php echo esc_html($c_pref_country ?: 'Any'); ?>)<br>State: <strong><?php echo esc_html($c_state ?: '—'); ?></strong> (Pref: <?php echo esc_html($c_pref_state ?: 'Any'); ?>)<br>City: <strong><?php echo esc_html($c_city ?: '—'); ?></strong> (Pref: <?php echo esc_html($c_pref_city ?: 'Any'); ?>)</td>
                                     <td style="text-align:center;"><?php echo $g4_pass ? '<span style="color:#16a34a;font-weight:bold;">PASSED ✅</span>' : '<span style="color:#dc2626;font-weight:bold;">FAILED ❌</span>'; ?></td>
                                 </tr>
                                 <tr>

@@ -6,6 +6,27 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 110: Fix Automatchmaking SQL Query Placeholders Mismatch, Candidate Gating & Trigger Dispatch
+- **Objective**:
+  1. Diagnose why automatic matchmaking runs (on form submit, Action Scheduler, or admin trigger) were creating 0 matches.
+  2. Resolve SQL query placeholder vs. argument mismatch in `MatchingEngine::query_candidates()` (69 placeholders vs 64 arguments), which was shifting every parameter starting at Country/State/City/Religion/Modesty and breaking candidate matching in MySQL.
+  3. Refactor `query_candidates()` in `MatchingEngine.php` to dynamic `$where` and `$args` array construction to guarantee 100% exact placeholder parity.
+  4. Ensure `FormController.php` triggers `mm_enqueue_user_matching_job` on all questionnaire submissions (`form_submit` / `form_update`) regardless of user tier.
+  5. Update Candidate Gate Debugger (`src/View/admin/logs/tab-debugger.php`) to evaluate multi-column location parameters (`country`, `state`, `city`).
+- **Implemented**:
+  - `src/Core/MatchingEngine.php`:
+    - Refactored `query_candidates(array $user, int $user_age)` to dynamically construct `$where` clauses alongside their respective `$args` values.
+    - Added clean bi-directional handling for Gender, Age, Country, State, City, Religion, Modesty, and pair exclusions.
+  - `src/Frontend/FormController.php`:
+    - Updated line 720 so profile submissions/updates trigger `mm_enqueue_user_matching_job($user_id, $trigger)` for all users.
+  - `src/View/admin/logs/tab-debugger.php`:
+    - Updated location presentation and evaluation logic to audit `country`, `state`, and `city` against candidate criteria with bi-directional gate checking.
+  - `tests/Unit/MatchingEngineTest.php`:
+    - Added tests `test_matching_engine_sql_query_evaluates_country_state_city_gates`, `test_query_candidates_placeholder_parity_with_any_preferences`, and `test_run_matching_for_user_creates_matches_end_to_end`.
+  - `tests/bootstrap.php`:
+    - Enhanced `Fakewpdb::insert` and `replace` to record column and value details for test verification.
+- **Verification**: Ran full automated test suite with **189/189 tests passing** (0 failures, 0 errors).
+
 ### Task 109: Remove In-Box Photo Format Span to Prevent UI Overlap
 - **Objective**: Remove the redundant `<span class="elementor-field-sublabel mm-photo-format-hint">` from inside each photo field container in `FieldGenerator.php` to eliminate visual overlap with the dashed upload box and "Add Photo" camera icon.
 - **Implemented**:

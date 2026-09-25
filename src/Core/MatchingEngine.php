@@ -403,141 +403,146 @@ class MatchingEngine {
         $user_age_min  = (int) ($user['preferred_age_min'] ?? 18);
         $user_age_max  = (int) ($user['preferred_age_max'] ?? 99);
 
-        // Prepare bi-directional parameters
-        $target_cand_gender = ($pref_gender !== '' && $pref_gender !== 'any') ? $pref_gender : '';
-        $target_user_gender = ($user_gender !== '' && $user_gender !== 'any') ? $user_gender : '';
+        $where = [
+            'c.user_id != %d',
+            '(c.is_active = 1 OR c.is_active IS NULL)',
+        ];
+        $args = [$user_id];
 
-        $sql = $wpdb->prepare(
-            "SELECT c.*
+        // 1. Gender bi-directional gate
+        if ($pref_gender !== '' && $pref_gender !== 'any') {
+            $where[] = "(LOWER(TRIM(c.gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.gender), ', ', ',')) > 0)";
+            $args[] = $pref_gender;
+            $args[] = $pref_gender;
+        }
+
+        if ($user_gender !== '' && $user_gender !== 'any') {
+            $where[] = "(c.pref_gender IS NULL OR c.pref_gender = '' OR LOWER(TRIM(c.pref_gender)) = 'any' OR LOWER(TRIM(c.pref_gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.pref_gender), ', ', ',')) > 0)";
+            $args[] = $user_gender;
+            $args[] = $user_gender;
+        }
+
+        // 2. Age bi-directional gate
+        if ($user_age_min > 0 && $user_age_max > 0) {
+            $where[] = "(c.birth_date IS NULL OR c.birth_date = '0000-00-00' OR (TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d))";
+            $args[] = $user_age_min;
+            $args[] = $user_age_max;
+        } elseif ($user_age_min > 0) {
+            $where[] = "(c.birth_date IS NULL OR c.birth_date = '0000-00-00' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) >= %d)";
+            $args[] = $user_age_min;
+        } elseif ($user_age_max > 0) {
+            $where[] = "(c.birth_date IS NULL OR c.birth_date = '0000-00-00' OR TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) <= %d)";
+            $args[] = $user_age_max;
+        }
+
+        if ($user_age > 0) {
+            $where[] = "(c.preferred_age_min IS NULL OR c.preferred_age_min <= 0 OR %d >= c.preferred_age_min)";
+            $args[] = $user_age;
+            $where[] = "(c.preferred_age_max IS NULL OR c.preferred_age_max <= 0 OR %d <= c.preferred_age_max)";
+            $args[] = $user_age;
+        }
+
+        // 3. Country bi-directional gate
+        $clean_pref_country = strtolower($pref_country);
+        if ($pref_country !== '' && $clean_pref_country !== 'any' && $clean_pref_country !== 'any country') {
+            $where[] = "(c.country IS NULL OR c.country = '' OR FIND_IN_SET(c.country, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.country, '%%'))";
+            $args[] = $pref_country;
+            $args[] = $pref_country;
+        }
+
+        $clean_user_country = strtolower($user_country);
+        if ($user_country !== '' && $clean_user_country !== 'any' && $clean_user_country !== 'any country') {
+            $where[] = "(c.pref_country IS NULL OR c.pref_country = '' OR LOWER(TRIM(c.pref_country)) = 'any' OR LOWER(TRIM(c.pref_country)) = 'any country' OR FIND_IN_SET(%s, REPLACE(c.pref_country, ', ', ',')) > 0 OR LOWER(c.pref_country) LIKE CONCAT('%%', %s, '%%'))";
+            $args[] = $user_country;
+            $args[] = $clean_user_country;
+        }
+
+        // 4. State bi-directional gate
+        $clean_pref_state = strtolower($pref_state);
+        if ($pref_state !== '' && $clean_pref_state !== 'any' && $clean_pref_state !== 'any state') {
+            $where[] = "(c.state IS NULL OR c.state = '' OR FIND_IN_SET(c.state, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.state, '%%'))";
+            $args[] = $pref_state;
+            $args[] = $pref_state;
+        }
+
+        $clean_user_state = strtolower($user_state);
+        if ($user_state !== '' && $clean_user_state !== 'any' && $clean_user_state !== 'any state') {
+            $where[] = "(c.pref_state IS NULL OR c.pref_state = '' OR LOWER(TRIM(c.pref_state)) = 'any' OR LOWER(TRIM(c.pref_state)) = 'any state' OR FIND_IN_SET(%s, REPLACE(c.pref_state, ', ', ',')) > 0 OR LOWER(c.pref_state) LIKE CONCAT('%%', %s, '%%'))";
+            $args[] = $user_state;
+            $args[] = $clean_user_state;
+        }
+
+        // 5. City bi-directional gate
+        $clean_pref_city = strtolower($pref_city);
+        if ($pref_city !== '' && $clean_pref_city !== 'any' && $clean_pref_city !== 'any city') {
+            $where[] = "(c.city IS NULL OR c.city = '' OR FIND_IN_SET(c.city, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.city, '%%'))";
+            $args[] = $pref_city;
+            $args[] = $pref_city;
+        }
+
+        $clean_user_city = strtolower($user_city);
+        if ($user_city !== '' && $clean_user_city !== 'any' && $clean_user_city !== 'any city') {
+            $where[] = "(c.pref_city IS NULL OR c.pref_city = '' OR LOWER(TRIM(c.pref_city)) = 'any' OR LOWER(TRIM(c.pref_city)) = 'any city' OR FIND_IN_SET(%s, REPLACE(c.pref_city, ', ', ',')) > 0 OR LOWER(c.pref_city) LIKE CONCAT('%%', %s, '%%'))";
+            $args[] = $user_city;
+            $args[] = $clean_user_city;
+        }
+
+        // 6. Religion bi-directional gate
+        $clean_pref_religion = strtolower($pref_religion);
+        $no_pref_rel = ['any', 'no preference', 'prefer not to say', 'any religion', ''];
+        if (!in_array($clean_pref_religion, $no_pref_rel, true)) {
+            $where[] = "(c.religion IS NULL OR c.religion = '' OR FIND_IN_SET(c.religion, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.religion, '%%'))";
+            $args[] = $pref_religion;
+            $args[] = $pref_religion;
+        }
+
+        $clean_user_religion = strtolower($user_religion);
+        if (!in_array($clean_user_religion, $no_pref_rel, true)) {
+            $where[] = "(c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) IN ('any', 'no preference', 'prefer not to say', 'any religion') OR FIND_IN_SET(%s, REPLACE(c.pref_religion, ', ', ',')) > 0 OR LOWER(c.pref_religion) LIKE CONCAT('%%', %s, '%%'))";
+            $args[] = $user_religion;
+            $args[] = $clean_user_religion;
+        }
+
+        // 7. Modesty bi-directional gate
+        $clean_pref_modesty = strtolower($pref_modesty);
+        $no_pref_mod = ['any', 'no preference', 'prefer not to say', ''];
+        if (!in_array($clean_pref_modesty, $no_pref_mod, true)) {
+            $where[] = "(c.modesty IS NULL OR c.modesty = '' OR FIND_IN_SET(c.modesty, REPLACE(%s, ', ', ',')) > 0 OR %s LIKE CONCAT('%%', c.modesty, '%%'))";
+            $args[] = $pref_modesty;
+            $args[] = $pref_modesty;
+        }
+
+        $clean_user_modesty = strtolower($user_modesty);
+        if (!in_array($clean_user_modesty, $no_pref_mod, true)) {
+            $where[] = "(c.pref_modesty IS NULL OR c.pref_modesty = '' OR LOWER(TRIM(c.pref_modesty)) IN ('any', 'no preference', 'prefer not to say') OR FIND_IN_SET(%s, REPLACE(c.pref_modesty, ', ', ',')) > 0 OR LOWER(c.pref_modesty) LIKE CONCAT('%%', %s, '%%'))";
+            $args[] = $user_modesty;
+            $args[] = $clean_user_modesty;
+        }
+
+        // 8. Exclude pairs that ALREADY exist in wp_matches (any status)
+        $where[] = "NOT EXISTS (
+            SELECT 1 FROM {$matches_table} m
+            WHERE m.user_one_id = LEAST(%d, c.user_id)
+              AND m.user_two_id = GREATEST(%d, c.user_id)
+        )";
+        $args[] = $user_id;
+        $args[] = $user_id;
+
+        // 9. Exclude candidates who already have a mutually accepted match this month
+        $where[] = "NOT EXISTS (
+            SELECT 1 FROM {$matches_table} m2
+            WHERE (m2.user_one_id = c.user_id OR m2.user_two_id = c.user_id)
+              AND m2.status = 'matched'
+              AND m2.updated_at >= %s
+        )";
+        $args[] = gmdate('Y-m-01 00:00:00');
+
+        $where_sql = implode("\n               AND ", $where);
+        $query = "SELECT c.*
              FROM {$pool_table} c
-             WHERE c.user_id != %d
-               AND (c.is_active = 1 OR c.is_active IS NULL)
+             WHERE {$where_sql}";
 
-               -- Gender bi-directional gate
-               AND (%s = '' OR LOWER(TRIM(c.gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.gender), ', ', ',')) > 0)
-               AND (c.pref_gender IS NULL OR c.pref_gender = '' OR LOWER(TRIM(c.pref_gender)) = 'any' OR %s = '' OR LOWER(TRIM(c.pref_gender)) = %s OR FIND_IN_SET(%s, REPLACE(LOWER(c.pref_gender), ', ', ',')) > 0)
-
-               -- Age bi-directional gate
-               AND (c.preferred_age_min IS NULL OR c.preferred_age_min <= 0 OR %d >= c.preferred_age_min)
-               AND (c.preferred_age_max IS NULL OR c.preferred_age_max <= 0 OR %d <= c.preferred_age_max)
-               AND (
-                   c.birth_date IS NULL 
-                   OR c.birth_date = '0000-00-00' 
-                   OR (TIMESTAMPDIFF(YEAR, c.birth_date, CURDATE()) BETWEEN %d AND %d)
-               )
-
-               -- Country bi-directional gate
-               AND (
-                   c.pref_country IS NULL OR c.pref_country = '' OR LOWER(TRIM(c.pref_country)) = 'any' OR LOWER(TRIM(c.pref_country)) = 'any country'
-                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any country'
-                   OR FIND_IN_SET(%s, REPLACE(c.pref_country, ', ', ',')) > 0
-                   OR LOWER(c.pref_country) LIKE CONCAT('%%', %s, '%%')
-               )
-               AND (
-                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any country'
-                   OR c.country IS NULL OR c.country = ''
-                   OR FIND_IN_SET(c.country, REPLACE(%s, ', ', ',')) > 0
-                   OR (%s != '' AND %s LIKE CONCAT('%%', c.country, '%%'))
-               )
-
-               -- State bi-directional gate (if specified)
-               AND (
-                   c.pref_state IS NULL OR c.pref_state = '' OR LOWER(TRIM(c.pref_state)) = 'any' OR LOWER(TRIM(c.pref_state)) = 'any state'
-                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any state'
-                   OR FIND_IN_SET(%s, REPLACE(c.pref_state, ', ', ',')) > 0
-                   OR LOWER(c.pref_state) LIKE CONCAT('%%', %s, '%%')
-               )
-               AND (
-                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any state'
-                   OR c.state IS NULL OR c.state = ''
-                   OR FIND_IN_SET(c.state, REPLACE(%s, ', ', ',')) > 0
-                   OR (%s != '' AND %s LIKE CONCAT('%%', c.state, '%%'))
-               )
-
-               -- City bi-directional gate (if specified)
-               AND (
-                   c.pref_city IS NULL OR c.pref_city = '' OR LOWER(TRIM(c.pref_city)) = 'any' OR LOWER(TRIM(c.pref_city)) = 'any city'
-                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any city'
-                   OR FIND_IN_SET(%s, REPLACE(c.pref_city, ', ', ',')) > 0
-                   OR LOWER(c.pref_city) LIKE CONCAT('%%', %s, '%%')
-               )
-               AND (
-                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'any city'
-                   OR c.city IS NULL OR c.city = ''
-                   OR FIND_IN_SET(c.city, REPLACE(%s, ', ', ',')) > 0
-                   OR (%s != '' AND %s LIKE CONCAT('%%', c.city, '%%'))
-               )
-
-               -- Religion bi-directional gate
-               AND (
-                   c.pref_religion IS NULL OR c.pref_religion = '' OR LOWER(TRIM(c.pref_religion)) = 'any' OR LOWER(TRIM(c.pref_religion)) = 'no preference' OR LOWER(TRIM(c.pref_religion)) = 'prefer not to say'
-                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
-                   OR FIND_IN_SET(%s, REPLACE(c.pref_religion, ', ', ',')) > 0
-                   OR LOWER(c.pref_religion) LIKE CONCAT('%%', %s, '%%')
-               )
-               AND (
-                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
-                   OR c.religion IS NULL OR c.religion = ''
-                   OR FIND_IN_SET(c.religion, REPLACE(%s, ', ', ',')) > 0
-                   OR (%s != '' AND %s LIKE CONCAT('%%', c.religion, '%%'))
-               )
-
-               -- Modesty bi-directional gate
-               AND (
-                   c.pref_modesty IS NULL OR c.pref_modesty = '' OR LOWER(TRIM(c.pref_modesty)) = 'any' OR LOWER(TRIM(c.pref_modesty)) = 'no preference' OR LOWER(TRIM(c.pref_modesty)) = 'prefer not to say'
-                   OR %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
-                   OR FIND_IN_SET(%s, REPLACE(c.pref_modesty, ', ', ',')) > 0
-                   OR LOWER(c.pref_modesty) LIKE CONCAT('%%', %s, '%%')
-               )
-               AND (
-                   %s = '' OR LOWER(%s) = 'any' OR LOWER(%s) = 'no preference' OR LOWER(%s) = 'prefer not to say'
-                   OR c.modesty IS NULL OR c.modesty = ''
-                   OR FIND_IN_SET(c.modesty, REPLACE(%s, ', ', ',')) > 0
-                   OR (%s != '' AND %s LIKE CONCAT('%%', c.modesty, '%%'))
-               )
-
-               -- Exclude pairs that ALREADY exist in wp_matches (any status)
-               AND NOT EXISTS (
-                   SELECT 1 FROM {$matches_table} m
-                   WHERE m.user_one_id = LEAST(%d, c.user_id)
-                     AND m.user_two_id = GREATEST(%d, c.user_id)
-               )
-
-               -- Exclude candidates who already have a mutually accepted match this month
-               AND NOT EXISTS (
-                   SELECT 1 FROM {$matches_table} m2
-                   WHERE (m2.user_one_id = c.user_id OR m2.user_two_id = c.user_id)
-                     AND m2.status = 'matched'
-                     AND m2.updated_at >= %s
-               )",
-            $user_id,
-            // Gender
-            $target_cand_gender, $target_cand_gender, $target_cand_gender,
-            $target_user_gender, $target_user_gender, $target_user_gender,
-            // Age
-            $user_age,
-            $user_age,
-            $user_age_min, $user_age_max,
-            // Country
-            $user_country, $user_country, $user_country, $user_country, strtolower($user_country),
-            $pref_country, $pref_country, $pref_country, $pref_country, strtolower($pref_country),
-            // State
-            $user_state, $user_state, $user_state, $user_state, strtolower($user_state),
-            $pref_state, $pref_state, $pref_state, $pref_state, strtolower($pref_state),
-            // City
-            $user_city, $user_city, $user_city, $user_city, strtolower($user_city),
-            $pref_city, $pref_city, $pref_city, $pref_city, strtolower($pref_city),
-            // Religion
-            $user_religion, $user_religion, $user_religion, $user_religion, strtolower($user_religion),
-            $pref_religion, $pref_religion, $pref_religion, $pref_religion, strtolower($pref_religion),
-            // Modesty
-            $user_modesty, $user_modesty, $user_modesty, $user_modesty, strtolower($user_modesty),
-            $pref_modesty, $pref_modesty, $pref_modesty, $pref_modesty, strtolower($pref_modesty),
-            // Existing match checks
-            $user_id,
-            $user_id,
-            gmdate('Y-m-01 00:00:00')
-        );
+        $sql = !empty($args) ? $wpdb->prepare($query, ...$args) : $query;
 
         return $wpdb->get_results($sql, ARRAY_A) ?: [];
     }

@@ -216,5 +216,153 @@ final class MatchingEngineTest extends TestCase
         $this->assertStringContainsString('c.country', $queries_str);
         $this->assertStringContainsString('c.state', $queries_str);
         $this->assertStringContainsString('c.city', $queries_str);
+
+        // Crucial test: Ensure zero unreplaced %s or %d placeholders remain in the executed SQL
+        $this->assertFalse((bool) preg_match('/%[s|d|f]/', $queries_str), 'All SQL placeholders must be completely and accurately bound without leftover placeholders.');
+    }
+
+    public function test_query_candidates_placeholder_parity_with_any_preferences(): void
+    {
+        global $wpdb;
+        $wpdb->queries = [];
+
+        $engine = MatchingEngine::instance();
+
+        $user_any = [
+            'user_id'            => 15,
+            'gender'             => 'female',
+            'pref_gender'        => 'any',
+            'birth_date'         => '1996-01-01',
+            'preferred_age_min'  => 0,
+            'preferred_age_max'  => 0,
+            'country'            => '',
+            'pref_country'       => 'any',
+            'state'              => '',
+            'pref_state'         => 'any',
+            'city'               => '',
+            'pref_city'          => 'any',
+            'religion'           => '',
+            'pref_religion'      => 'No Preference',
+            'modesty'            => '',
+            'pref_modesty'       => 'No Preference',
+            'user_type'          => 'free',
+        ];
+
+        $ref = new \ReflectionClass($engine);
+        $method = $ref->getMethod('query_candidates');
+        $method->setAccessible(true);
+        $method->invoke($engine, $user_any, 28);
+
+        $last_query = end($wpdb->queries) ?: '';
+        $this->assertNotEmpty($last_query);
+        $this->assertFalse((bool) preg_match('/%[s|d|f]/', $last_query), 'SQL with "any" preferences must have 100% placeholder parity.');
+    }
+
+    public function test_run_matching_for_user_creates_matches_end_to_end(): void
+    {
+        global $wpdb;
+        $wpdb->queries = [];
+
+        $user_id = 101;
+        $user_data = [
+            'user_id'              => $user_id,
+            'gender'               => 'male',
+            'pref_gender'          => 'female',
+            'birth_date'           => '1990-01-01',
+            'preferred_age_min'    => 20,
+            'preferred_age_max'    => 35,
+            'country'              => 'United States',
+            'pref_country'         => 'United States',
+            'state'                => 'California',
+            'pref_state'           => 'California',
+            'city'                 => 'Los Angeles',
+            'pref_city'            => 'Los Angeles',
+            'religion'             => 'Muslim',
+            'pref_religion'        => 'Muslim',
+            'modesty'              => 'Modest dress / conservative',
+            'pref_modesty'         => 'Modest dress / conservative',
+            'origin'               => 'Arab',
+            'pref_origin'          => 'Arab',
+            'languages'            => 'Arabic, English',
+            'height_cm'            => 180,
+            'preferred_height_min' => 155,
+            'preferred_height_max' => 170,
+            'job'                  => 'Engineer',
+            'smoking'              => 'non_smoker',
+            'pref_smoking'         => 'non_smoker',
+            'drinking'             => 'never',
+            'pref_drinking'        => 'never',
+            'user_type'            => 'monthly',
+            'is_active'            => 1,
+        ];
+
+        $candidate_id = 102;
+        $candidate_data = [
+            'user_id'              => $candidate_id,
+            'gender'               => 'female',
+            'pref_gender'          => 'male',
+            'birth_date'           => '1994-06-01',
+            'preferred_age_min'    => 25,
+            'preferred_age_max'    => 40,
+            'country'              => 'United States',
+            'pref_country'         => 'United States',
+            'state'                => 'California',
+            'pref_state'           => 'California',
+            'city'                 => 'Los Angeles',
+            'pref_city'            => 'Los Angeles',
+            'religion'             => 'Muslim',
+            'pref_religion'        => 'Muslim',
+            'modesty'              => 'Modest dress / conservative',
+            'pref_modesty'         => 'Modest dress / conservative',
+            'origin'               => 'Arab',
+            'pref_origin'          => 'Arab',
+            'languages'            => 'Arabic, English',
+            'height_cm'            => 165,
+            'preferred_height_min' => 175,
+            'preferred_height_max' => 185,
+            'job'                  => 'Designer',
+            'smoking'              => 'non_smoker',
+            'pref_smoking'         => 'non_smoker',
+            'drinking'             => 'never',
+            'pref_drinking'        => 'never',
+            'user_type'            => 'monthly',
+            'is_active'            => 1,
+        ];
+
+        // Mock pool table query for get_user_pool
+        $pool_table = $wpdb->prefix . 'matchmaking_pool';
+        $user_pool_sql = $wpdb->prepare("SELECT * FROM {$pool_table} WHERE user_id = %d", $user_id);
+        $wpdb->mock_rows[$user_pool_sql] = $user_data;
+
+        $engine = MatchingEngine::instance();
+        $user_age = (int) (new \DateTime())->diff(new \DateTime($user_data['birth_date']))->y;
+
+        // Query candidates through reflection to get the exact prepared SQL key
+        $ref = new \ReflectionClass($engine);
+        $method = $ref->getMethod('query_candidates');
+        $method->setAccessible(true);
+        $method->invoke($engine, $user_data, $user_age);
+
+        $cand_sql = end($wpdb->queries);
+        $wpdb->mock_results[$cand_sql] = [$candidate_data];
+
+        // Also mock pair uniqueness check
+        $matches_table = $wpdb->prefix . 'matches';
+        $u1 = min($user_id, $candidate_id);
+        $u2 = max($user_id, $candidate_id);
+        $exists_sql = $wpdb->prepare("SELECT id FROM {$matches_table} WHERE user_one_id = %d AND user_two_id = %d LIMIT 1", $u1, $u2);
+        $wpdb->mock_vars[$exists_sql] = null;
+
+        // Run matching for user
+        $engine->run_matching_for_user($user_id, 'form_submit');
+
+        // Verify that INSERT INTO wp_matches was executed
+        $inserted_matches = array_filter($wpdb->queries, static fn($q) => str_starts_with(trim($q), "INSERT INTO {$matches_table}"));
+        $this->assertNotEmpty($inserted_matches, 'Matching run must insert a new pair into wp_matches.');
+
+        $insert_q = reset($inserted_matches);
+        $this->assertStringContainsString((string)$u1, $insert_q);
+        $this->assertStringContainsString((string)$u2, $insert_q);
+        $this->assertStringContainsString('pending_review', $insert_q);
     }
 }
