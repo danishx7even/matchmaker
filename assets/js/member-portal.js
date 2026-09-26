@@ -704,30 +704,39 @@
         var lightboxIndex   = 0;
 
         function ensureLightboxDom() {
-            if (!document.getElementById('mm-lightbox-modal')) {
-                var modal = document.createElement('div');
-                modal.id = 'mm-lightbox-modal';
-                modal.className = 'mm-lightbox-modal';
-                modal.setAttribute('role', 'dialog');
-                modal.setAttribute('aria-modal', 'true');
-                modal.setAttribute('aria-label', 'Photo Preview');
-                modal.innerHTML = [
-                    '  <div class="mm-lightbox-container">',
-                    '    <button type="button" class="mm-lightbox-close" aria-label="Close Preview">&times;</button>',
-                    '    <button type="button" class="mm-lightbox-nav mm-lightbox-prev" aria-label="Previous Image">&#10094;</button>',
-                    '    <button type="button" class="mm-lightbox-nav mm-lightbox-next" aria-label="Next Image">&#10095;</button>',
-                    '    <div class="mm-lightbox-img-wrap">',
-                    '      <img src="" alt="" class="mm-lightbox-img" id="mm-lightbox-target-img">',
-                    '    </div>',
-                    '    <div class="mm-lightbox-footer">',
-                    '      <span class="mm-lightbox-counter" id="mm-lightbox-counter">1 / 1</span>',
-                    '      <button type="button" class="mm-lightbox-zoom-toggle" id="mm-lightbox-zoom-toggle" title="Toggle Zoom">&#128269;</button>',
-                    '    </div>',
-                    '  </div>'
-                ].join('');
-                document.body.appendChild(modal);
+            var existing = document.getElementById('mm-lightbox-modal');
+            if (existing) {
+                // If modal exists but is NOT a direct child of body, move it to body
+                // This is critical — position:fixed is clipped by ancestors with overflow != visible
+                if (existing.parentNode !== document.body) {
+                    document.body.appendChild(existing);
+                }
+                return;
             }
+            // Create fresh and always append directly to <body>
+            var modal = document.createElement('div');
+            modal.id = 'mm-lightbox-modal';
+            modal.className = 'mm-lightbox-modal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-label', 'Photo Preview');
+            modal.innerHTML = [
+                '  <div class="mm-lightbox-container">',
+                '    <button type="button" class="mm-lightbox-close" aria-label="Close Preview">&times;</button>',
+                '    <button type="button" class="mm-lightbox-nav mm-lightbox-prev" aria-label="Previous Image">&#10094;</button>',
+                '    <button type="button" class="mm-lightbox-nav mm-lightbox-next" aria-label="Next Image">&#10095;</button>',
+                '    <div class="mm-lightbox-img-wrap">',
+                '      <img src="" alt="" class="mm-lightbox-img" id="mm-lightbox-target-img">',
+                '    </div>',
+                '    <div class="mm-lightbox-footer">',
+                '      <span class="mm-lightbox-counter" id="mm-lightbox-counter">1 / 1</span>',
+                '      <button type="button" class="mm-lightbox-zoom-toggle" id="mm-lightbox-zoom-toggle" title="Toggle Zoom">&#128269;</button>',
+                '    </div>',
+                '  </div>'
+            ].join('');
+            document.body.appendChild(modal);
         }
+
 
         function updateLightboxView() {
             if (!lightboxGallery.length || lightboxIndex < 0 || lightboxIndex >= lightboxGallery.length) return;

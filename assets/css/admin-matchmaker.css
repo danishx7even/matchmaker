@@ -387,8 +387,20 @@ a {
 /* =============================================================
    Admin Lightbox Modal Component
    ============================================================= */
+
+/* WordPress admin wraps content in #wpwrap which can clip position:fixed children.
+   The JS always appends #mm-lightbox-modal directly to <body>, bypassing these containers.
+   These rules ensure the body-level modal renders over everything in WP admin. */
+body.mm-lightbox-open #wpwrap,
+body.mm-lightbox-open #wpcontent,
+body.mm-lightbox-open #wpbody,
+body.mm-lightbox-open #wpbody-content {
+    overflow: visible !important;
+}
+
 .mm-lightbox-modal {
     position: fixed;
+
     top: 0;
     left: 0;
     right: 0;

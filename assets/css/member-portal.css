@@ -2042,6 +2042,18 @@ body.mm-lightbox-open {
     overflow: hidden !important;
 }
 
+/* Elementor and other page builders can trap position:fixed in overflow:hidden containers.
+   The JS always moves #mm-lightbox-modal to direct child of <body>.
+   These rules ensure it renders at full viewport level regardless. */
+body.mm-lightbox-open .elementor,
+body.mm-lightbox-open .elementor-section-wrap,
+body.mm-lightbox-open .mm-portal-canvas,
+body.mm-lightbox-open .site-content,
+body.mm-lightbox-open main,
+body.mm-lightbox-open .entry-content {
+    overflow: visible !important;
+}
+
 .mm-lightbox-modal {
     position: fixed;
     top: 0;

@@ -6,6 +6,28 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 115: Fix Lightbox — JS-Controlled Body-Level Modal, WordPress Admin Overflow Bypass
+- **Objective**:
+  1. Identify and resolve why the image lightbox was silently failing on click in both Admin (candidate profile `user-single.php`, match view `match-single.php`) and Member Portal (`tab-profile.php`, match steps 1, 2, 5).
+  2. Implement a permanent, definitive fix by ensuring `#mm-lightbox-modal` is **always mounted as a direct child of `<body>`**, never trapped inside WordPress admin's `#wpwrap` / `#wpcontent` overflow containers or Elementor wrapper elements.
+- **Root Cause**: The `#mm-lightbox-modal` was PHP-rendered inside page content templates (inside `#wpwrap > #wpcontent > #wpbody-content` on the admin side, and inside `.mm-portal-canvas` on the frontend). CSS `position:fixed` can be clipped when any ancestor element has `overflow: hidden` or `overflow: auto`. WordPress admin's `#wpwrap` is a known culprit.
+- **Implemented**:
+  - `src/View/frontend/portal/portal.php`:
+    - Removed the PHP-rendered `#mm-lightbox-modal` HTML block.
+  - `src/View/admin/pool/user-single.php`:
+    - Removed the PHP-rendered `#mm-lightbox-modal` HTML block.
+  - `src/View/admin/matches/match-single.php`:
+    - Removed the PHP-rendered `#mm-lightbox-modal` HTML block.
+  - `assets/js/admin-matchmaker.js`:
+    - Refactored `ensureLightboxDom()` to check if an existing `#mm-lightbox-modal` is a direct child of `document.body` and move it there if not, before returning. All new modal creation also uses `document.body.appendChild()`.
+  - `assets/js/member-portal.js`:
+    - Same refactor of `ensureLightboxDom()` — moves existing modal to `document.body` if needed, always creates new at `document.body`.
+  - `assets/css/admin-matchmaker.css`:
+    - Added `body.mm-lightbox-open #wpwrap, #wpcontent, #wpbody, #wpbody-content { overflow: visible !important; }` to bypass WordPress admin overflow clipping.
+  - `assets/css/member-portal.css`:
+    - Added overflow bypass for Elementor and common page-builder wrappers.
+- **Verification**: Ran full automated test suite with **196/196 tests passing** (0 failures, 0 errors).
+
 ### Task 114: Use Monthly Quota Count for Matches Received This Month in Member Portal
 - **Objective**:
   1. Fix the "Matches received this month" counter on the member dashboard (`tab-profile.php` via `MatchRepository::get_match_stats`) to use the user's active billing cycle quota count (`maybe_reset_monthly_quota($user_id)`) rather than counting raw pending/unapproved database rows.

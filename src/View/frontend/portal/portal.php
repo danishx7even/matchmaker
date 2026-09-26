@@ -109,20 +109,4 @@ $mem_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_acc
         <?php include __DIR__ . '/tab-services.php'; ?>
     </div>
 
-    <!-- Responsive Lightbox Modal Component -->
-    <div id="mm-lightbox-modal" class="mm-lightbox-modal" role="dialog" aria-modal="true" aria-label="<?php esc_attr_e('Photo Preview', 'matchmaker'); ?>" style="display:none;">
-        <div class="mm-lightbox-container">
-            <button type="button" class="mm-lightbox-close" aria-label="<?php esc_attr_e('Close Preview', 'matchmaker'); ?>" onclick="if(window.MM_closeLightbox){window.MM_closeLightbox();}">&times;</button>
-            <button type="button" class="mm-lightbox-nav mm-lightbox-prev" aria-label="<?php esc_attr_e('Previous Image', 'matchmaker'); ?>">&#10094;</button>
-            <button type="button" class="mm-lightbox-nav mm-lightbox-next" aria-label="<?php esc_attr_e('Next Image', 'matchmaker'); ?>">&#10095;</button>
-            <div class="mm-lightbox-img-wrap">
-                <img src="" alt="" class="mm-lightbox-img" id="mm-lightbox-target-img">
-            </div>
-            <div class="mm-lightbox-footer">
-                <span class="mm-lightbox-counter" id="mm-lightbox-counter">1 / 1</span>
-                <button type="button" class="mm-lightbox-zoom-toggle" id="mm-lightbox-zoom-toggle" title="<?php esc_attr_e('Toggle Zoom', 'matchmaker'); ?>">&#128269;</button>
-            </div>
-        </div>
-    </div>
-
 </div><!-- .mm-portal-canvas -->
