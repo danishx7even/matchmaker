@@ -33,7 +33,7 @@ if (!defined('ABSPATH')) {
         <p class="state-main-desc"><?php esc_html_e('You both accepted the match. Now you can connect directly outside Arab Zawaj.', 'matchmaker'); ?></p>
 
         <div class="matched-profile-summary-box">
-            <img src="<?php echo esc_url($active_match['photo'] ?: get_avatar_url(0, ['size' => 150])); ?>" alt="">
+            <img src="<?php echo esc_url($active_match['photo'] ?: get_avatar_url(0, ['size' => 150])); ?>" alt="<?php echo esc_attr($active_match['name']); ?>" class="mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>">
             <div>
                 <h2 class="font-cormorant"><?php echo esc_html($active_match['name']); ?></h2>
                 <div class="meta-sub"><?php echo esc_html($active_match['age']); ?> • <?php echo esc_html($active_match['location']); ?></div>

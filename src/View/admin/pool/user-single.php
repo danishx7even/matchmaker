@@ -24,9 +24,9 @@ if (!defined('ABSPATH')) {
 }
 
 $repo   = \Matchmaker\Repository\MatchRepository::instance();
-$photo1 = $meta['user_photo1'] ?? '';
-$photo2 = $meta['user_photo2'] ?? '';
-$photo3 = $meta['user_photo3'] ?? '';
+$photo1 = !empty($meta['user_photo1']) ? $meta['user_photo1'] : (!empty($pool['user_photo1']) ? $pool['user_photo1'] : (string) get_user_meta($user_id, 'user_photo1', true));
+$photo2 = !empty($meta['user_photo2']) ? $meta['user_photo2'] : (!empty($pool['user_photo2']) ? $pool['user_photo2'] : (string) get_user_meta($user_id, 'user_photo2', true));
+$photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['user_photo3']) ? $pool['user_photo3'] : (string) get_user_meta($user_id, 'user_photo3', true));
 ?>
 
 <!-- Header Card -->

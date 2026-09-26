@@ -52,11 +52,15 @@ class NotificationService {
 
     /**
      * Configure the heartbeat frequency.
+     * Keeps standard heartbeat settings on admin side, and accelerates to 15s on frontend member portal.
      *
      * @param array $settings The heartbeat settings.
      * @return array
      */
     public function configure_heartbeat_frequency(array $settings): array {
+        if (function_exists('is_admin') && is_admin()) {
+            return $settings;
+        }
         $settings['interval'] = 15;
         return $settings;
     }
@@ -70,6 +74,11 @@ class NotificationService {
      */
     public function handle_heartbeat_pulse(array $response, array $data): array {
         if (!is_user_logged_in()) {
+            return $response;
+        }
+
+        // On admin side, skip member notification polling unless explicitly requested
+        if (function_exists('is_admin') && is_admin() && empty($data['mm_poll_notifications'])) {
             return $response;
         }
 

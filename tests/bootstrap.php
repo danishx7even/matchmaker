@@ -100,6 +100,10 @@ function delete_user_meta($user_id, $key) {
     return true;
 }
 
+function is_admin(): bool {
+    return !empty($GLOBALS['__mm_is_admin']);
+}
+
 // -----------------------------------------------------------------------------
 // User & Auth Stubs
 // -----------------------------------------------------------------------------

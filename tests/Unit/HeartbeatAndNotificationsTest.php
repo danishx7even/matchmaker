@@ -64,4 +64,23 @@ class HeartbeatAndNotificationsTest
             throw new \RuntimeException("Expected notification query on wp_matchmaker_notifications");
         }
     }
+
+    public function test_heartbeat_settings_preserves_admin_interval(): void
+    {
+        $GLOBALS['__mm_is_admin'] = true;
+        try {
+            $settings = $this->service->configure_heartbeat_frequency(['interval' => 60]);
+            if (($settings['interval'] ?? 0) !== 60) {
+                throw new \RuntimeException("Expected admin heartbeat interval to remain 60, got: " . ($settings['interval'] ?? 'null'));
+            }
+
+            // Also test pulse on admin side without explicit flag skips processing
+            $response = $this->service->handle_heartbeat_pulse([], ['screen_id' => 'edit-post']);
+            if (isset($response['mm_unread_count'])) {
+                throw new \RuntimeException("Expected admin heartbeat pulse to skip notification counting");
+            }
+        } finally {
+            $GLOBALS['__mm_is_admin'] = false;
+        }
+    }
 }

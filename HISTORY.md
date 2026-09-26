@@ -6,6 +6,28 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 113: Bulletproof Profile Details Lightbox & Disable 15s Heartbeat on Admin Dashboard
+- **Objective**:
+  1. Ensure profile details lightbox triggers 100% reliably in both Admin (`user-single.php`, `match-single.php`) and Member Portal (`tab-profile.php`, `step-2-profile.php`, `step-1-discovery.php`, `step-5-contact.php`).
+  2. Implement global `window.MM_openLightbox` fallback handler, ensure DOM readiness checking (handling cases where scripts execute after `DOMContentLoaded`), and attach click listeners to all photo containers.
+  3. Disable the 15s heartbeat acceleration on the WordPress admin dashboard (`is_admin()`), reserving the 15s notification pulse strictly for the frontend Member Portal.
+- **Implemented**:
+  - `src/Service/NotificationService.php`:
+    - Updated `configure_heartbeat_frequency()` to check `if (is_admin()) return $settings;`, leaving default WordPress admin heartbeat intervals intact.
+    - Updated `handle_heartbeat_pulse()` to skip member notification counting on the admin dashboard unless explicitly flagged with `mm_poll_notifications`.
+  - `assets/js/admin-matchmaker.js` & `assets/js/member-portal.js`:
+    - Refactored initialization into `initMatchmakerAdmin()` and `initMemberPortal()` with dual execution: attaching `DOMContentLoaded` if `document.readyState === 'loading'`, or running immediately if DOM is already loaded.
+    - Added global window helpers `window.MM_openLightbox` / `window.MM_closeLightbox` for instant direct invocations.
+    - Updated `openLightbox()` to explicitly set `modalEl.style.setProperty('display', 'flex', 'important')` and `.is-active`.
+    - Expanded click delegation targets to include `.main-photo-frame img`, `.candidate-hero-block img`, `.candidate-square-thumb`, `.matched-profile-summary-box img`, `.mm-photos-grid img`, `.az-about-photo img`, `.mm-card img`, `.mm-lightbox-trigger`, and `[data-mm-lightbox]`.
+  - `src/View/frontend/portal/steps/step-2-profile.php`, `step-1-discovery.php`, `step-5-contact.php`:
+    - Added `class="mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" style="cursor:zoom-in;"` to candidate photos in Step 1, Step 2, and Step 5.
+  - `src/View/admin/pool/user-single.php` & `src/View/admin/matches/match-single.php`:
+    - Added robust photo resolution fallbacks checking `$meta`, `$pool`, and `get_user_meta()`.
+  - `tests/Unit/HeartbeatAndNotificationsTest.php`:
+    - Added `test_heartbeat_settings_preserves_admin_interval`.
+- **Verification**: Ran full automated test suite with **195/195 tests passing** (0 failures, 0 errors).
+
 ### Task 112: Profile Details Lightbox Fix, Pool Table Browser Lightbox Removal & Settings System Logs Deduplication
 - **Objective**:
   1. Fix the Image Lightbox feature in the User Profile Details page (`user-single.php` in admin and `tab-profile.php` on frontend) where profile images are displayed, ensuring clicking the image reliably opens the responsive Lightbox modal with zoom, next/prev navigation, and dismiss controls.

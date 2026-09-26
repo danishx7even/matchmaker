@@ -55,11 +55,12 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     <?php
     $p1_loc_parts = is_array($p1) ? array_filter([$p1['city'] ?? '', $p1['state'] ?? '', $p1['country'] ?? '']) : [];
     $p1_loc = !empty($p1_loc_parts) ? implode(', ', $p1_loc_parts) : (is_array($p1) ? ($p1['location'] ?? '—') : '—');
+    $u1_photo = !empty($m1['user_photo1']) ? $m1['user_photo1'] : (!empty($p1['user_photo1']) ? $p1['user_photo1'] : (string) get_user_meta($u1_id, 'user_photo1', true));
     ?>
     <div class="mm-card">
         <h3><?php echo esc_html($u1 ? $u1->display_name : 'User #' . $u1_id); ?> (User 1)</h3>
-        <?php if (!empty($m1['user_photo1'])) : ?>
-            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($m1['user_photo1']); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-1" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
+        <?php if (!empty($u1_photo)) : ?>
+            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($u1_photo); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-1" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u1 ? $u1->user_email : '—'); ?></td></tr>
@@ -78,11 +79,12 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     <?php
     $p2_loc_parts = is_array($p2) ? array_filter([$p2['city'] ?? '', $p2['state'] ?? '', $p2['country'] ?? '']) : [];
     $p2_loc = !empty($p2_loc_parts) ? implode(', ', $p2_loc_parts) : (is_array($p2) ? ($p2['location'] ?? '—') : '—');
+    $u2_photo = !empty($m2['user_photo1']) ? $m2['user_photo1'] : (!empty($p2['user_photo1']) ? $p2['user_photo1'] : (string) get_user_meta($u2_id, 'user_photo1', true));
     ?>
     <div class="mm-card">
         <h3><?php echo esc_html($u2 ? $u2->display_name : 'User #' . $u2_id); ?> (User 2)</h3>
-        <?php if (!empty($m2['user_photo1'])) : ?>
-            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($m2['user_photo1']); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-2" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
+        <?php if (!empty($u2_photo)) : ?>
+            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($u2_photo); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-2" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u2 ? $u2->user_email : '—'); ?></td></tr>

@@ -539,8 +539,8 @@
         }
     };
 
-    /* Document Ready Initialization */
-    document.addEventListener('DOMContentLoaded', function () {
+    /* Document Ready & Global Initialization */
+    function initMemberPortal() {
 
         // Global Event Delegation Listener for JS Redirections and Actions (replacing inline onclick)
         document.addEventListener('click', function (e) {
@@ -654,7 +654,7 @@
             lastKnownUnreadCount = 0;
         }
 
-        // 4. WordPress Heartbeat API — 15s interval
+        // 4. WordPress Heartbeat API — 15s interval for Member Portal
         if (typeof jQuery !== 'undefined') {
             jQuery(document).on('heartbeat-send', function (e, data) {
                 data['mm_poll_notifications'] = true;
@@ -698,6 +698,7 @@
                 lastKnownUnreadCount = count;
             });
         }
+
         // 5. Responsive Lightbox for Member Portal Profile Photos
         var lightboxGallery = [];
         var lightboxIndex   = 0;
@@ -752,14 +753,21 @@
             lightboxGallery = [];
             lightboxIndex = 0;
 
-            var src = el.getAttribute('src') || el.getAttribute('data-src') || el.src || '';
-            var gallery = el.getAttribute('data-mm-lightbox') || '';
+            if (el && el.tagName !== 'IMG') {
+                var innerImg = el.querySelector('img');
+                if (innerImg) {
+                    el = innerImg;
+                }
+            }
+
+            var src = (el && (el.getAttribute('src') || el.getAttribute('data-src') || el.src)) || '';
+            var gallery = (el && el.getAttribute('data-mm-lightbox')) || '';
             var siblings = [];
 
             if (gallery) {
                 siblings = Array.prototype.slice.call(document.querySelectorAll('[data-mm-lightbox="' + gallery + '"]'));
-            } else {
-                var parent = el.closest('.az-about-photo, .mm-photos-grid');
+            } else if (el) {
+                var parent = el.closest('.az-about-photo, .mm-photos-grid, .main-photo-frame, .candidate-hero-block, .matched-profile-summary-box, .mm-card');
                 if (parent) {
                     siblings = Array.prototype.slice.call(parent.querySelectorAll('img'));
                 } else {
@@ -792,6 +800,7 @@
             var modal = document.getElementById('mm-lightbox-modal');
             if (modal) {
                 document.body.classList.add('mm-lightbox-open');
+                modal.style.setProperty('display', 'flex', 'important');
                 modal.classList.add('is-active');
             }
         }
@@ -800,12 +809,13 @@
             var modal = document.getElementById('mm-lightbox-modal');
             if (modal) {
                 modal.classList.remove('is-active');
-                document.body.classList.remove('mm-lightbox-open');
-                var img = document.getElementById('mm-lightbox-target-img');
-                if (img) {
-                    img.classList.remove('is-zoomed');
-                    img.src = '';
-                }
+                modal.style.setProperty('display', 'none', 'important');
+            }
+            document.body.classList.remove('mm-lightbox-open');
+            var img = document.getElementById('mm-lightbox-target-img');
+            if (img) {
+                img.classList.remove('is-zoomed');
+                img.src = '';
             }
         }
 
@@ -821,10 +831,16 @@
             updateLightboxView();
         }
 
+        // Expose globally for instant inline / shortcode usage
+        window.MM_Portal.openLightbox = openLightbox;
+        window.MM_Portal.closeLightbox = closeLightbox;
+        window.MM_openLightbox = openLightbox;
+        window.MM_closeLightbox = closeLightbox;
+
         ensureLightboxDom();
 
         document.addEventListener('click', function (e) {
-            var trigger = e.target.closest('.az-about-photo img, .mm-photos-grid img, .mm-lightbox-trigger, [data-mm-lightbox]');
+            var trigger = e.target.closest('.az-about-photo img, .mm-photos-grid img, .main-photo-frame img, .candidate-hero-block img, .candidate-square-thumb, .matched-profile-summary-box img, .mm-card img, .mm-lightbox-trigger, [data-mm-lightbox]');
             if (trigger) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -879,6 +895,12 @@
                 }
             }
         });
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMemberPortal);
+    } else {
+        initMemberPortal();
+    }
 
 }());

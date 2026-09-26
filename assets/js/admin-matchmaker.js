@@ -597,10 +597,16 @@
             lightboxIndex   = 0;
 
             var $el = $(clickedEl);
+            if ($el.is('div') || $el.is('span') || $el.is('aside') || $el.is('figure')) {
+                var $innerImg = $el.find('img').first();
+                if ($innerImg.length) {
+                    $el = $innerImg;
+                }
+            }
             var src = $el.attr('src') || $el.data('src') || $el.prop('src') || '';
             var gallery = $el.attr('data-mm-lightbox') || '';
 
-            var $container = $el.closest('.mm-photos-grid, .az-about-photo');
+            var $container = $el.closest('.mm-photos-grid, .az-about-photo, .main-photo-frame, .candidate-hero-block, .matched-profile-summary-box, .mm-card');
             var $siblings;
 
             if (gallery) {
@@ -633,16 +639,25 @@
             }
 
             updateLightboxView();
-            var $modal = $('#mm-lightbox-modal');
-            $('body').addClass('mm-lightbox-open');
-            $modal.show().addClass('is-active');
+            var modalEl = document.getElementById('mm-lightbox-modal');
+            if (modalEl) {
+                document.body.classList.add('mm-lightbox-open');
+                modalEl.style.setProperty('display', 'flex', 'important');
+                modalEl.classList.add('is-active');
+            }
         }
 
         function closeLightbox() {
-            var $modal = $('#mm-lightbox-modal');
-            $modal.removeClass('is-active').hide();
-            $('body').removeClass('mm-lightbox-open');
-            $('#mm-lightbox-target-img').removeClass('is-zoomed').attr('src', '');
+            var modalEl = document.getElementById('mm-lightbox-modal');
+            if (modalEl) {
+                modalEl.classList.remove('is-active');
+                modalEl.style.setProperty('display', 'none', 'important');
+            }
+            document.body.classList.remove('mm-lightbox-open');
+            var $img = $('#mm-lightbox-target-img');
+            if ($img.length) {
+                $img.removeClass('is-zoomed').attr('src', '');
+            }
         }
 
         function nextLightboxImage() {
@@ -657,11 +672,15 @@
             updateLightboxView();
         }
 
+        // Expose globally for instant inline or shortcode invocation
+        window.MM_openLightbox = openLightbox;
+        window.MM_closeLightbox = closeLightbox;
+
         // Initialize DOM structure early
         ensureLightboxDom();
 
         // Delegated click listener specifically for profile photos
-        $(document).on('click', '.mm-photos-grid img, .az-about-photo img, .mm-lightbox-trigger, [data-mm-lightbox]', function (e) {
+        $(document).on('click', '.mm-photos-grid img, .az-about-photo img, .main-photo-frame img, .candidate-hero-block img, .matched-profile-summary-box img, .mm-card img, .mm-lightbox-trigger, [data-mm-lightbox]', function (e) {
             e.preventDefault();
             e.stopPropagation();
             openLightbox(this);
