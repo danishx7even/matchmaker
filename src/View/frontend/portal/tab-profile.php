@@ -41,7 +41,7 @@ $badge_label = $repo->format_tier_label($user_type);
     <div class="az-card az-about-card">
         <div class="az-about-photo">
             <?php if (!empty($photo)) : ?>
-                <img src="<?php echo esc_url($photo); ?>" alt="<?php echo esc_attr($name); ?>" class="mm-lightbox-trigger" data-mm-lightbox="profile-gallery" style="border-radius:14px;object-fit:cover;cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>">
+                <img src="<?php echo esc_url($photo); ?>" alt="<?php echo esc_attr($name); ?>" class="mm-lightbox-trigger" data-mm-lightbox="profile-gallery" style="border-radius:14px;object-fit:cover;cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}">
             <?php else : ?>
                 <div class="az-photo-placeholder" style="width:320px;height:320px;border-radius:14px;background:#f0ede6;display:flex;align-items:center;justify-content:center;font-size:48px;color:#CC723F;font-weight:700;">
                     <?php echo esc_html(strtoupper(substr($name ?: 'U', 0, 1))); ?>

@@ -57,40 +57,52 @@ class PortalController
     {
         global $post;
 
-        if (!is_a($post, 'WP_Post')) {
+        $dashboard_id = (int) get_option('mm_page_dashboard_id', 0);
+        $is_dashboard = ($dashboard_id > 0 && function_exists('is_page') && is_page($dashboard_id));
+        $has_shortcode = is_a($post, 'WP_Post') && (has_shortcode($post->post_content, 'matchmaker_member_portal') || has_shortcode($post->post_content, 'az_profile'));
+
+        if (!$is_dashboard && !$has_shortcode) {
             return;
         }
 
-        $has_shortcode = has_shortcode($post->post_content, 'matchmaker_member_portal') || has_shortcode($post->post_content, 'az_profile');
+        $this->enqueue_portal_assets();
+    }
 
-        if (!$has_shortcode) {
-            return;
-        }
-
+    /**
+     * Directly enqueue portal CSS & JS assets.
+     *
+     * @return void
+     */
+    public function enqueue_portal_assets(): void
+    {
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
         $version    = defined('MM_VERSION') ? MM_VERSION : '2.0.0';
 
-        wp_enqueue_style(
-            'mm-member-portal-styles',
-            $plugin_url . 'assets/css/member-portal.css',
-            [],
-            $version
-        );
+        if (!wp_style_is('mm-member-portal-styles', 'enqueued')) {
+            wp_enqueue_style(
+                'mm-member-portal-styles',
+                $plugin_url . 'assets/css/member-portal.css',
+                [],
+                $version
+            );
+        }
 
-        wp_enqueue_script(
-            'mm-member-portal-script',
-            $plugin_url . 'assets/js/member-portal.js',
-            ['jquery', 'heartbeat'],
-            $version,
-            true
-        );
+        if (!wp_script_is('mm-member-portal-script', 'enqueued')) {
+            wp_enqueue_script(
+                'mm-member-portal-script',
+                $plugin_url . 'assets/js/member-portal.js',
+                ['jquery', 'heartbeat'],
+                $version,
+                true
+            );
 
-        wp_localize_script('mm-member-portal-script', 'mmPortalData', [
-            'ajaxUrl'       => admin_url('admin-ajax.php'),
-            'nonce'         => wp_create_nonce('mm_portal_nonce'),
-            'dashboardUrl'  => home_url('/dashboard/'),
-            'membershipUrl' => home_url('/membership-account/'),
-        ]);
+            wp_localize_script('mm-member-portal-script', 'mmPortalData', [
+                'ajaxUrl'       => admin_url('admin-ajax.php'),
+                'nonce'         => wp_create_nonce('mm_portal_nonce'),
+                'dashboardUrl'  => home_url('/dashboard/'),
+                'membershipUrl' => home_url('/membership-account/'),
+            ]);
+        }
     }
 
     /**
@@ -101,6 +113,8 @@ class PortalController
      */
     public function render_portal(array|string $atts = []): string
     {
+        $this->enqueue_portal_assets();
+
         if (!is_user_logged_in()) {
             $login_url = function_exists('pmpro_url') ? pmpro_url('login') : home_url('/login/');
             return '<div class="mm-portal-wrap"><div class="az-card" style="text-align:center; padding: 48px 24px;">'

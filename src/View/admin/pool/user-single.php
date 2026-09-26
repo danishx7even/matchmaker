@@ -94,9 +94,9 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
         
         <?php if (!empty($photo1) || !empty($photo2) || !empty($photo3)) : ?>
             <div class="mm-photos-grid">
-                <?php if (!empty($photo1)) : ?><img src="<?php echo esc_url($photo1); ?>" alt="Photo 1" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"><?php endif; ?>
-                <?php if (!empty($photo2)) : ?><img src="<?php echo esc_url($photo2); ?>" alt="Photo 2" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"><?php endif; ?>
-                <?php if (!empty($photo3)) : ?><img src="<?php echo esc_url($photo3); ?>" alt="Photo 3" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"><?php endif; ?>
+                <?php if (!empty($photo1)) : ?><img src="<?php echo esc_url($photo1); ?>" alt="Photo 1" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                <?php if (!empty($photo2)) : ?><img src="<?php echo esc_url($photo2); ?>" alt="Photo 2" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                <?php if (!empty($photo3)) : ?><img src="<?php echo esc_url($photo3); ?>" alt="Photo 3" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
             </div>
             <hr style="margin:15px 0 10px; border:0; border-top:1px solid #eee;">
         <?php endif; ?>
@@ -286,4 +286,20 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
             <?php endif; ?>
         </tbody>
     </table>
+</div>
+
+<!-- Responsive Lightbox Modal Component -->
+<div id="mm-lightbox-modal" class="mm-lightbox-modal" role="dialog" aria-modal="true" aria-label="<?php esc_attr_e('Photo Preview', 'matchmaker'); ?>" style="display:none;">
+    <div class="mm-lightbox-container">
+        <button type="button" class="mm-lightbox-close" aria-label="<?php esc_attr_e('Close Preview', 'matchmaker'); ?>" onclick="if(window.MM_closeLightbox){window.MM_closeLightbox();}">&times;</button>
+        <button type="button" class="mm-lightbox-nav mm-lightbox-prev" aria-label="<?php esc_attr_e('Previous Image', 'matchmaker'); ?>">&#10094;</button>
+        <button type="button" class="mm-lightbox-nav mm-lightbox-next" aria-label="<?php esc_attr_e('Next Image', 'matchmaker'); ?>">&#10095;</button>
+        <div class="mm-lightbox-img-wrap">
+            <img src="" alt="" class="mm-lightbox-img" id="mm-lightbox-target-img">
+        </div>
+        <div class="mm-lightbox-footer">
+            <span class="mm-lightbox-counter" id="mm-lightbox-counter">1 / 1</span>
+            <button type="button" class="mm-lightbox-zoom-toggle" id="mm-lightbox-zoom-toggle" title="<?php esc_attr_e('Toggle Zoom', 'matchmaker'); ?>">&#128269;</button>
+        </div>
+    </div>
 </div>

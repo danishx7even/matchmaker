@@ -60,7 +60,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     <div class="mm-card">
         <h3><?php echo esc_html($u1 ? $u1->display_name : 'User #' . $u1_id); ?> (User 1)</h3>
         <?php if (!empty($u1_photo)) : ?>
-            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($u1_photo); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-1" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
+            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($u1_photo); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-1" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"></div>
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u1 ? $u1->user_email : '—'); ?></td></tr>
@@ -84,7 +84,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     <div class="mm-card">
         <h3><?php echo esc_html($u2 ? $u2->display_name : 'User #' . $u2_id); ?> (User 2)</h3>
         <?php if (!empty($u2_photo)) : ?>
-            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($u2_photo); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-2" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
+            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($u2_photo); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-2" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"></div>
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u2 ? $u2->user_email : '—'); ?></td></tr>
@@ -97,5 +97,21 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo $repo->format_social_links_html($m2['user_social_links'] ?? ''); ?></td></tr>
             <tr><th><?php esc_html_e('Response', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($match['user_two_response'] ?? 'pending')); ?></strong></td></tr>
         </table>
+    </div>
+</div>
+
+<!-- Responsive Lightbox Modal Component -->
+<div id="mm-lightbox-modal" class="mm-lightbox-modal" role="dialog" aria-modal="true" aria-label="<?php esc_attr_e('Photo Preview', 'matchmaker'); ?>" style="display:none;">
+    <div class="mm-lightbox-container">
+        <button type="button" class="mm-lightbox-close" aria-label="<?php esc_attr_e('Close Preview', 'matchmaker'); ?>" onclick="if(window.MM_closeLightbox){window.MM_closeLightbox();}">&times;</button>
+        <button type="button" class="mm-lightbox-nav mm-lightbox-prev" aria-label="<?php esc_attr_e('Previous Image', 'matchmaker'); ?>">&#10094;</button>
+        <button type="button" class="mm-lightbox-nav mm-lightbox-next" aria-label="<?php esc_attr_e('Next Image', 'matchmaker'); ?>">&#10095;</button>
+        <div class="mm-lightbox-img-wrap">
+            <img src="" alt="" class="mm-lightbox-img" id="mm-lightbox-target-img">
+        </div>
+        <div class="mm-lightbox-footer">
+            <span class="mm-lightbox-counter" id="mm-lightbox-counter">1 / 1</span>
+            <button type="button" class="mm-lightbox-zoom-toggle" id="mm-lightbox-zoom-toggle" title="<?php esc_attr_e('Toggle Zoom', 'matchmaker'); ?>">&#128269;</button>
+        </div>
     </div>
 </div>

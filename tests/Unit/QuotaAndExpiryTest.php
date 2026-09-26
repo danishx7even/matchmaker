@@ -329,6 +329,23 @@ final class QuotaAndExpiryTest extends TestCase
         $this->assertEquals(3, $summary['user_quotas'][801]);
         $this->assertEquals(1, $summary['user_quotas'][803]);
     }
+
+    public function test_get_match_stats_uses_monthly_quota_count_excluding_pending_records(): void
+    {
+        $repo = MatchRepository::instance();
+        $user_id = 901;
+        $cur_month = gmdate('Y-m');
+
+        // Set monthly quota count to 2
+        update_user_meta($user_id, 'cycle_matches_count', 2);
+        update_user_meta($user_id, 'mm_cycle_month', $cur_month);
+
+        $stats = $repo->get_match_stats($user_id);
+
+        // received_this_term must equal the monthly quota count (2), regardless of pending matches in DB
+        $this->assertEquals(2, $stats['received_this_term']);
+    }
 }
+
 
 

@@ -6,6 +6,17 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 114: Use Monthly Quota Count for Matches Received This Month in Member Portal
+- **Objective**:
+  1. Fix the "Matches received this month" counter on the member dashboard (`tab-profile.php` via `MatchRepository::get_match_stats`) to use the user's active billing cycle quota count (`maybe_reset_monthly_quota($user_id)`) rather than counting raw pending/unapproved database rows.
+  2. Ensure pending review and admin-rejected matches do not prematurely inflate the member's delivered matches counter.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `get_match_stats(int $user_id)` so that `received_this_term` calls `$this->maybe_reset_monthly_quota($user_id)`.
+  - `tests/Unit/QuotaAndExpiryTest.php`:
+    - Added `test_get_match_stats_uses_monthly_quota_count_excluding_pending_records`.
+- **Verification**: Ran full automated test suite with **196/196 tests passing** (0 failures, 0 errors).
+
 ### Task 113: Bulletproof Profile Details Lightbox & Disable 15s Heartbeat on Admin Dashboard
 - **Objective**:
   1. Ensure profile details lightbox triggers 100% reliably in both Admin (`user-single.php`, `match-single.php`) and Member Portal (`tab-profile.php`, `step-2-profile.php`, `step-1-discovery.php`, `step-5-contact.php`).

@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
             <div class="new-match-card">
                 <div>
                     <div class="candidate-hero-block">
-                        <img src="<?php echo esc_url($active_match['photo'] ?: get_avatar_url(0, ['size' => 150])); ?>" alt="<?php echo esc_attr($active_match['name']); ?>" class="candidate-square-thumb mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>">
+                        <img src="<?php echo esc_url($active_match['photo'] ?: get_avatar_url(0, ['size' => 150])); ?>" alt="<?php echo esc_attr($active_match['name']); ?>" class="candidate-square-thumb mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}">
                         <div class="candidate-meta">
                             <h2 class="font-cormorant"><?php echo esc_html($active_match['name']); ?>, <?php echo esc_html($active_match['age']); ?></h2>
                             <div class="meta-loc">

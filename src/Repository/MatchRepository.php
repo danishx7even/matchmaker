@@ -1859,15 +1859,8 @@ class MatchRepository
         $table       = $wpdb->prefix . 'matches';
         $month_start = gmdate('Y-m-01 00:00:00');
 
-        // 1. Count of matches received this month (all statuses: approved, matched, rejected, expired)
-        $received_this_term = (int) $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$table}
-                 WHERE (user_one_id = %d OR user_two_id = %d)
-                   AND created_at >= %s",
-                $user_id, $user_id, $month_start
-            )
-        );
+        // 1. Count of matches received this month (using monthly quota count: approved / delivered matches)
+        $received_this_term = $this->maybe_reset_monthly_quota($user_id);
 
         // 2. Remaining days to respond to current active approved match
         $active_row = $wpdb->get_row(

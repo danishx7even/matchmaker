@@ -7,10 +7,3 @@
 ---
 
 *No active task currently in progress. Ready for next prompt.*
-
-
-
-
-
-
-
