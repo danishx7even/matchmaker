@@ -543,6 +543,321 @@
                 }
             });
         });
+
+        /* =============================================================
+           Responsive Image Lightbox Module
+           ============================================================= */
+        var lightboxGallery = [];
+        var lightboxIndex   = 0;
+
+        function ensureLightboxDom() {
+            if ($('#mm-lightbox-modal').length === 0) {
+                var modalHtml = [
+                    '<div id="mm-lightbox-modal" class="mm-lightbox-modal" role="dialog" aria-modal="true" aria-label="Image Preview">',
+                    '  <div class="mm-lightbox-container">',
+                    '    <button type="button" class="mm-lightbox-close" aria-label="Close Preview">&times;</button>',
+                    '    <button type="button" class="mm-lightbox-nav mm-lightbox-prev" aria-label="Previous Image">&#10094;</button>',
+                    '    <button type="button" class="mm-lightbox-nav mm-lightbox-next" aria-label="Next Image">&#10095;</button>',
+                    '    <div class="mm-lightbox-img-wrap">',
+                    '      <img src="" alt="" class="mm-lightbox-img" id="mm-lightbox-target-img">',
+                    '    </div>',
+                    '    <div class="mm-lightbox-footer">',
+                    '      <span class="mm-lightbox-counter" id="mm-lightbox-counter">1 / 1</span>',
+                    '      <button type="button" class="mm-lightbox-zoom-toggle" id="mm-lightbox-zoom-toggle" title="Toggle Zoom">&#128269;</button>',
+                    '    </div>',
+                    '  </div>',
+                    '</div>'
+                ].join('');
+                $('body').append(modalHtml);
+            }
+        }
+
+        function updateLightboxView() {
+            if (!lightboxGallery.length || lightboxIndex < 0 || lightboxIndex >= lightboxGallery.length) {
+                return;
+            }
+            var item = lightboxGallery[lightboxIndex];
+            var $img = $('#mm-lightbox-target-img');
+            $img.removeClass('is-zoomed');
+            $img.attr('src', item.src);
+            $img.attr('alt', item.alt || 'Photo');
+
+            $('#mm-lightbox-counter').text((lightboxIndex + 1) + ' / ' + lightboxGallery.length);
+
+            if (lightboxGallery.length > 1) {
+                $('.mm-lightbox-nav').show();
+            } else {
+                $('.mm-lightbox-nav').hide();
+            }
+        }
+
+        function openLightbox(src, galleryName) {
+            ensureLightboxDom();
+            lightboxGallery = [];
+            lightboxIndex   = 0;
+
+            if (galleryName) {
+                var $items = $('[data-mm-lightbox="' + galleryName + '"]');
+                $items.each(function () {
+                    var itemSrc = $(this).attr('src') || $(this).data('src') || '';
+                    if (itemSrc) {
+                        lightboxGallery.push({
+                            src: itemSrc,
+                            alt: $(this).attr('alt') || ''
+                        });
+                    }
+                });
+            }
+
+            if (lightboxGallery.length === 0 && src) {
+                lightboxGallery.push({ src: src, alt: 'Photo' });
+            }
+
+            for (var i = 0; i < lightboxGallery.length; i++) {
+                if (lightboxGallery[i].src === src) {
+                    lightboxIndex = i;
+                    break;
+                }
+            }
+
+            updateLightboxView();
+            var $modal = $('#mm-lightbox-modal');
+            $modal.css('display', 'flex');
+            setTimeout(function () {
+                $modal.addClass('is-active');
+            }, 10);
+        }
+
+        function closeLightbox() {
+            var $modal = $('#mm-lightbox-modal');
+            $modal.removeClass('is-active');
+            setTimeout(function () {
+                $modal.css('display', 'none');
+                $('#mm-lightbox-target-img').removeClass('is-zoomed').attr('src', '');
+            }, 200);
+        }
+
+        function nextLightboxImage() {
+            if (lightboxGallery.length <= 1) return;
+            lightboxIndex = (lightboxIndex + 1) % lightboxGallery.length;
+            updateLightboxView();
+        }
+
+        function prevLightboxImage() {
+            if (lightboxGallery.length <= 1) return;
+            lightboxIndex = (lightboxIndex - 1 + lightboxGallery.length) % lightboxGallery.length;
+            updateLightboxView();
+        }
+
+        $(document).on('click', '.mm-lightbox-trigger, [data-mm-lightbox]', function (e) {
+            e.preventDefault();
+            var src = $(this).attr('src') || $(this).data('src') || '';
+            var gallery = $(this).attr('data-mm-lightbox') || '';
+            if (src) {
+                openLightbox(src, gallery);
+            }
+        });
+
+        $(document).on('click', '.mm-lightbox-close', function (e) {
+            e.preventDefault();
+            closeLightbox();
+        });
+
+        $(document).on('click', '.mm-lightbox-next', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            nextLightboxImage();
+        });
+
+        $(document).on('click', '.mm-lightbox-prev', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            prevLightboxImage();
+        });
+
+        $(document).on('click', '#mm-lightbox-modal', function (e) {
+            if (e.target === this || $(e.target).hasClass('mm-lightbox-container')) {
+                closeLightbox();
+            }
+        });
+
+        $(document).on('click', '#mm-lightbox-target-img, #mm-lightbox-zoom-toggle', function (e) {
+            e.stopPropagation();
+            $('#mm-lightbox-target-img').toggleClass('is-zoomed');
+        });
+
+        $(document).on('keydown', function (e) {
+            var $modal = $('#mm-lightbox-modal');
+            if ($modal.length && $modal.hasClass('is-active')) {
+                if (e.key === 'Escape') {
+                    closeLightbox();
+                } else if (e.key === 'ArrowRight') {
+                    nextLightboxImage();
+                } else if (e.key === 'ArrowLeft') {
+                    prevLightboxImage();
+                }
+            }
+        });
+
+        /* =============================================================
+           System File Logs Live Interactive Module
+           ============================================================= */
+        function getFileLogsNonce() {
+            var elNonce = $('#mm-log-switcher-group').attr('data-nonce');
+            if (elNonce) return elNonce;
+            if (typeof matchmakerAdmin !== 'undefined' && matchmakerAdmin.file_logs_nonce) {
+                return matchmakerAdmin.file_logs_nonce;
+            }
+            return getAdminNonce();
+        }
+
+        var currentLogType = 'info';
+        var cachedRawLog   = '';
+
+        function renderLogLines(rawContent) {
+            var $wrapper = $('#mm-log-lines-wrapper');
+            if (!$wrapper.length) return;
+
+            if (!rawContent || !rawContent.trim().length) {
+                $wrapper.html('<div style="color:#64748b; font-style:italic; padding:20px 0; text-align:center;">Log file is currently empty.</div>');
+                return;
+            }
+
+            var lines = rawContent.split('\n');
+            var filter = ($('#mm-log-filter-input').val() || '').toLowerCase();
+            var html = '';
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                if (!line || !line.trim().length) continue;
+
+                if (filter && line.toLowerCase().indexOf(filter) === -1) {
+                    continue;
+                }
+
+                var color = '#f8fafc';
+                if (line.indexOf('[ERROR]') !== -1) {
+                    color = '#f87171';
+                } else if (line.indexOf('[WARNING]') !== -1) {
+                    color = '#fbbf24';
+                } else if (line.indexOf('[INFO]') !== -1) {
+                    color = '#38bdf8';
+                } else if (line.indexOf('[DEBUG]') !== -1) {
+                    color = '#c084fc';
+                }
+
+                html += '<div class="mm-log-line" style="color:' + color + '; border-bottom:1px solid rgba(255,255,255,0.03); padding:2px 0;">' + escapeHtml(line) + '</div>';
+            }
+
+            if (!html.length && filter) {
+                html = '<div style="color:#64748b; font-style:italic; padding:20px 0; text-align:center;">No log lines matched the search filter "' + escapeHtml(filter) + '".</div>';
+            }
+
+            $wrapper.html(html);
+
+            if ($('#mm-log-auto-scroll').is(':checked')) {
+                var container = document.getElementById('mm-log-terminal-container');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }
+        }
+
+        function loadFileLog(type, maxLines) {
+            var $overlay = $('#mm-log-loading-overlay');
+            if ($overlay.length) $overlay.css('display', 'flex');
+
+            $.ajax({
+                url: getAjaxUrl(),
+                type: 'POST',
+                data: {
+                    action: 'mm_get_file_log',
+                    nonce: getFileLogsNonce(),
+                    log_type: type,
+                    max_lines: maxLines || ($('#mm-log-max-lines').val() || 300)
+                },
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.success && res.data) {
+                        cachedRawLog = res.data.content || '';
+                        $('#mm-log-meta-path').text(res.data.path || '');
+                        $('#mm-log-meta-size').text(res.data.size || '0 B');
+                        $('#mm-log-meta-lines').text(res.data.lines || 0);
+                        $('#mm-log-meta-mtime').text(res.data.mtime || 'Never');
+                        renderLogLines(cachedRawLog);
+
+                        var $dlBtn = $('#mm-btn-download-log');
+                        if ($dlBtn.length) {
+                            var currentHref = $dlBtn.attr('href') || '';
+                            $dlBtn.attr('href', currentHref.replace(/log_type=[a-z]+/, 'log_type=' + type));
+                        }
+                    }
+                },
+                complete: function () {
+                    if ($overlay.length) $overlay.hide();
+                }
+            });
+        }
+
+        $(document).on('click', '.mm-log-type-btn', function (e) {
+            e.preventDefault();
+            var $btn = $(this);
+            var type = $btn.attr('data-log-type') || 'info';
+            currentLogType = type;
+
+            $('.mm-log-type-btn').css({ background: 'transparent', color: '#64748b', boxShadow: 'none' }).removeClass('active-log-btn');
+            $btn.css({ background: '#CC723F', color: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }).addClass('active-log-btn');
+
+            loadFileLog(type);
+        });
+
+        $(document).on('input', '#mm-log-filter-input', function () {
+            renderLogLines(cachedRawLog);
+        });
+
+        $(document).on('change', '#mm-log-max-lines', function () {
+            loadFileLog(currentLogType, $(this).val());
+        });
+
+        $(document).on('click', '#mm-btn-refresh-log', function (e) {
+            e.preventDefault();
+            loadFileLog(currentLogType);
+        });
+
+        $(document).on('click', '#mm-btn-clear-log', function (e) {
+            e.preventDefault();
+            if (!window.confirm('Are you sure you want to completely clear ' + currentLogType + '.log? This action cannot be undone.')) {
+                return;
+            }
+
+            var $overlay = $('#mm-log-loading-overlay');
+            if ($overlay.length) $overlay.css('display', 'flex');
+
+            $.ajax({
+                url: getAjaxUrl(),
+                type: 'POST',
+                data: {
+                    action: 'mm_clear_file_log',
+                    nonce: getFileLogsNonce(),
+                    log_type: currentLogType
+                },
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.success) {
+                        cachedRawLog = '';
+                        $('#mm-log-meta-size').text('0 B');
+                        $('#mm-log-meta-lines').text('0');
+                        $('#mm-log-meta-mtime').text('Just now');
+                        renderLogLines('');
+                    } else {
+                        alert((res && res.data && res.data.message) ? res.data.message : 'Failed to clear log.');
+                    }
+                },
+                complete: function () {
+                    if ($overlay.length) $overlay.hide();
+                }
+            });
+        });
     }
 
     function escapeHtml(str) {

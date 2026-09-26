@@ -6,6 +6,36 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 111: Active Match Auto-Expiry, Detailed Blockage Feedback, Profile Match History, Responsive Lightbox & Consolidated Logs Hub
+- **Objective**:
+  1. Auto-expire stale approved matches whose expiry window has elapsed during active match evaluation (`has_active_approved_match()`).
+  2. Provide specific, descriptive blockage notices when an admin attempts to approve or send a match to a user who already has an active approved match (specifying active user name, match ID, partner name, and days remaining).
+  3. Expose complete, unfiltered Match History on the single candidate profile details view (`user-single.php`) across all match states (Pending, Approved, Matched, Rejected, Expired, Admin Rejected).
+  4. Implement a responsive full-screen vanilla JS Lightbox modal for profile photos and table thumbnails with keyboard navigation, zoom toggle, and image counters.
+  5. Consolidate system file logs (`info.log` / `error.log`) directly into the **Matchmaker > Logs** hub (`admin.php?page=matchmaking-logs&tab=file_logs`) with live log switcher, terminal log viewer, search filter, max lines selector, download, and clear tools.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `has_active_approved_match(int $user_id, int $exclude_match_id = 0)` to perform background self-healing auto-expiry of overdue approved records before evaluating active count.
+    - Added `get_active_approved_match_info(int $user_id, int $exclude_match_id = 0): ?array` to extract partner details and days remaining for descriptive blockage feedback.
+    - Added structured `log_event()` audit records in `expire_match()` and match state transitions.
+  - `src/Service/MatchService.php`:
+    - Updated `process_admin_approve()` to pass `$match_id` into `has_active_approved_match()` and build descriptive blockage notices detailing the active member name, match ID, partner, and days remaining.
+  - `src/Admin/AdminPortal.php`:
+    - In `render_single_user_view()`, removed the `array_filter` so `$matches` preserves all historical records (Pending, Approved, Matched, Rejected, Expired, Admin Rejected).
+    - Updated `enqueue_admin_assets()` to localize `file_logs_nonce` to `matchmakerAdmin`.
+    - Updated `render_logs_page()` to support `tab=file_logs` with nonces and log statistics.
+  - `src/View/admin/pool/user-single.php`, `match-single.php`, `pool-list.php`:
+    - Added `data-mm-lightbox` attributes and `mm-lightbox-trigger` classes to profile photos and candidate thumbnails.
+  - `src/View/admin/logs/tab-file-logs.php` & `logs.php`:
+    - Created dedicated System File Logs tab view in Logs hub with dual log switcher, active log meta bar, search filter, max lines dropdown, auto-scroll toggle, download, and clear log actions.
+    - Updated `logs.php` nav tabs and renderer to include `tab=file_logs`.
+  - `assets/css/admin-matchmaker.css` & `assets/js/admin-matchmaker.js`:
+    - Added responsive full-screen Lightbox modal styles and vanilla JS interactive module (`ensureLightboxDom`, `openLightbox`, `updateLightboxView`, `nextLightboxImage`, `prevLightboxImage`, keyboard and zoom handlers).
+    - Added interactive AJAX File Logs module for real-time log stream rendering, switching, filtering, downloading, and clearing.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Added `test_has_active_approved_match_auto_expires_overdue_records`, `test_get_active_approved_match_info_returns_blockage_details`, `test_process_admin_approve_blockage_message_formatting`, and `test_single_user_match_history_renders_all_statuses`.
+- **Verification**: Ran full automated test suite with **193/193 tests passing** (0 failures, 0 errors).
+
 ### Task 110: Fix Automatchmaking SQL Query Placeholders Mismatch, Candidate Gating & Trigger Dispatch
 - **Objective**:
   1. Diagnose why automatic matchmaking runs (on form submit, Action Scheduler, or admin trigger) were creating 0 matches.

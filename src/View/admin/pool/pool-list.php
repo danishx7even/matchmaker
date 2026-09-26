@@ -153,7 +153,7 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
                 <tr>
                     <td>
                         <?php if (!empty($photo)) : ?>
-                            <img src="<?php echo esc_url($photo); ?>" style="width:36px;height:36px;border-radius:4px;object-fit:cover;" alt="">
+                            <img src="<?php echo esc_url($photo); ?>" style="width:36px;height:36px;border-radius:4px;object-fit:cover;cursor:zoom-in;" alt="" data-mm-lightbox="pool-user-<?php echo $uid; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>">
                         <?php else : ?>
                             <div class="mm-avatar-thumb">
                                 <?php echo esc_html(strtoupper(substr($user_obj ? $user_obj->display_name : 'U', 0, 1))); ?>

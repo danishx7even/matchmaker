@@ -51,6 +51,9 @@ $is_test_mode = $repo->is_test_mode();
         <a href="<?php echo esc_url(admin_url('admin.php?page=matchmaking-logs&tab=notification_logs')); ?>" class="nav-tab <?php echo ($active_tab === 'notification_logs') ? 'nav-tab-active' : ''; ?>">
             ✉️ <?php esc_html_e('Notification & Email Logs', 'matchmaker'); ?>
         </a>
+        <a href="<?php echo esc_url(admin_url('admin.php?page=matchmaking-logs&tab=file_logs')); ?>" class="nav-tab <?php echo ($active_tab === 'file_logs') ? 'nav-tab-active' : ''; ?>">
+            🖥️ <?php esc_html_e('System File Logs', 'matchmaker'); ?>
+        </a>
         <a href="<?php echo esc_url(admin_url('admin.php?page=matchmaking-logs&tab=debugger')); ?>" class="nav-tab <?php echo ($active_tab === 'debugger') ? 'nav-tab-active' : ''; ?>">
             🔍 <?php esc_html_e('Candidate Gate Debugger', 'matchmaker'); ?>
         </a>
@@ -61,6 +64,9 @@ $is_test_mode = $repo->is_test_mode();
     if ($active_tab === 'notification_logs') {
         extract($tab_data, EXTR_SKIP);
         require __DIR__ . '/tab-notification-logs.php';
+    } elseif ($active_tab === 'file_logs') {
+        extract($tab_data, EXTR_SKIP);
+        require __DIR__ . '/tab-file-logs.php';
     } elseif ($active_tab === 'debugger') {
         extract($tab_data, EXTR_SKIP);
         require __DIR__ . '/tab-debugger.php';

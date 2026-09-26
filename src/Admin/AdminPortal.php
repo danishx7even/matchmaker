@@ -427,8 +427,9 @@ class AdminPortal
             'mm-admin-script',
             'matchmakerAdmin',
             [
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce'    => wp_create_nonce('mm_admin_nonce'),
+                'ajax_url'        => admin_url('admin-ajax.php'),
+                'nonce'           => wp_create_nonce('mm_admin_nonce'),
+                'file_logs_nonce' => wp_create_nonce('mm_file_logs_nonce'),
                 'strings'  => [
                     'exporting'      => __('Generating CSV export...', 'matchmaker'),
                     'export_success' => __('CSV downloaded successfully.', 'matchmaker'),
@@ -875,10 +876,7 @@ class AdminPortal
         $user_obj    = get_userdata($user_id);
         $meta        = $repo->get_meta_block($user_id);
         $all_matches = $repo->find_all_matches_for_user($user_id);
-        $matches     = array_values(array_filter($all_matches, static function ($m) {
-            $st = (string) ($m['status'] ?? '');
-            return !in_array($st, ['expired', 'rejected', 'admin_rejected'], true);
-        }));
+        $matches     = $all_matches;
 
         if (!$pool || !$user_obj) {
             echo '<p>' . esc_html__('User profile not found in matchmaking pool.', 'matchmaker') . '</p>';
@@ -1179,13 +1177,36 @@ class AdminPortal
         $matches_table = $wpdb->prefix . 'matches';
 
         $active_tab = sanitize_key($_GET['tab'] ?? 'match_logs');
-        if (!in_array($active_tab, ['match_logs', 'notification_logs', 'debugger'], true)) {
+        if (!in_array($active_tab, ['match_logs', 'notification_logs', 'file_logs', 'debugger'], true)) {
             $active_tab = 'match_logs';
         }
 
         $tab_data = [];
 
-        if ($active_tab === 'debugger') {
+        if ($active_tab === 'file_logs') {
+            $download_nonce  = wp_create_nonce('mm_download_file_log');
+            $file_logs_nonce = wp_create_nonce('mm_file_logs_nonce');
+            $info_log_stats  = [
+                'path'    => \Matchmaker\Service\FileLoggerService::get_log_file_path('info'),
+                'size'    => \Matchmaker\Service\FileLoggerService::get_log_file_size('info'),
+                'lines'   => \Matchmaker\Service\FileLoggerService::get_log_line_count('info'),
+                'mtime'   => \Matchmaker\Service\FileLoggerService::get_log_file_mtime('info'),
+                'content' => \Matchmaker\Service\FileLoggerService::get_log_content('info', 300),
+            ];
+            $error_log_stats = [
+                'path'    => \Matchmaker\Service\FileLoggerService::get_log_file_path('error'),
+                'size'    => \Matchmaker\Service\FileLoggerService::get_log_file_size('error'),
+                'lines'   => \Matchmaker\Service\FileLoggerService::get_log_line_count('error'),
+                'mtime'   => \Matchmaker\Service\FileLoggerService::get_log_file_mtime('error'),
+                'content' => \Matchmaker\Service\FileLoggerService::get_log_content('error', 300),
+            ];
+            $tab_data = [
+                'download_nonce'  => $download_nonce,
+                'file_logs_nonce' => $file_logs_nonce,
+                'info_log_stats'  => $info_log_stats,
+                'error_log_stats' => $error_log_stats,
+            ];
+        } elseif ($active_tab === 'debugger') {
             // Live Matching Trigger for Audit
             $run_notice = '';
             if (isset($_POST['mm_run_live_user_id'])) {

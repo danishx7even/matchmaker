@@ -150,20 +150,50 @@ class MatchService {
             $u1_id = (int) $match['user_one_id'];
             $u2_id = (int) $match['user_two_id'];
 
-            if ($repo->has_active_approved_match($u1_id)) {
-                $u1_obj = get_userdata($u1_id);
-                $msg = sprintf(__('Cannot approve match: %s already has an active approved match awaiting response.', 'matchmaker'), $u1_obj ? $u1_obj->display_name : "User #{$u1_id}");
-                $repo->log_event('match_lifecycle', 'admin_approval_blocked', sprintf(__('Approval Blocked for Match #%d (Active Match Pending)', 'matchmaker'), $match_id), $msg, ['match_id' => $match_id, 'active_user_id' => $u1_id], $match_id, $admin_id, null, 'warning');
+            if ($repo->has_active_approved_match($u1_id, $match_id)) {
+                $u1_obj  = get_userdata($u1_id);
+                $u1_name = $u1_obj ? $u1_obj->display_name : "User #{$u1_id}";
+                $info    = $repo->get_active_approved_match_info($u1_id, $match_id);
+
+                if ($info) {
+                    $msg = sprintf(
+                        __('Cannot approve match #%d: %s already has an active approved match (#%d with %s) awaiting response (%d day(s) remaining).', 'matchmaker'),
+                        $match_id,
+                        $u1_name,
+                        (int) $info['match_id'],
+                        $info['partner_name'],
+                        (int) $info['days_remaining']
+                    );
+                } else {
+                    $msg = sprintf(__('Cannot approve match: %s already has an active approved match awaiting response.', 'matchmaker'), $u1_name);
+                }
+
+                $repo->log_event('match_lifecycle', 'admin_approval_blocked', sprintf(__('Approval Blocked for Match #%d (Active Match Pending for %s)', 'matchmaker'), $match_id, $u1_name), $msg, ['match_id' => $match_id, 'active_user_id' => $u1_id, 'active_match_info' => $info], $match_id, $admin_id, null, 'warning');
                 return [
                     'success' => false,
                     'message' => $msg,
                 ];
             }
 
-            if ($repo->has_active_approved_match($u2_id)) {
-                $u2_obj = get_userdata($u2_id);
-                $msg = sprintf(__('Cannot approve match: %s already has an active approved match awaiting response.', 'matchmaker'), $u2_obj ? $u2_obj->display_name : "User #{$u2_id}");
-                $repo->log_event('match_lifecycle', 'admin_approval_blocked', sprintf(__('Approval Blocked for Match #%d (Active Match Pending)', 'matchmaker'), $match_id), $msg, ['match_id' => $match_id, 'active_user_id' => $u2_id], $match_id, $admin_id, null, 'warning');
+            if ($repo->has_active_approved_match($u2_id, $match_id)) {
+                $u2_obj  = get_userdata($u2_id);
+                $u2_name = $u2_obj ? $u2_obj->display_name : "User #{$u2_id}";
+                $info    = $repo->get_active_approved_match_info($u2_id, $match_id);
+
+                if ($info) {
+                    $msg = sprintf(
+                        __('Cannot approve match #%d: %s already has an active approved match (#%d with %s) awaiting response (%d day(s) remaining).', 'matchmaker'),
+                        $match_id,
+                        $u2_name,
+                        (int) $info['match_id'],
+                        $info['partner_name'],
+                        (int) $info['days_remaining']
+                    );
+                } else {
+                    $msg = sprintf(__('Cannot approve match: %s already has an active approved match awaiting response.', 'matchmaker'), $u2_name);
+                }
+
+                $repo->log_event('match_lifecycle', 'admin_approval_blocked', sprintf(__('Approval Blocked for Match #%d (Active Match Pending for %s)', 'matchmaker'), $match_id, $u2_name), $msg, ['match_id' => $match_id, 'active_user_id' => $u2_id, 'active_match_info' => $info], $match_id, $admin_id, null, 'warning');
                 return [
                     'success' => false,
                     'message' => $msg,

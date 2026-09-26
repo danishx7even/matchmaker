@@ -1412,24 +1412,142 @@ class MatchRepository
 
     /**
      * Check if user currently has an active approved match awaiting response.
+     * Automatically self-heals and expires overdue approved records in the background.
      *
-     * @param int $user_id WordPress user ID.
-     * @return bool
+     * @param int $user_id          WordPress user ID.
+     * @param int $exclude_match_id Optional match ID to exclude (e.g. match currently being evaluated).
+     * @return bool True if an active, non-expired approved match exists.
      */
-    public function has_active_approved_match(int $user_id): bool
+    public function has_active_approved_match(int $user_id, int $exclude_match_id = 0): bool
     {
+        if ($user_id <= 0) {
+            return false;
+        }
+
         global $wpdb;
-        $table = $wpdb->prefix . 'matches';
-        $cnt   = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table} WHERE (user_one_id = %d OR user_two_id = %d) AND status = 'approved'",
-            $user_id,
-            $user_id
-        ));
+        $table       = $wpdb->prefix . 'matches';
+        $expiry_days = $this->get_match_expiry_days();
+
+        // 1. Background self-healing: Auto-expire any stale approved matches for this user past the deadline
+        $stale_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id FROM {$table}
+                 WHERE (user_one_id = %d OR user_two_id = %d)
+                   AND status = 'approved'
+                   AND COALESCE(approved_at, created_at, updated_at) < DATE_SUB(NOW(), INTERVAL %d DAY)",
+                $user_id,
+                $user_id,
+                $expiry_days
+            ),
+            ARRAY_A
+        );
+
+        if (!empty($stale_rows)) {
+            foreach ($stale_rows as $stale) {
+                $stale_id = (int) ($stale['id'] ?? 0);
+                if ($stale_id > 0) {
+                    $this->expire_match($stale_id, 'auto_expired_overdue');
+                }
+            }
+        }
+
+        // 2. Query remaining active approved matches
+        if ($exclude_match_id > 0) {
+            $cnt = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$table}
+                     WHERE (user_one_id = %d OR user_two_id = %d)
+                       AND status = 'approved'
+                       AND id != %d",
+                    $user_id,
+                    $user_id,
+                    $exclude_match_id
+                )
+            );
+        } else {
+            $cnt = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$table}
+                     WHERE (user_one_id = %d OR user_two_id = %d)
+                       AND status = 'approved'",
+                    $user_id,
+                    $user_id
+                )
+            );
+        }
+
         return $cnt > 0;
     }
 
     /**
-     * Mark a match as expired and trigger admin notification.
+     * Get details of the active approved match for a user (for descriptive blockage notices).
+     *
+     * @param int $user_id          WordPress user ID.
+     * @param int $exclude_match_id Optional match ID to exclude.
+     * @return array<string, mixed>|null Active match details or null if none.
+     */
+    public function get_active_approved_match_info(int $user_id, int $exclude_match_id = 0): ?array
+    {
+        if ($user_id <= 0) {
+            return null;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'matches';
+
+        if ($exclude_match_id > 0) {
+            $row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$table}
+                     WHERE (user_one_id = %d OR user_two_id = %d)
+                       AND status = 'approved'
+                       AND id != %d
+                     ORDER BY created_at DESC LIMIT 1",
+                    $user_id,
+                    $user_id,
+                    $exclude_match_id
+                ),
+                ARRAY_A
+            );
+        } else {
+            $row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$table}
+                     WHERE (user_one_id = %d OR user_two_id = %d)
+                       AND status = 'approved'
+                     ORDER BY created_at DESC LIMIT 1",
+                    $user_id,
+                    $user_id
+                ),
+                ARRAY_A
+            );
+        }
+
+        if (empty($row)) {
+            return null;
+        }
+
+        $is_u1       = ((int) $row['user_one_id'] === $user_id);
+        $partner_id  = $is_u1 ? (int) $row['user_two_id'] : (int) $row['user_one_id'];
+        $partner_obj = get_userdata($partner_id);
+
+        $expiry_days    = $this->get_match_expiry_days();
+        $ref_date       = !empty($row['approved_at']) ? $row['approved_at'] : (!empty($row['created_at']) ? $row['created_at'] : $row['updated_at']);
+        $deadline       = strtotime($ref_date . ' +' . $expiry_days . ' days');
+        $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
+
+        return [
+            'match_id'       => (int) $row['id'],
+            'partner_id'     => $partner_id,
+            'partner_name'   => $partner_obj ? $partner_obj->display_name : 'User #' . $partner_id,
+            'partner_email'  => $partner_obj ? $partner_obj->user_email : '',
+            'approved_at'    => $row['approved_at'] ?? $row['created_at'],
+            'days_remaining' => $days_remaining,
+        ];
+    }
+
+    /**
+     * Mark a match as expired and trigger admin notification and event logging.
      *
      * @param int      $match_id          Match row ID.
      * @param string   $reason            Reason for expiry.
@@ -1440,6 +1558,8 @@ class MatchRepository
     {
         global $wpdb;
         $table = $wpdb->prefix . 'matches';
+
+        $match = $this->find_match_by_id($match_id);
 
         $updated = $wpdb->update(
             $table,
@@ -1453,6 +1573,24 @@ class MatchRepository
         if ($updated !== false) {
             $this->dismiss_notifications_for_match($match_id, 'match_approved');
             \Matchmaker\Service\NotificationService::instance()->send_match_expired_admin_email($match_id, $reason, $declining_user_id);
+
+            $this->log_event(
+                'match_lifecycle',
+                'match_expired',
+                sprintf(__('Match #%d Expired (%s)', 'matchmaker'), $match_id, str_replace('_', ' ', $reason)),
+                sprintf(__('Match #%d between User #%d and User #%d transitioned to expired. Reason: %s', 'matchmaker'), $match_id, (int) ($match['user_one_id'] ?? 0), (int) ($match['user_two_id'] ?? 0), $reason),
+                [
+                    'match_id'          => $match_id,
+                    'reason'            => $reason,
+                    'declining_user_id' => $declining_user_id,
+                    'match'             => $match,
+                ],
+                $match_id,
+                $declining_user_id,
+                null,
+                'warning'
+            );
+
             return true;
         }
 

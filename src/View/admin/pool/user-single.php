@@ -94,9 +94,9 @@ $photo3 = $meta['user_photo3'] ?? '';
         
         <?php if (!empty($photo1) || !empty($photo2) || !empty($photo3)) : ?>
             <div class="mm-photos-grid">
-                <?php if (!empty($photo1)) : ?><img src="<?php echo esc_url($photo1); ?>" alt="Photo 1"><?php endif; ?>
-                <?php if (!empty($photo2)) : ?><img src="<?php echo esc_url($photo2); ?>" alt="Photo 2"><?php endif; ?>
-                <?php if (!empty($photo3)) : ?><img src="<?php echo esc_url($photo3); ?>" alt="Photo 3"><?php endif; ?>
+                <?php if (!empty($photo1)) : ?><img src="<?php echo esc_url($photo1); ?>" alt="Photo 1" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"><?php endif; ?>
+                <?php if (!empty($photo2)) : ?><img src="<?php echo esc_url($photo2); ?>" alt="Photo 2" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"><?php endif; ?>
+                <?php if (!empty($photo3)) : ?><img src="<?php echo esc_url($photo3); ?>" alt="Photo 3" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"><?php endif; ?>
             </div>
             <hr style="margin:15px 0 10px; border:0; border-top:1px solid #eee;">
         <?php endif; ?>
@@ -218,7 +218,7 @@ $photo3 = $meta['user_photo3'] ?? '';
                         <td>
                             <div style="display:flex; align-items:center; gap:10px;">
                                 <?php if (!empty($cand_photo)) : ?>
-                                    <img src="<?php echo esc_url($cand_photo); ?>" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" alt="">
+                                    <img src="<?php echo esc_url($cand_photo); ?>" style="width:34px;height:34px;border-radius:50%;object-fit:cover;cursor:zoom-in;" alt="" data-mm-lightbox="cand-thumb-<?php echo $cand_id; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>">
                                 <?php else : ?>
                                     <div class="mm-avatar-thumb" style="width:34px;height:34px;border-radius:50%;">
                                         <?php echo esc_html(strtoupper(substr($cand_user ? $cand_user->display_name : 'U', 0, 1))); ?>

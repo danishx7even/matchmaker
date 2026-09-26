@@ -59,7 +59,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     <div class="mm-card">
         <h3><?php echo esc_html($u1 ? $u1->display_name : 'User #' . $u1_id); ?> (User 1)</h3>
         <?php if (!empty($m1['user_photo1'])) : ?>
-            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($m1['user_photo1']); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;" alt=""></div>
+            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($m1['user_photo1']); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-1" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u1 ? $u1->user_email : '—'); ?></td></tr>
@@ -82,7 +82,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     <div class="mm-card">
         <h3><?php echo esc_html($u2 ? $u2->display_name : 'User #' . $u2_id); ?> (User 2)</h3>
         <?php if (!empty($m2['user_photo1'])) : ?>
-            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($m2['user_photo1']); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;" alt=""></div>
+            <div style="margin-bottom:15px;"><img src="<?php echo esc_url($m2['user_photo1']); ?>" style="width:120px;height:140px;object-fit:cover;border-radius:6px;cursor:zoom-in;" alt="" data-mm-lightbox="match-user-2" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"></div>
         <?php endif; ?>
         <table class="mm-kv-table">
             <tr><th><?php esc_html_e('Email', 'matchmaker'); ?></th><td><?php echo esc_html($u2 ? $u2->user_email : '—'); ?></td></tr>
