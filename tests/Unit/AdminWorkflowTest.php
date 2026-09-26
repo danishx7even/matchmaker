@@ -607,7 +607,9 @@ class AdminWorkflowTest
             'gender'     => 'male',
             'user_type'  => 'monthly',
         ];
-        $meta = [];
+        $meta = [
+            'user_photo1' => 'https://example.com/p1.jpg',
+        ];
         $age = '34';
         $height = "5'10\"";
         $quota_used = 2;
@@ -670,6 +672,51 @@ class AdminWorkflowTest
         }
         if (!str_contains($html, '#103') || !str_contains($html, 'Expired')) {
             throw new \RuntimeException("Expected user-single.php to display Expired Match #103");
+        }
+
+        // Check lightbox trigger on photo gallery
+        if (!str_contains($html, 'data-mm-lightbox="profile-gallery"')) {
+            throw new \RuntimeException("Expected user-single.php profile photos to have data-mm-lightbox attribute");
+        }
+        if (!str_contains($html, 'class="mm-lightbox-trigger"')) {
+            throw new \RuntimeException("Expected user-single.php profile photos to have mm-lightbox-trigger class");
+        }
+    }
+
+    public function test_pool_browser_table_does_not_contain_lightbox_triggers(): void
+    {
+        $pool_users = [
+            (object) [
+                'user_id'             => 201,
+                'display_name'        => 'Test Candidate',
+                'user_email'          => 'candidate@example.com',
+                'gender'              => 'female',
+                'birth_date'          => '1995-05-15',
+                'location'            => 'Dubai, UAE',
+                'city'                => 'Dubai',
+                'state'               => 'Dubai',
+                'country'             => 'AE',
+                'origin'              => 'Emirati',
+                'religion'            => 'Muslim',
+                'modesty'             => 'Hijab',
+                'user_photo1'         => 'https://example.com/photo1.jpg',
+                'status'              => 'active',
+                'created_at'          => '2026-09-01 10:00:00',
+                'cycle_matches_count' => 2,
+            ]
+        ];
+        $total_users = 1;
+        $page = 1;
+        $per_page = 20;
+        $total_pages = 1;
+        $filters = [];
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/pool/pool-list.php';
+        $html = (string) ob_get_clean();
+
+        if (str_contains($html, 'data-mm-lightbox')) {
+            throw new \RuntimeException("Expected pool-list.php table thumbnails NOT to contain data-mm-lightbox");
         }
     }
 }

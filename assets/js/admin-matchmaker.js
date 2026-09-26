@@ -553,7 +553,7 @@
         function ensureLightboxDom() {
             if ($('#mm-lightbox-modal').length === 0) {
                 var modalHtml = [
-                    '<div id="mm-lightbox-modal" class="mm-lightbox-modal" role="dialog" aria-modal="true" aria-label="Image Preview">',
+                    '<div id="mm-lightbox-modal" class="mm-lightbox-modal" role="dialog" aria-modal="true" aria-label="Photo Preview">',
                     '  <div class="mm-lightbox-container">',
                     '    <button type="button" class="mm-lightbox-close" aria-label="Close Preview">&times;</button>',
                     '    <button type="button" class="mm-lightbox-nav mm-lightbox-prev" aria-label="Previous Image">&#10094;</button>',
@@ -591,23 +591,35 @@
             }
         }
 
-        function openLightbox(src, galleryName) {
+        function openLightbox(clickedEl) {
             ensureLightboxDom();
             lightboxGallery = [];
             lightboxIndex   = 0;
 
-            if (galleryName) {
-                var $items = $('[data-mm-lightbox="' + galleryName + '"]');
-                $items.each(function () {
-                    var itemSrc = $(this).attr('src') || $(this).data('src') || '';
-                    if (itemSrc) {
-                        lightboxGallery.push({
-                            src: itemSrc,
-                            alt: $(this).attr('alt') || ''
-                        });
-                    }
-                });
+            var $el = $(clickedEl);
+            var src = $el.attr('src') || $el.data('src') || $el.prop('src') || '';
+            var gallery = $el.attr('data-mm-lightbox') || '';
+
+            var $container = $el.closest('.mm-photos-grid, .az-about-photo');
+            var $siblings;
+
+            if (gallery) {
+                $siblings = $('[data-mm-lightbox="' + gallery + '"]');
+            } else if ($container.length) {
+                $siblings = $container.find('img');
+            } else {
+                $siblings = $el;
             }
+
+            $siblings.each(function () {
+                var s = $(this).attr('src') || $(this).data('src') || $(this).prop('src') || '';
+                if (s) {
+                    lightboxGallery.push({
+                        src: s,
+                        alt: $(this).attr('alt') || 'Photo'
+                    });
+                }
+            });
 
             if (lightboxGallery.length === 0 && src) {
                 lightboxGallery.push({ src: src, alt: 'Photo' });
@@ -622,19 +634,15 @@
 
             updateLightboxView();
             var $modal = $('#mm-lightbox-modal');
-            $modal.css('display', 'flex');
-            setTimeout(function () {
-                $modal.addClass('is-active');
-            }, 10);
+            $('body').addClass('mm-lightbox-open');
+            $modal.show().addClass('is-active');
         }
 
         function closeLightbox() {
             var $modal = $('#mm-lightbox-modal');
-            $modal.removeClass('is-active');
-            setTimeout(function () {
-                $modal.css('display', 'none');
-                $('#mm-lightbox-target-img').removeClass('is-zoomed').attr('src', '');
-            }, 200);
+            $modal.removeClass('is-active').hide();
+            $('body').removeClass('mm-lightbox-open');
+            $('#mm-lightbox-target-img').removeClass('is-zoomed').attr('src', '');
         }
 
         function nextLightboxImage() {
@@ -649,13 +657,14 @@
             updateLightboxView();
         }
 
-        $(document).on('click', '.mm-lightbox-trigger, [data-mm-lightbox]', function (e) {
+        // Initialize DOM structure early
+        ensureLightboxDom();
+
+        // Delegated click listener specifically for profile photos
+        $(document).on('click', '.mm-photos-grid img, .az-about-photo img, .mm-lightbox-trigger, [data-mm-lightbox]', function (e) {
             e.preventDefault();
-            var src = $(this).attr('src') || $(this).data('src') || '';
-            var gallery = $(this).attr('data-mm-lightbox') || '';
-            if (src) {
-                openLightbox(src, gallery);
-            }
+            e.stopPropagation();
+            openLightbox(this);
         });
 
         $(document).on('click', '.mm-lightbox-close', function (e) {

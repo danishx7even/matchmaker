@@ -6,6 +6,32 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 112: Profile Details Lightbox Fix, Pool Table Browser Lightbox Removal & Settings System Logs Deduplication
+- **Objective**:
+  1. Fix the Image Lightbox feature in the User Profile Details page (`user-single.php` in admin and `tab-profile.php` on frontend) where profile images are displayed, ensuring clicking the image reliably opens the responsive Lightbox modal with zoom, next/prev navigation, and dismiss controls.
+  2. Remove the Lightbox trigger from the Candidate Pool table browser (`pool-list.php`) so it is strictly scoped only to profile details.
+  3. Remove the duplicate "System Logs" tab from the Settings page (`settings.php` and `AdminPortal::render_settings_page()`) so that system file logs exist solely in the unified **Matchmaker > Logs** hub (`tab=file_logs`).
+  4. Ensure all tabs, settings, and logs continue working seamlessly with 0 regressions.
+- **Implemented**:
+  - `src/View/admin/pool/pool-list.php`:
+    - Removed `data-mm-lightbox` and `cursor:zoom-in` from table thumbnails, restoring standard table thumbnail behavior.
+  - `src/View/admin/pool/user-single.php`:
+    - Cleaned up candidate avatar thumbnails in tables; maintained lightbox markup on candidate self-profile photo gallery (`.mm-photos-grid img`).
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Added `class="mm-lightbox-trigger" data-mm-lightbox="profile-gallery"` and `cursor:zoom-in` on the member profile photo.
+  - `src/View/admin/settings/settings.php`:
+    - Removed redundant `System Logs` tab link (`<a href="#tab-file-logs">`), panel markup (`#mm-panel-file-logs`), and inline `initFileLogsViewer()` JS.
+  - `src/Admin/AdminPortal.php`:
+    - Removed unnecessary file I/O operations (`$info_log_stats`, `$error_log_stats`) from `render_settings_page()`.
+  - `assets/css/admin-matchmaker.css` & `assets/css/member-portal.css`:
+    - Added responsive full-screen lightbox styles (`.mm-lightbox-modal`, `.mm-lightbox-modal.is-active`, `.mm-lightbox-container`, `.mm-lightbox-img`, `.mm-lightbox-close`, `.mm-lightbox-nav`, `.mm-lightbox-counter`, `.mm-lightbox-zoom-toggle`) with `z-index: 9999999`, backdrop filter blur, and mobile responsive breakpoints.
+  - `assets/js/admin-matchmaker.js` & `assets/js/member-portal.js`:
+    - Added full vanilla/jQuery lightbox event handlers: early DOM creation (`ensureLightboxDom()`), open/close transitions, zoom toggling, multi-image gallery traversal (`nextLightboxImage()`, `prevLightboxImage()`), and keyboard navigation (Escape, ArrowRight, ArrowLeft).
+    - Removed duplicate zoom and keydown event handlers from `admin-matchmaker.js`.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Added `test_pool_browser_table_does_not_contain_lightbox_triggers` and lightbox markup assertion on single user profile details.
+- **Verification**: Ran full automated test suite with **194/194 tests passing** (0 failures, 0 errors).
+
 ### Task 111: Active Match Auto-Expiry, Detailed Blockage Feedback, Profile Match History, Responsive Lightbox & Consolidated Logs Hub
 - **Objective**:
   1. Auto-expire stale approved matches whose expiry window has elapsed during active match evaluation (`has_active_approved_match()`).

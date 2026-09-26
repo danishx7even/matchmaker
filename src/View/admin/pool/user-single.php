@@ -218,7 +218,7 @@ $photo3 = $meta['user_photo3'] ?? '';
                         <td>
                             <div style="display:flex; align-items:center; gap:10px;">
                                 <?php if (!empty($cand_photo)) : ?>
-                                    <img src="<?php echo esc_url($cand_photo); ?>" style="width:34px;height:34px;border-radius:50%;object-fit:cover;cursor:zoom-in;" alt="" data-mm-lightbox="cand-thumb-<?php echo $cand_id; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>">
+                                    <img src="<?php echo esc_url($cand_photo); ?>" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" alt="">
                                 <?php else : ?>
                                     <div class="mm-avatar-thumb" style="width:34px;height:34px;border-radius:50%;">
                                         <?php echo esc_html(strtoupper(substr($cand_user ? $cand_user->display_name : 'U', 0, 1))); ?>

@@ -2,15 +2,11 @@
 
 **Status**: `IDLE`
 **Active Task**: None
-**Current Phase**: Ready for new task
+**Current Phase**: Idle / Standby
 
 ---
 
-### Objectives & Scope
-*No active tasks. System is stable, verified, and ready for work.*
-
-### Step-by-Step Checklist
-*No pending items.*
+*No active task currently in progress. Ready for next prompt.*
 
 
 

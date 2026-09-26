@@ -1140,23 +1140,6 @@ class AdminPortal
             . "<p><a href=\"{admin_profile_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;\">View Member in Candidate Pool &rarr;</a></p>";
         $admin_service_template          = (string) get_option('mm_email_admin_service_purchase_template', $default_admin_service_template);
 
-        // 7. File Logs Stats & Initial Content
-        $info_log_stats = [
-            'path'    => \Matchmaker\Service\FileLoggerService::get_log_file_path('info'),
-            'size'    => \Matchmaker\Service\FileLoggerService::get_log_file_size('info'),
-            'lines'   => \Matchmaker\Service\FileLoggerService::get_log_line_count('info'),
-            'mtime'   => \Matchmaker\Service\FileLoggerService::get_log_file_mtime('info'),
-            'content' => \Matchmaker\Service\FileLoggerService::get_log_content('info', 300),
-        ];
-
-        $error_log_stats = [
-            'path'    => \Matchmaker\Service\FileLoggerService::get_log_file_path('error'),
-            'size'    => \Matchmaker\Service\FileLoggerService::get_log_file_size('error'),
-            'lines'   => \Matchmaker\Service\FileLoggerService::get_log_line_count('error'),
-            'mtime'   => \Matchmaker\Service\FileLoggerService::get_log_file_mtime('error'),
-            'content' => \Matchmaker\Service\FileLoggerService::get_log_content('error', 300),
-        ];
-
         require dirname(__DIR__) . '/View/admin/settings/settings.php';
     }
 
