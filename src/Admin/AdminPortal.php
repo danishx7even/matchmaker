@@ -545,6 +545,11 @@ class AdminPortal
             }
 
             $stats = $repo->reset_test_matchmaking_data();
+            \Matchmaker\Service\FileLoggerService::info(
+                'Admin #' . get_current_user_id() . ' reset test matchmaking data.',
+                ['admin_id' => get_current_user_id(), 'profiles_preserved' => $stats['profiles_preserved'] ?? 0],
+                'admin'
+            );
             $msg = sprintf(
                 __('Test matchmaking data reset successfully! Preserved %d candidate profiles. Cleared match records, notifications, and logs.', 'matchmaker'),
                 $stats['profiles_preserved']
@@ -557,6 +562,11 @@ class AdminPortal
         if (isset($_POST['mm_recalculate_quotas'])) {
             check_admin_referer('mm_recalculate_quotas_nonce');
             $stats = $repo->recalculate_all_user_quotas();
+            \Matchmaker\Service\FileLoggerService::info(
+                'Admin #' . get_current_user_id() . ' recalculated match quotas for ' . ($stats['updated_count'] ?? 0) . ' users.',
+                ['admin_id' => get_current_user_id(), 'updated_count' => $stats['updated_count'] ?? 0],
+                'admin'
+            );
             $msg   = sprintf(
                 __('Successfully recalculated and synchronized monthly match counters for %d monthly members.', 'matchmaker'),
                 $stats['updated_count']
@@ -687,6 +697,12 @@ class AdminPortal
                 update_option('mm_email_admin_service_purchase_template', wp_kses_post(wp_unslash($_POST['mm_email_admin_service_purchase_template'])));
             }
 
+            \Matchmaker\Service\FileLoggerService::info(
+                'Admin #' . get_current_user_id() . ' updated plugin settings.',
+                ['admin_id' => get_current_user_id()],
+                'admin'
+            );
+
             add_settings_error('mm_admin_notices', 'settings_saved', __('Settings saved successfully.', 'matchmaker'), 'updated');
             return;
         }
@@ -707,8 +723,18 @@ class AdminPortal
             $result   = MatchService::instance()->process_admin_approve($match_id, $admin_id);
 
             if (!empty($result['success'])) {
+                \Matchmaker\Service\FileLoggerService::info(
+                    'Admin #' . $admin_id . ' approved match #' . $match_id . '.',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id, 'message' => $result['message'] ?? ''],
+                    'admin'
+                );
                 add_settings_error('mm_admin_notices', 'approved', $result['message'] ?? sprintf(__('Match #%d approved successfully.', 'matchmaker'), $match_id), 'updated');
             } else {
+                \Matchmaker\Service\FileLoggerService::warning(
+                    'Admin #' . $admin_id . ' failed to approve match #' . $match_id . ': ' . ($result['message'] ?? 'unknown error') . '.',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id, 'message' => $result['message'] ?? ''],
+                    'admin'
+                );
                 add_settings_error('mm_admin_notices', 'approve_failed', $result['message'] ?? __('Failed to approve match.', 'matchmaker'), 'error');
             }
             return;
@@ -716,10 +742,21 @@ class AdminPortal
 
         // --- REJECT MATCH ---
         if ($action === 'reject' && $match_id > 0 && wp_verify_nonce($nonce, 'mm_reject_' . $match_id)) {
-            $success = MatchService::instance()->process_admin_reject($match_id);
+            $admin_id = get_current_user_id();
+            $success  = MatchService::instance()->process_admin_reject($match_id);
             if ($success) {
+                \Matchmaker\Service\FileLoggerService::info(
+                    'Admin #' . $admin_id . ' rejected match #' . $match_id . '.',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id],
+                    'admin'
+                );
                 add_settings_error('mm_admin_notices', 'rejected', __('Match rejected.', 'matchmaker'), 'updated');
             } else {
+                \Matchmaker\Service\FileLoggerService::warning(
+                    'Admin #' . $admin_id . ' failed to reject match #' . $match_id . '.',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id],
+                    'admin'
+                );
                 add_settings_error('mm_admin_notices', 'reject_failed', __('Failed to reject match.', 'matchmaker'), 'error');
             }
             return;
@@ -731,8 +768,18 @@ class AdminPortal
             $result   = MatchService::instance()->process_admin_cancel_approved($match_id, $admin_id);
 
             if (!empty($result['success'])) {
+                \Matchmaker\Service\FileLoggerService::info(
+                    'Admin #' . $admin_id . ' cancelled approved match #' . $match_id . ' (reverted to pending_review).',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id, 'message' => $result['message'] ?? ''],
+                    'admin'
+                );
                 add_settings_error('mm_admin_notices', 'cancelled_approved', $result['message'] ?? sprintf(__('Match #%d approval cancelled and reverted to pending review.', 'matchmaker'), $match_id), 'updated');
             } else {
+                \Matchmaker\Service\FileLoggerService::warning(
+                    'Admin #' . $admin_id . ' failed to cancel approved match #' . $match_id . ': ' . ($result['message'] ?? 'unknown error') . '.',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id, 'message' => $result['message'] ?? ''],
+                    'admin'
+                );
                 add_settings_error('mm_admin_notices', 'cancel_approved_failed', $result['message'] ?? __('Failed to cancel approved match.', 'matchmaker'), 'error');
             }
             return;
@@ -759,6 +806,11 @@ class AdminPortal
                 $inserted = $repo->create_match($u1, $u2, $admin_id, 'pending_review', 'manual', $score);
 
                 if ($inserted) {
+                    \Matchmaker\Service\FileLoggerService::info(
+                        'Admin #' . $admin_id . ' created manual match #' . $inserted . ' (users #' . $u1 . ' & #' . $u2 . ', score ' . $score . '/6).',
+                        ['admin_id' => $admin_id, 'match_id' => $inserted, 'u1' => $u1, 'u2' => $u2, 'score' => $score],
+                        'admin'
+                    );
                     $repo->log_event(
                         'match_lifecycle',
                         'manual_match_created',
@@ -772,6 +824,11 @@ class AdminPortal
                     );
                     add_settings_error('mm_admin_notices', 'manual_created', __('Manual match pair created and queued for review.', 'matchmaker'), 'updated');
                 } else {
+                    \Matchmaker\Service\FileLoggerService::warning(
+                        'Admin #' . $admin_id . ' manual match failed: pair already exists for #' . $u1 . ' & #' . $u2 . '.',
+                        ['admin_id' => $admin_id, 'u1' => $u1, 'u2' => $u2],
+                        'admin'
+                    );
                     add_settings_error('mm_admin_notices', 'manual_exists', __('Match pair already exists in the database.', 'matchmaker'), 'error');
                 }
             }
@@ -785,6 +842,11 @@ class AdminPortal
                 return;
             }
 
+            \Matchmaker\Service\FileLoggerService::info(
+                'Admin #' . get_current_user_id() . ' manually triggered matching job for user #' . $user_id . '.',
+                ['admin_id' => get_current_user_id(), 'user_id' => $user_id],
+                'admin'
+            );
             mm_enqueue_user_matching_job($user_id, 'admin_manual_trigger');
             add_settings_error('mm_admin_notices', 'job_queued', sprintf(__('Matching engine job queued for User #%d.', 'matchmaker'), $user_id), 'updated');
             return;

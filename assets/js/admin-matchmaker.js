@@ -760,38 +760,128 @@
             if (!$wrapper.length) return;
 
             if (!rawContent || !rawContent.trim().length) {
-                $wrapper.html('<div style="color:#64748b; font-style:italic; padding:20px 0; text-align:center;">Log file is currently empty.</div>');
+                $wrapper.html('<div class="mm-log-empty-state"><span class="dashicons dashicons-media-document" style="font-size:36px; width:36px; height:36px; color:#94a3b8;"></span><p>Log file is currently empty.</p></div>');
                 return;
             }
 
-            var lines = rawContent.split('\n');
-            var filter = ($('#mm-log-filter-input').val() || '').toLowerCase();
-            var html = '';
+            var lines         = rawContent.split('\n');
+            var filterKeyword = ($('#mm-log-filter-input').val() || '').toLowerCase().trim();
+            var filterLevel   = ($('#mm-log-filter-level').val() || '').toLowerCase().trim();
+            var filterCat     = ($('#mm-log-filter-category').val() || '').toLowerCase().trim();
+            var html          = '';
+            var countRendered = 0;
+
+            var levelPillClasses = {
+                'INFO': 'mm-log-pill-info',
+                'WARNING': 'mm-log-pill-warning',
+                'ERROR': 'mm-log-pill-error',
+                'DEBUG': 'mm-log-pill-debug'
+            };
+
+            var levelIcons = {
+                'INFO': 'ℹ️',
+                'WARNING': '⚠️',
+                'ERROR': '🛑',
+                'DEBUG': '🔍'
+            };
 
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i];
                 if (!line || !line.trim().length) continue;
 
-                if (filter && line.toLowerCase().indexOf(filter) === -1) {
+                var timestamp = '';
+                var level     = 'INFO';
+                var category  = 'GENERAL';
+                var message   = line.trim();
+                var context   = '';
+
+                var match3 = line.match(/^\[(.*?)\]\s*\[(.*?)\]\s*\[(.*?)\]\s*(.*?)(?:\s*\|\s*context:\s*(.*))?$/);
+                var match2 = !match3 ? line.match(/^\[(.*?)\]\s*\[(.*?)\]\s*(.*?)(?:\s*\|\s*context:\s*(.*))?$/) : null;
+
+                if (match3) {
+                    timestamp = match3[1].trim();
+                    level     = match3[2].trim().toUpperCase();
+                    category  = match3[3].trim().toUpperCase();
+                    message   = match3[4].trim();
+                    context   = match3[5] ? match3[5].trim() : '';
+                } else if (match2) {
+                    timestamp = match2[1].trim();
+                    level     = match2[2].trim().toUpperCase();
+                    category  = 'GENERAL';
+                    message   = match2[3].trim();
+                    context   = match2[4] ? match2[4].trim() : '';
+                }
+
+                var lineLevelLower = level.toLowerCase();
+                var lineCatLower   = category.toLowerCase();
+
+                // Check Level filter
+                if (filterLevel && lineLevelLower !== filterLevel) {
                     continue;
                 }
 
-                var color = '#f8fafc';
-                if (line.indexOf('[ERROR]') !== -1) {
-                    color = '#f87171';
-                } else if (line.indexOf('[WARNING]') !== -1) {
-                    color = '#fbbf24';
-                } else if (line.indexOf('[INFO]') !== -1) {
-                    color = '#38bdf8';
-                } else if (line.indexOf('[DEBUG]') !== -1) {
-                    color = '#c084fc';
+                // Check Category filter
+                if (filterCat && lineCatLower !== filterCat) {
+                    continue;
                 }
 
-                html += '<div class="mm-log-line" style="color:' + color + '; border-bottom:1px solid rgba(255,255,255,0.03); padding:2px 0;">' + escapeHtml(line) + '</div>';
+                // Check Keyword filter (matches message, timestamp, category, level, or context)
+                if (filterKeyword) {
+                    var fullSearchText = (line + ' ' + message + ' ' + context + ' ' + category + ' ' + level).toLowerCase();
+                    if (fullSearchText.indexOf(filterKeyword) === -1) {
+                        continue;
+                    }
+                }
+
+                countRendered++;
+
+                var pillClass = levelPillClasses[level] || 'mm-log-pill-info';
+                var icon      = levelIcons[level] || '•';
+
+                var jsonFormatted = null;
+                if (context && context.length) {
+                    try {
+                        var parsed = JSON.parse(context);
+                        jsonFormatted = JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        jsonFormatted = null;
+                    }
+                }
+
+                html += '<div class="mm-log-entry-row ' + pillClass + '" data-level="' + escapeHtml(lineLevelLower) + '" data-category="' + escapeHtml(lineCatLower) + '">';
+                html += '  <div class="mm-log-entry-header">';
+                html += '    <div class="mm-log-entry-badges">';
+                html += '      <span class="mm-log-level-pill ' + pillClass + '">';
+                html += '        <span class="mm-log-level-icon">' + icon + '</span>';
+                html += '        <strong>' + escapeHtml(level) + '</strong>';
+                html += '      </span>';
+                if (category) {
+                    html += '      <span class="mm-log-category-badge">' + escapeHtml(category) + '</span>';
+                }
+                if (timestamp) {
+                    html += '      <span class="mm-log-time-badge">🕒 ' + escapeHtml(timestamp) + '</span>';
+                }
+                html += '    </div>';
+                html += '  </div>';
+
+                html += '  <div class="mm-log-entry-body">';
+                html += '    <div class="mm-log-entry-message">' + escapeHtml(message) + '</div>';
+
+                if (jsonFormatted) {
+                    html += '    <details class="mm-log-context-details">';
+                    html += '      <summary class="mm-log-context-summary"><span>📦 Context Payload (JSON)</span></summary>';
+                    html += '      <pre class="mm-log-context-json">' + escapeHtml(jsonFormatted) + '</pre>';
+                    html += '    </details>';
+                } else if (context) {
+                    html += '    <div class="mm-log-context-raw"><span style="font-weight:600; color:#64748b;">Context:</span> ' + escapeHtml(context) + '</div>';
+                }
+
+                html += '  </div>';
+                html += '</div>';
             }
 
-            if (!html.length && filter) {
-                html = '<div style="color:#64748b; font-style:italic; padding:20px 0; text-align:center;">No log lines matched the search filter "' + escapeHtml(filter) + '".</div>';
+            if (!countRendered && (filterKeyword || filterLevel || filterCat)) {
+                html = '<div class="mm-log-empty-state"><span class="dashicons dashicons-search" style="font-size:36px; width:36px; height:36px; color:#94a3b8;"></span><p>No log entries matched your filter criteria.</p></div>';
             }
 
             $wrapper.html(html);
@@ -825,6 +915,13 @@
                         $('#mm-log-meta-size').text(res.data.size || '0 B');
                         $('#mm-log-meta-lines').text(res.data.lines || 0);
                         $('#mm-log-meta-mtime').text(res.data.mtime || 'Never');
+
+                        if (type === 'error') {
+                            $('#mm-log-meta-title').html('<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ef4444;"></span> error.log (System Exceptions)');
+                        } else {
+                            $('#mm-log-meta-title').html('<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span> info.log (General Events)');
+                        }
+
                         renderLogLines(cachedRawLog);
 
                         var $dlBtn = $('#mm-btn-download-log');
@@ -847,12 +944,16 @@
             currentLogType = type;
 
             $('.mm-log-type-btn').css({ background: 'transparent', color: '#64748b', boxShadow: 'none' }).removeClass('active-log-btn');
-            $btn.css({ background: '#CC723F', color: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }).addClass('active-log-btn');
+            $btn.css({ background: '#CC723F', color: '#fff', boxShadow: '0 2px 4px rgba(204,114,63,0.25)' }).addClass('active-log-btn');
 
             loadFileLog(type);
         });
 
         $(document).on('input', '#mm-log-filter-input', function () {
+            renderLogLines(cachedRawLog);
+        });
+
+        $(document).on('change', '#mm-log-filter-level, #mm-log-filter-category', function () {
             renderLogLines(cachedRawLog);
         });
 

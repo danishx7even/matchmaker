@@ -552,7 +552,16 @@ class MatchRepository
     {
         global $wpdb;
         $table = $wpdb->prefix . 'matchmaking_pool';
-        return $wpdb->replace($table, $payload);
+        $result = $wpdb->replace($table, $payload);
+        if ($result === false && !empty($wpdb->last_error)) {
+            if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+                \Matchmaker\Service\FileLoggerService::error('DB error in upsert_pool: ' . $wpdb->last_error, [
+                    'user_id' => $payload['user_id'] ?? 0,
+                    'db_error' => $wpdb->last_error,
+                ], 'repository');
+            }
+        }
+        return $result;
     }
 
     /**
@@ -1335,11 +1344,33 @@ class MatchRepository
         );
 
         if ($result === false) {
+            if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+                \Matchmaker\Service\FileLoggerService::error('DB error in create_match: ' . $wpdb->last_error, [
+                    'user_a'       => $user_a,
+                    'user_b'       => $user_b,
+                    'initiator_id' => $initiator_id,
+                    'match_source' => $match_source,
+                    'db_error'     => $wpdb->last_error,
+                ], 'repository');
+            }
             error_log('[Matchmaker] create_match failed: ' . $wpdb->last_error);
             return false;
         }
 
-        return (int) $wpdb->insert_id;
+        $inserted_id = (int) $wpdb->insert_id;
+        if ($inserted_id > 0 && class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+            \Matchmaker\Service\FileLoggerService::info('Match record #' . $inserted_id . ' created (users: #' . $u1 . ' & #' . $u2 . ', source: ' . $match_source . ', score: ' . $score . '/6, status: ' . $status . ').', [
+                'match_id'     => $inserted_id,
+                'user_one_id'  => $u1,
+                'user_two_id'  => $u2,
+                'initiator_id' => $initiator_id,
+                'match_source' => $match_source,
+                'score'        => $score,
+                'status'       => $status,
+            ], 'repository');
+        }
+
+        return $inserted_id;
     }
 
     /**
@@ -1747,7 +1778,14 @@ class MatchRepository
         );
         if ($result !== false) {
             $this->dismiss_notifications_for_match($match_id, 'match_approved');
+            if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+                \Matchmaker\Service\FileLoggerService::info('Match #' . $match_id . ' status changed to admin_rejected.', ['match_id' => $match_id], 'repository');
+            }
             return true;
+        }
+
+        if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+            \Matchmaker\Service\FileLoggerService::error('DB error in reject_match for match #' . $match_id . ': ' . $wpdb->last_error, ['match_id' => $match_id, 'db_error' => $wpdb->last_error], 'repository');
         }
         return false;
     }

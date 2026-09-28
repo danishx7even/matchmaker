@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace Matchmaker\Service;
 
 use Matchmaker\Repository\MatchRepository;
+use Matchmaker\Service\FileLoggerService;
 
 if (!defined('ABSPATH')) {
+
     exit;
 }
 
@@ -278,6 +280,19 @@ class NotificationService {
         $mail_b_sent = wp_mail($user_b->user_email, $subject, wpautop($body_b));
         remove_filter('wp_mail_content_type', $html_filter);
 
+        if (class_exists(FileLoggerService::class)) {
+            if ($mail_a_sent) {
+                FileLoggerService::info('Match approval email sent to ' . $user_a->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_a->ID, 'email' => $user_a->user_email], 'email');
+            } else {
+                FileLoggerService::error('Match approval email failed to send to ' . $user_a->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_a->ID, 'email' => $user_a->user_email], 'email');
+            }
+            if ($mail_b_sent) {
+                FileLoggerService::info('Match approval email sent to ' . $user_b->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_b->ID, 'email' => $user_b->user_email], 'email');
+            } else {
+                FileLoggerService::error('Match approval email failed to send to ' . $user_b->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_b->ID, 'email' => $user_b->user_email], 'email');
+            }
+        }
+
         $repo->log_event(
             'email',
             'email_sent',
@@ -371,6 +386,19 @@ class NotificationService {
         $mail_a_sent = wp_mail($user_a->user_email, $subject, wpautop($body_a));
         $mail_b_sent = wp_mail($user_b->user_email, $subject, wpautop($body_b));
         remove_filter('wp_mail_content_type', $html_filter);
+
+        if (class_exists(FileLoggerService::class)) {
+            if ($mail_a_sent) {
+                FileLoggerService::info('Mutual match email sent to ' . $user_a->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_a->ID, 'email' => $user_a->user_email], 'email');
+            } else {
+                FileLoggerService::error('Mutual match email failed to send to ' . $user_a->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_a->ID, 'email' => $user_a->user_email], 'email');
+            }
+            if ($mail_b_sent) {
+                FileLoggerService::info('Mutual match email sent to ' . $user_b->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_b->ID, 'email' => $user_b->user_email], 'email');
+            } else {
+                FileLoggerService::error('Mutual match email failed to send to ' . $user_b->user_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'user_id' => (int) $user_b->ID, 'email' => $user_b->user_email], 'email');
+            }
+        }
 
         $repo->log_event(
             'email',
@@ -473,6 +501,14 @@ class NotificationService {
         $admin_sent = wp_mail($admin_email, $subject, $body);
         remove_filter('wp_mail_content_type', static fn() => 'text/html');
 
+        if (class_exists(FileLoggerService::class)) {
+            if ($admin_sent) {
+                FileLoggerService::info('Admin match expiry alert sent to ' . $admin_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'reason' => $reason], 'email');
+            } else {
+                FileLoggerService::error('Admin match expiry alert failed to send to ' . $admin_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'reason' => $reason], 'email');
+            }
+        }
+
         $repo->log_event(
             'email',
             'admin_alert_email',
@@ -566,6 +602,22 @@ class NotificationService {
         add_filter('wp_mail_content_type', static fn() => 'text/html');
         $sent = wp_mail($recipient, $subject, wpautop($body));
         remove_filter('wp_mail_content_type', static fn() => 'text/html');
+
+        if (class_exists(FileLoggerService::class)) {
+            if ($sent) {
+                FileLoggerService::info('Admin service purchase notification sent to ' . $recipient . ' for user #' . $user_id . ' (service=' . $level_name . ').', [
+                    'user_id'   => $user_id,
+                    'level_id'  => $level_id,
+                    'recipient' => $recipient,
+                ], 'email');
+            } else {
+                FileLoggerService::error('Admin service purchase notification failed to send to ' . $recipient . ' for user #' . $user_id . ' (service=' . $level_name . ').', [
+                    'user_id'   => $user_id,
+                    'level_id'  => $level_id,
+                    'recipient' => $recipient,
+                ], 'email');
+            }
+        }
 
         $repo->log_event(
             'email',

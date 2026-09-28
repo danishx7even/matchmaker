@@ -3,7 +3,10 @@ declare(strict_types=1);
 
 namespace Matchmaker\Core;
 
+use Matchmaker\Service\FileLoggerService;
+
 if (!defined('ABSPATH')) {
+
     exit;
 }
 
@@ -235,10 +238,17 @@ class MatchingEngine {
      */
     public function run_matching_for_user(int $user_id, string $trigger): void
     {
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('Match engine: starting matching run for user #' . $user_id . ' (trigger=' . $trigger . ').', ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
+        }
+
         // 1. Load the user's pool row.
         $user = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
 
         if (empty($user)) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::warning('Match engine: user #' . $user_id . ' not found or inactive in pool (trigger=' . $trigger . ').', ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
+            }
             error_log("[Matchmaker] run_matching_for_user: user #{$user_id} not found or inactive in pool.");
             \Matchmaker\Repository\MatchRepository::instance()->log_event(
                 'match_engine',
@@ -259,6 +269,9 @@ class MatchingEngine {
         $is_paid_tier     = in_array(($user['user_type'] ?? 'free'), ['monthly', 'one_on_one'], true);
 
         if (!$is_paid_tier && !in_array($trigger, $allowed_triggers, true)) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('Match engine: skipping user #' . $user_id . ' (tier=' . ($user['user_type'] ?? 'free') . ' not eligible for trigger=' . $trigger . ').', ['user_id' => $user_id, 'user_type' => $user['user_type'] ?? 'free', 'trigger' => $trigger], 'match_engine');
+            }
             error_log("[Matchmaker] Skipping user #{$user_id} — user_type={$user['user_type']}, trigger={$trigger}.");
             \Matchmaker\Repository\MatchRepository::instance()->log_event(
                 'match_engine',
@@ -276,6 +289,9 @@ class MatchingEngine {
 
         // 3. Mutual match gate — if user already has an accepted mutual match this month, skip generating more matches.
         if (\Matchmaker\Repository\MatchRepository::instance()->has_mutual_match_this_month($user_id)) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('Match engine: skipping user #' . $user_id . ' — already has an active mutual match this month.', ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
+            }
             error_log("[Matchmaker] Skipping user #{$user_id} — user already has a mutually accepted match this month.");
             \Matchmaker\Repository\MatchRepository::instance()->log_event(
                 'match_engine',
@@ -305,6 +321,9 @@ class MatchingEngine {
         $candidates = $this->query_candidates($user, $user_age);
 
         if (empty($candidates)) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('Match engine: 0 qualifying candidates found for user #' . $user_id . ' (trigger=' . $trigger . ').', ['user_id' => $user_id, 'trigger' => $trigger, 'user_age' => $user_age], 'match_engine');
+            }
             error_log("[Matchmaker] user #{$user_id}: no qualifying candidates found.");
             \Matchmaker\Repository\MatchRepository::instance()->set_last_match_run($user_id);
             \Matchmaker\Repository\MatchRepository::instance()->log_event(
@@ -319,6 +338,10 @@ class MatchingEngine {
                 'info'
             );
             return;
+        }
+
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('Match engine: ' . count($candidates) . ' qualifying candidates found for user #' . $user_id . '.', ['user_id' => $user_id, 'count' => count($candidates), 'trigger' => $trigger], 'match_engine');
         }
 
         // 6. Score each candidate in PHP.
@@ -346,6 +369,16 @@ class MatchingEngine {
 
         // 9. Record the last run timestamp.
         \Matchmaker\Repository\MatchRepository::instance()->set_last_match_run($user_id);
+
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('Match engine: run completed for user #' . $user_id . ' — ' . $inserted . ' new matches created from ' . count($candidates) . ' candidates (trigger=' . $trigger . ').', [
+                'user_id'          => $user_id,
+                'trigger'          => $trigger,
+                'candidates_count' => count($candidates),
+                'matches_inserted' => $inserted,
+                'max_limit'        => $max_limit,
+            ], 'match_engine');
+        }
 
         \Matchmaker\Repository\MatchRepository::instance()->log_event(
             'match_engine',
@@ -673,7 +706,18 @@ class MatchingEngine {
             $score
         );
 
-        // create_match returns int|false — convert to bool for strict_types
-        return ($result !== false && $result > 0);
+        if ($result !== false && $result > 0) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::debug('Match pair created: match #' . $result . ' (user #' . $user_id . ' vs candidate #' . $candidate_id . ', score=' . $score . '/6).', [
+                    'match_id'     => $result,
+                    'user_id'      => $user_id,
+                    'candidate_id' => $candidate_id,
+                    'score'        => $score,
+                ], 'match_engine');
+            }
+            return true;
+        }
+
+        return false;
     }
 }

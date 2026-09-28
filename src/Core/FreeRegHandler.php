@@ -128,13 +128,25 @@ class FreeRegHandler {
         $phone_number = sanitize_text_field($data['phone_number'] ?? '');
         $password     = (string) ($data['password'] ?? '');
 
+        \Matchmaker\Service\FileLoggerService::info(
+            'Free registration attempt: ' . $email . '.',
+            ['email' => $email, 'form_id' => $form_id],
+            'registration'
+        );
+
         try {
             $user_id = wp_create_user($email, $password, $email);
-            if (is_wp_error($user_id)) { 
-                $handler->add_error('email', $user_id->get_error_message()); 
-                $handler->set_status('error'); 
-                return; 
+            if (is_wp_error($user_id)) {
+                \Matchmaker\Service\FileLoggerService::error(
+                    'Free registration failed — user creation error: ' . $user_id->get_error_message() . '.',
+                    ['email' => $email, 'error_code' => $user_id->get_error_code()],
+                    'registration'
+                );
+                $handler->add_error('email', $user_id->get_error_message());
+                $handler->set_status('error');
+                return;
             }
+
             wp_update_user([
                 'ID' => $user_id, 
                 'display_name' => !empty($full_name) ? $full_name : $email, 
@@ -148,11 +160,22 @@ class FreeRegHandler {
 
             update_user_meta($user_id, 'mm_email_verified', 0);
 
+            \Matchmaker\Service\FileLoggerService::info(
+                'Free registration: new user created #' . $user_id . ' (' . $email . ').',
+                ['user_id' => $user_id, 'email' => $email, 'name' => $full_name],
+                'registration'
+            );
+
             if (function_exists('pmpro_changeMembershipLevel')) {
                 $free_level = PMProSync::instance()->get_primary_level_for_tier('free', 2);
                 add_filter('pmpro_send_checkout_emails', '__return_false', 999);
                 try { 
-                    pmpro_changeMembershipLevel($free_level, $user_id); 
+                    pmpro_changeMembershipLevel($free_level, $user_id);
+                    \Matchmaker\Service\FileLoggerService::info(
+                        'Free registration: PMPro free level ' . $free_level . ' assigned to user #' . $user_id . '.',
+                        ['user_id' => $user_id, 'level_id' => $free_level],
+                        'registration'
+                    );
                 } finally { 
                     remove_filter('pmpro_send_checkout_emails', '__return_false', 999); 
                 }
@@ -163,8 +186,26 @@ class FreeRegHandler {
                 'user_password' => $password, 
                 'remember' => true
             ];
-            wp_signon($credentials, is_ssl());
+            $signed_in = wp_signon($credentials, is_ssl());
+            if (is_wp_error($signed_in)) {
+                \Matchmaker\Service\FileLoggerService::warning(
+                    'Free registration: auto-login failed for user #' . $user_id . ': ' . $signed_in->get_error_message() . '.',
+                    ['user_id' => $user_id, 'email' => $email],
+                    'registration'
+                );
+            } else {
+                \Matchmaker\Service\FileLoggerService::info(
+                    'Free registration: auto-login successful for user #' . $user_id . '.',
+                    ['user_id' => $user_id, 'email' => $email],
+                    'registration'
+                );
+            }
         } catch (\Throwable $e) {
+            \Matchmaker\Service\FileLoggerService::error(
+                'Free registration fatal error: ' . $e->getMessage() . '.',
+                ['email' => $email, 'exception' => get_class($e), 'file' => $e->getFile(), 'line' => $e->getLine()],
+                'registration'
+            );
             error_log('Free User Registration Fatal: ' . $e->getMessage());
             $handler->add_error_message(__('An unexpected error occurred during account creation. Please try again.', 'matchmaking'));
             $handler->set_status('error');

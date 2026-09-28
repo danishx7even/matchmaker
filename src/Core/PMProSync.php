@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Matchmaker\Core;
 
+use Matchmaker\Service\FileLoggerService;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -1338,6 +1340,9 @@ class PMProSync {
             }
 
             \Matchmaker\Repository\MatchRepository::instance()->save_meta($user_id, 'user_type', $resolved_user_type);
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('User #' . $user_id . ' user_type synced to: ' . $resolved_user_type . '.', ['user_id' => $user_id, 'user_type' => $resolved_user_type], 'pmpro');
+            }
             update_user_meta($user_id, 'mm_has_one_on_one', $has_one_on_one ? 1 : 0);
 
             \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
@@ -1367,8 +1372,6 @@ class PMProSync {
             return;
         }
 
-        $this->sync_all_membership_levels($user_id);
-
         $level_id = 0;
         if (is_object($morder) && !empty($morder->membership_id)) {
             $level_id = (int) $morder->membership_id;
@@ -1378,8 +1381,21 @@ class PMProSync {
             $level_id = (int) $_POST['pmpro_level'];
         }
 
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('PMPro checkout sync triggered for user #' . $user_id . '.', ['user_id' => $user_id, 'level_id' => $level_id], 'pmpro');
+        }
+
+        $this->sync_all_membership_levels($user_id);
+
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('PMPro checkout: membership levels synced for user #' . $user_id . '.', ['user_id' => $user_id], 'pmpro');
+        }
+
         if ($level_id > 0 && $this->is_service_level($level_id)) {
             \Matchmaker\Service\NotificationService::instance()->send_admin_service_purchase_notification($user_id, $level_id, $morder);
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('PMPro checkout: admin service notification sent for user #' . $user_id . ' (level ' . $level_id . ').', ['user_id' => $user_id, 'level_id' => $level_id], 'pmpro');
+            }
         }
     }
 
@@ -1394,6 +1410,10 @@ class PMProSync {
     {
         if ($user_id <= 0) {
             return;
+        }
+
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('PMPro membership expiry sync for user #' . $user_id . '.', ['user_id' => $user_id, 'membership_id' => $membership_id], 'pmpro');
         }
 
         $this->sync_all_membership_levels($user_id);
@@ -1411,6 +1431,10 @@ class PMProSync {
     {
         if ($user_id <= 0) {
             return;
+        }
+
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('PMPro membership status change sync for user #' . $user_id . ': status=' . $status . '.', ['user_id' => $user_id, 'status' => $status, 'level_id' => $level_id], 'pmpro');
         }
 
         $this->sync_all_membership_levels($user_id);

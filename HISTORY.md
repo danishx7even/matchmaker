@@ -6,7 +6,38 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 116: Comprehensive File Logging Instrumentation & Redesigned High-Legibility Log Viewer UI
+- **Objective**:
+  1. Add comprehensive disk file logging via `FileLoggerService` across all key plugin lifecycle events: form submission, profile updates, photo validation and uploads, PMPro checkout and level sync, matching engine executions, database operations (with error logging), admin actions (match approvals, rejections, cancellations, manual match creation, settings saves), user registration, and email notifications.
+  2. Redesign the System File Logs admin tab (`tab-file-logs.php`, `admin-matchmaker.js`, `admin-matchmaker.css`) with structured entry cards, level badges (INFO, WARNING, ERROR, DEBUG), category tags, timestamp pills, and expandable JSON context payload viewers for maximum legibility and scanability.
+- **Implemented**:
+  - `src/Frontend/FormController.php`:
+    - Added `FileLoggerService` logging in `handle_ajax()` for: nonce failure (`warning`), unauthenticated attempt (`warning`), unverified email (`warning`), missing Photo 1 (`info`), invalid image extensions/MIME types (`warning`), invalid age/height boundaries (`info`), database `upsert_pool()` failures (`error`), media attachment upload successes (`info`) and failures (`error`), and overall form submit/update completion (`info`).
+  - `src/Core/PMProSync.php`:
+    - Added logging in `handle_checkout_sync()` (trigger & level assignment), `handle_expiry_sync()`, `handle_status_change_sync()`, and `sync_all_membership_levels()` (`user_type` sync transitions).
+  - `src/Core/MatchingEngine.php`:
+    - Added logging in `run_matching_for_user()` (run start with trigger, inactive pool skip, tier gate skip, active mutual match skip, qualifying candidates count, final insertion summary) and `insert_match_pair()` (`debug` logging on pair created).
+  - `src/Repository/MatchRepository.php`:
+    - Added DB error logging in `upsert_pool()`, `create_match()`, and `reject_match()` to capture `$wpdb->last_error` and payload details to `error.log`.
+  - `src/Core/FreeRegHandler.php`:
+    - Added logging for free registration attempts, user creation successes and errors, PMPro free level assignments, auto-login successes and failures, and fatal exception handling.
+  - `src/Admin/AdminPortal.php`:
+    - Added logging for admin match approvals, rejections, cancellations (reverting to pending), manual match pair creation, admin-triggered matching runs, test data resets, quota recalculations, and settings saves.
+  - `src/Service/NotificationService.php`:
+    - Added logging on all `wp_mail()` dispatches (match approval emails to both participants, mutual match contact reveal emails, admin match expiry alerts, and admin service purchase notifications) capturing success and delivery failure.
+  - `src/View/admin/logs/tab-file-logs.php`:
+    - Redesigned the log view into structured cards with colored level pills (`INFO`, `WARNING`, `ERROR`, `DEBUG`), category badges (`FORM`, `PMPRO`, `MATCH_ENGINE`, `REPOSITORY`, `ADMIN`, `REGISTRATION`, `EMAIL`), timestamp badges, and collapsible `<details>` panels for formatted JSON context data.
+    - Added multi-level filtering (text search, Level dropdown, Category dropdown, and Max Lines).
+  - `assets/js/admin-matchmaker.js`:
+    - Upgraded `renderLogLines()` to parse log format via regex, dynamically generate structured HTML cards, and filter live across keywords, levels, and categories.
+  - `assets/css/admin-matchmaker.css`:
+    - Added styling for `.mm-log-stream-container`, `.mm-log-entry-row`, `.mm-log-level-pill`, `.mm-log-category-badge`, `.mm-log-time-badge`, and `.mm-log-context-details`.
+  - `tests/Unit/FileLoggerTest.php`:
+    - Added `test_tab_file_logs_renders_structured_entry_cards` to verify template rendering and badge generation.
+- **Verification**: Ran full automated test suite with **197/197 tests passing** (0 failures, 0 errors).
+
 ### Task 115: Fix Lightbox — JS-Controlled Body-Level Modal, WordPress Admin Overflow Bypass
+
 - **Objective**:
   1. Identify and resolve why the image lightbox was silently failing on click in both Admin (candidate profile `user-single.php`, match view `match-single.php`) and Member Portal (`tab-profile.php`, match steps 1, 2, 5).
   2. Implement a permanent, definitive fix by ensuring `#mm-lightbox-modal` is **always mounted as a direct child of `<body>`**, never trapped inside WordPress admin's `#wpwrap` / `#wpcontent` overflow containers or Elementor wrapper elements.

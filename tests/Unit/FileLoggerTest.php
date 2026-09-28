@@ -198,4 +198,46 @@ class FileLoggerTest
             throw new \RuntimeException("MatchRepository::log_event did not stream error event to error.log.");
         }
     }
+
+    public function test_tab_file_logs_renders_structured_entry_cards(): void
+    {
+        $download_nonce  = 'test_download_nonce';
+        $file_logs_nonce = 'test_file_logs_nonce';
+        $info_log_stats  = [
+            'path'    => '/var/log/info.log',
+            'size'    => '1.2 KB',
+            'lines'   => 2,
+            'mtime'   => '1 min ago',
+            'content' => "[2026-09-28 12:00:00 UTC] [INFO] [FORM] Profile updated by user #123 (Jane Doe). | context: {\"user_id\":123,\"name\":\"Jane Doe\"}\n[2026-09-28 12:05:00 UTC] [ERROR] [REPOSITORY] DB error in create_match: Deadlock found. | context: {\"error_code\":1213}",
+        ];
+        $error_log_stats = [
+            'path'    => '/var/log/error.log',
+            'size'    => '500 B',
+            'lines'   => 1,
+            'mtime'   => '1 min ago',
+            'content' => "[2026-09-28 12:05:00 UTC] [ERROR] [REPOSITORY] DB error in create_match: Deadlock found. | context: {\"error_code\":1213}",
+        ];
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/logs/tab-file-logs.php';
+        $html = (string) ob_get_clean();
+
+        // Check essential structured UI elements
+        if (!str_contains($html, 'mm-log-stream-container')) {
+            throw new \RuntimeException("Expected tab-file-logs.php to output mm-log-stream-container.");
+        }
+        if (!str_contains($html, 'mm-log-entry-row')) {
+            throw new \RuntimeException("Expected tab-file-logs.php to output mm-log-entry-row entries.");
+        }
+        if (!str_contains($html, 'mm-log-level-pill') || !str_contains($html, 'mm-log-pill-info') || !str_contains($html, 'mm-log-pill-error')) {
+            throw new \RuntimeException("Expected tab-file-logs.php to output colored level pills.");
+        }
+        if (!str_contains($html, 'mm-log-category-badge') || !str_contains($html, 'FORM') || !str_contains($html, 'REPOSITORY')) {
+            throw new \RuntimeException("Expected tab-file-logs.php to output category badges.");
+        }
+        if (!str_contains($html, 'mm-log-context-details') || !str_contains($html, 'Context Payload (JSON)')) {
+            throw new \RuntimeException("Expected tab-file-logs.php to output structured context payload details.");
+        }
+    }
 }
+

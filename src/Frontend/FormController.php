@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace Matchmaker\Frontend;
 
+use Matchmaker\Service\FileLoggerService;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -441,21 +443,32 @@ class FormController {
      */
     public function handle_ajax(): void
     {
+        global $wpdb;
+
         // 1. Nonce verification
         $nonce = isset($_POST['mmf_nonce']) ? sanitize_text_field(wp_unslash((string) $_POST['mmf_nonce'])) : '';
         if (!wp_verify_nonce($nonce, 'mmf_form_nonce')) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::warning('Form submission blocked: invalid security nonce.', ['user_id' => get_current_user_id(), 'ip' => $_SERVER['REMOTE_ADDR'] ?? ''], 'form');
+            }
             wp_send_json_error(['message' => __('Security token expired. Please refresh the page.', 'matchmaker')]);
         }
 
         // 2. Authentication check
         $user_id = get_current_user_id();
         if ($user_id <= 0) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::warning('Form submission rejected: unauthenticated user.', ['ip' => $_SERVER['REMOTE_ADDR'] ?? ''], 'form');
+            }
             wp_send_json_error(['message' => __('You must be logged in to save your matchmaking profile.', 'matchmaker')]);
         }
 
         // Email Verification Check
         if (class_exists('\Matchmaker\Service\EmailVerificationService')) {
             if (!\Matchmaker\Service\EmailVerificationService::instance()->is_user_verified($user_id)) {
+                if (class_exists(FileLoggerService::class)) {
+                    FileLoggerService::warning('Form submission blocked: user #' . $user_id . ' email not verified.', ['user_id' => $user_id], 'form');
+                }
                 wp_send_json_error(['message' => __('Please verify your email address before saving your profile.', 'matchmaker')]);
             }
         }
@@ -469,6 +482,9 @@ class FormController {
         $email     = sanitize_email((string) ($f['email'] ?? ''));
 
         if (empty($full_name) || empty($email) || !is_email($email)) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('Form submission validation failed: invalid name or email.', ['user_id' => $user_id, 'email' => $email], 'form');
+            }
             wp_send_json_error(['message' => __('Please provide a valid full name and email address.', 'matchmaker')]);
         }
 
@@ -479,6 +495,9 @@ class FormController {
             && (int) ($_FILES['form_fields']['error'][$photo_key] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
 
         if (!$has_existing && !$has_uploaded) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('Form submission validation failed: Photo 1 missing for user #' . $user_id . '.', ['user_id' => $user_id], 'form');
+            }
             wp_send_json_error(['message' => __('Photo 1 is mandatory. Please provide your main profile photo.', 'matchmaker')]);
         }
 
@@ -503,6 +522,9 @@ class FormController {
                 if (!in_array($ext, $allowed_extensions, true) || (!empty($mime) && !in_array($mime, $allowed_mimes, true))) {
                     $photo_num = preg_replace('/\D/', '', $photo_k);
                     $photo_label = $photo_num ? sprintf(__('Photo %s', 'matchmaker'), $photo_num) : __('Profile Photo', 'matchmaker');
+                    if (class_exists(FileLoggerService::class)) {
+                        FileLoggerService::warning('Form submission photo format invalid for user #' . $user_id . ': ' . $photo_k . ' (' . $ext . '/' . $mime . ').', ['user_id' => $user_id, 'photo' => $photo_k, 'ext' => $ext, 'mime' => $mime], 'form');
+                    }
                     wp_send_json_error([
                         'message' => sprintf(
                             __('Invalid file format for %s. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'matchmaker'),
@@ -571,12 +593,18 @@ class FormController {
         $pref_age_min = !empty($f['preferred_age_min']) ? (int) $f['preferred_age_min'] : 18;
         $pref_age_max = !empty($f['preferred_age_max']) ? (int) $f['preferred_age_max'] : 80;
         if (!empty($f['preferred_age_min']) && !empty($f['preferred_age_max']) && $pref_age_min >= $pref_age_max) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('Form submission age range invalid for user #' . $user_id . ' (min=' . $pref_age_min . ', max=' . $pref_age_max . ').', ['user_id' => $user_id], 'form');
+            }
             wp_send_json_error(['message' => __('Preferred Maximum Age must be higher than Minimum Age.', 'matchmaker')]);
         }
 
         $pref_h_min = $parse_height((string) ($f['preferred_height_min'] ?? ''));
         $pref_h_max = $parse_height((string) ($f['preferred_height_max'] ?? ''));
         if ($pref_h_min !== null && $pref_h_max !== null && $pref_h_min >= $pref_h_max) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::info('Form submission height range invalid for user #' . $user_id . ' (min=' . $pref_h_min . ', max=' . $pref_h_max . ').', ['user_id' => $user_id], 'form');
+            }
             wp_send_json_error(['message' => __('Preferred Maximum Height must be higher than Minimum Height.', 'matchmaker')]);
         }
 
@@ -625,6 +653,9 @@ class FormController {
         $inserted = \Matchmaker\Repository\MatchRepository::instance()->upsert_pool($pool_payload);
 
         if ($inserted === false) {
+            if (class_exists(FileLoggerService::class)) {
+                FileLoggerService::error('DB error: upsert_pool failed for user #' . $user_id . ' (' . ($wpdb->last_error ?? 'unknown') . ').', ['user_id' => $user_id, 'db_error' => $wpdb->last_error ?? ''], 'form');
+            }
             wp_send_json_error(['message' => __('Database error while updating match pool. Please try again.', 'matchmaker')]);
         }
 
@@ -701,8 +732,14 @@ class FormController {
                     $url = wp_get_attachment_url($attachment_id);
                     if ($url) {
                         update_user_meta($user_id, $photo_key, esc_url_raw($url));
+                        if (class_exists(FileLoggerService::class)) {
+                            FileLoggerService::info('Photo uploaded successfully: ' . $photo_key . ' for user #' . $user_id . '.', ['user_id' => $user_id, 'photo_key' => $photo_key, 'attachment_id' => $attachment_id, 'url' => $url], 'form');
+                        }
                     }
                 } else {
+                    if (class_exists(FileLoggerService::class)) {
+                        FileLoggerService::error('Photo upload failed: ' . $photo_key . ' for user #' . $user_id . ' — ' . $attachment_id->get_error_message() . '.', ['user_id' => $user_id, 'photo_key' => $photo_key, 'error' => $attachment_id->get_error_message()], 'form');
+                    }
                     error_log(
                         "Matchmaker: photo upload failed for {$photo_key}, user {$user_id} — "
                         . $attachment_id->get_error_message()
@@ -718,6 +755,17 @@ class FormController {
             $is_update = !empty(get_user_meta($user_id, 'mm_last_match_run', true));
             $trigger   = $is_update ? 'form_update' : 'form_submit';
             mm_enqueue_user_matching_job($user_id, $trigger);
+        }
+
+        $action_label = $is_update_profile ? 'profile_update' : 'form_submit';
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info('Matchmaking profile ' . ($is_update_profile ? 'updated' : 'submitted') . ' by user #' . $user_id . ' (' . $full_name . ').', [
+                'user_id'   => $user_id,
+                'name'      => $full_name,
+                'email'     => $email,
+                'user_type' => $user_type,
+                'trigger'   => $action_label,
+            ], 'form');
         }
 
         $response_data = [

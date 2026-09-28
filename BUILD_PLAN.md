@@ -2,8 +2,10 @@
 
 **Status**: `IDLE`
 **Active Task**: None
-**Current Phase**: Idle / Standby
+**Current Phase**: Idle
 
----
+## Objectives
+*No active tasks. System is operational.*
 
-*No active task currently in progress. Ready for next prompt.*
+## Checklist
+*Ready for next instructions.*
