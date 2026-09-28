@@ -755,19 +755,39 @@
         var currentLogType = 'info';
         var cachedRawLog   = '';
 
+        function getActiveRawContent() {
+            if (cachedRawLog && cachedRawLog.trim().length) {
+                return cachedRawLog;
+            }
+            var $initialScript = (currentLogType === 'error')
+                ? $('#mm-initial-error-log-data')
+                : $('#mm-initial-info-log-data');
+
+            if ($initialScript.length) {
+                cachedRawLog = $initialScript.text() || '';
+            }
+            return cachedRawLog;
+        }
+
         function renderLogLines(rawContent) {
             var $wrapper = $('#mm-log-lines-wrapper');
             if (!$wrapper.length) return;
 
-            if (!rawContent || !rawContent.trim().length) {
+            var content = rawContent !== undefined && rawContent !== null ? rawContent : getActiveRawContent();
+            if (!content || !content.trim().length) {
+                content = getActiveRawContent();
+            }
+
+            if (!content || !content.trim().length) {
                 $wrapper.html('<div class="mm-log-empty-state"><span class="dashicons dashicons-media-document" style="font-size:36px; width:36px; height:36px; color:#94a3b8;"></span><p>Log file is currently empty.</p></div>');
                 return;
             }
 
-            var lines         = rawContent.split('\n');
+            var lines         = content.split('\n');
             var filterKeyword = ($('#mm-log-filter-input').val() || '').toLowerCase().trim();
             var filterLevel   = ($('#mm-log-filter-level').val() || '').toLowerCase().trim();
             var filterCat     = ($('#mm-log-filter-category').val() || '').toLowerCase().trim();
+            var searchTerms   = filterKeyword ? filterKeyword.split(/\s+/).filter(Boolean) : [];
             var html          = '';
             var countRendered = 0;
 
@@ -825,10 +845,17 @@
                     continue;
                 }
 
-                // Check Keyword filter (matches message, timestamp, category, level, or context)
-                if (filterKeyword) {
-                    var fullSearchText = (line + ' ' + message + ' ' + context + ' ' + category + ' ' + level).toLowerCase();
-                    if (fullSearchText.indexOf(filterKeyword) === -1) {
+                // Check Keyword search across all terms (AND condition)
+                if (searchTerms.length > 0) {
+                    var fullSearchText = (line + ' ' + message + ' ' + context + ' ' + category + ' ' + level + ' ' + timestamp).toLowerCase();
+                    var allMatched = true;
+                    for (var t = 0; t < searchTerms.length; t++) {
+                        if (fullSearchText.indexOf(searchTerms[t]) === -1) {
+                            allMatched = false;
+                            break;
+                        }
+                    }
+                    if (!allMatched) {
                         continue;
                     }
                 }
@@ -869,7 +896,7 @@
 
                 if (jsonFormatted) {
                     html += '    <details class="mm-log-context-details">';
-                    html += '      <summary class="mm-log-context-summary"><span>📦 Context Payload (JSON)</span></summary>';
+                    html += '      <summary class="mm-log-context-summary"><span>📦 Context Parameters & Payload (JSON)</span></summary>';
                     html += '      <pre class="mm-log-context-json">' + escapeHtml(jsonFormatted) + '</pre>';
                     html += '    </details>';
                 } else if (context) {
@@ -881,7 +908,7 @@
             }
 
             if (!countRendered && (filterKeyword || filterLevel || filterCat)) {
-                html = '<div class="mm-log-empty-state"><span class="dashicons dashicons-search" style="font-size:36px; width:36px; height:36px; color:#94a3b8;"></span><p>No log entries matched your filter criteria.</p></div>';
+                html = '<div class="mm-log-empty-state"><span class="dashicons dashicons-search" style="font-size:36px; width:36px; height:36px; color:#94a3b8;"></span><p>No log entries matched your search filter criteria.</p></div>';
             }
 
             $wrapper.html(html);
@@ -937,11 +964,15 @@
             });
         }
 
+        // Initialize cache from embedded DOM data on load
+        getActiveRawContent();
+
         $(document).on('click', '.mm-log-type-btn', function (e) {
             e.preventDefault();
             var $btn = $(this);
             var type = $btn.attr('data-log-type') || 'info';
             currentLogType = type;
+            cachedRawLog   = ''; // reset so loadFileLog loads fresh data
 
             $('.mm-log-type-btn').css({ background: 'transparent', color: '#64748b', boxShadow: 'none' }).removeClass('active-log-btn');
             $btn.css({ background: '#CC723F', color: '#fff', boxShadow: '0 2px 4px rgba(204,114,63,0.25)' }).addClass('active-log-btn');
@@ -949,12 +980,12 @@
             loadFileLog(type);
         });
 
-        $(document).on('input', '#mm-log-filter-input', function () {
-            renderLogLines(cachedRawLog);
+        $(document).on('input keyup', '#mm-log-filter-input', function () {
+            renderLogLines(getActiveRawContent());
         });
 
         $(document).on('change', '#mm-log-filter-level, #mm-log-filter-category', function () {
-            renderLogLines(cachedRawLog);
+            renderLogLines(getActiveRawContent());
         });
 
         $(document).on('change', '#mm-log-max-lines', function () {

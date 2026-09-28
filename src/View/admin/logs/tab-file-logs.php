@@ -1,6 +1,6 @@
 <?php
 /**
- * View: Admin Matchmaking System File Logs Tab (Redesigned & High-Legibility)
+ * View: Admin Matchmaking System File Logs Tab (Redesigned with Guided Learning & Instant Filtering)
  *
  * Available variables:
  *   @var string $download_nonce
@@ -90,12 +90,12 @@ if (!function_exists('mm_render_log_entry_html')) {
                         <strong><?php echo esc_html($level); ?></strong>
                     </span>
                     <?php if (!empty($category)) : ?>
-                        <span class="mm-log-category-badge" title="<?php esc_attr_e('Log Category', 'matchmaker'); ?>">
+                        <span class="mm-log-category-badge" title="<?php esc_attr_e('Subsystem Component', 'matchmaker'); ?>">
                             <?php echo esc_html($category); ?>
                         </span>
                     <?php endif; ?>
                     <?php if (!empty($timestamp)) : ?>
-                        <span class="mm-log-time-badge" title="<?php esc_attr_e('Timestamp', 'matchmaker'); ?>">
+                        <span class="mm-log-time-badge" title="<?php esc_attr_e('UTC Timestamp', 'matchmaker'); ?>">
                             🕒 <?php echo esc_html($timestamp); ?>
                         </span>
                     <?php endif; ?>
@@ -108,7 +108,7 @@ if (!function_exists('mm_render_log_entry_html')) {
                 <?php if (!empty($parsed_json)) : ?>
                     <details class="mm-log-context-details">
                         <summary class="mm-log-context-summary">
-                            <span>📦 <?php esc_html_e('Context Payload (JSON)', 'matchmaker'); ?></span>
+                            <span>📦 <?php esc_html_e('Context Parameters & Payload (JSON)', 'matchmaker'); ?></span>
                         </summary>
                         <pre class="mm-log-context-json"><?php echo esc_html($parsed_json); ?></pre>
                     </details>
@@ -124,6 +124,10 @@ if (!function_exists('mm_render_log_entry_html')) {
     }
 }
 ?>
+
+<!-- Hidden Raw Data Payloads for Instant JS Cache & Filtering -->
+<script id="mm-initial-info-log-data" type="text/plain"><?php echo esc_html($info_log_stats['content'] ?? ''); ?></script>
+<script id="mm-initial-error-log-data" type="text/plain"><?php echo esc_html($error_log_stats['content'] ?? ''); ?></script>
 
 <div class="mm-system-logs-wrapper" style="margin-top:20px;">
     <!-- Log Switcher Bar -->
@@ -149,6 +153,56 @@ if (!function_exists('mm_render_log_entry_html')) {
             </button>
         </div>
     </div>
+
+    <!-- Collapsible Log Learning Guide / Legend -->
+    <details class="mm-log-guide-accordion" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:18px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <summary style="padding:14px 20px; font-weight:700; font-size:14px; color:#0f172a; cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; background:#f8fafc; border-bottom:1px solid #f1f5f9;">
+            <span style="display:inline-flex; align-items:center; gap:8px;">
+                📖 <?php esc_html_e('How to Read & Understand System Logs (Click to expand guide & glossary)', 'matchmaker'); ?>
+            </span>
+            <span style="font-size:12px; color:#CC723F; font-weight:600;"><?php esc_html_e('View Reference Guide &rarr;', 'matchmaker'); ?></span>
+        </summary>
+        <div style="padding:20px; font-size:13px; color:#334155; line-height:1.6; background:#fff;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px;">
+                <!-- Column 1: Log Types -->
+                <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <h4 style="margin:0 0 10px; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:6px;">
+                        📂 <?php esc_html_e('Log Files & Purposes', 'matchmaker'); ?>
+                    </h4>
+                    <p style="margin:0 0 8px;"><strong>📋 info.log (Access & Operations):</strong> <?php esc_html_e('Real-time timeline of member activity, form submissions, PMPro level changes, matching engine jobs, and notifications.', 'matchmaker'); ?></p>
+                    <p style="margin:0;"><strong>⚠️ error.log (Errors Only):</strong> <?php esc_html_e('Dedicated error log capturing database failures, failed photo uploads, email delivery errors, and PHP exceptions.', 'matchmaker'); ?></p>
+                </div>
+
+                <!-- Column 2: Log Levels -->
+                <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <h4 style="margin:0 0 10px; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:6px;">
+                        🏷️ <?php esc_html_e('Log Level Meanings', 'matchmaker'); ?>
+                    </h4>
+                    <ul style="margin:0; padding-left:18px;">
+                        <li><span style="color:#0369a1; font-weight:700;">ℹ️ INFO:</span> <?php esc_html_e('Normal platform events (e.g. form saved, checkout completed, 5 candidates evaluated).', 'matchmaker'); ?></li>
+                        <li><span style="color:#b45309; font-weight:700;">⚠️ WARNING:</span> <?php esc_html_e('Non-fatal validation stops (e.g. invalid photo format, unverified email, unauthenticated request).', 'matchmaker'); ?></li>
+                        <li><span style="color:#be123c; font-weight:700;">🛑 ERROR:</span> <?php esc_html_e('System failures requiring attention (e.g. DB SQL query error, mail server failure, upload error).', 'matchmaker'); ?></li>
+                        <li><span style="color:#6b21a8; font-weight:700;">🔍 DEBUG:</span> <?php esc_html_e('Detailed scoring and matching pair creation parameters.', 'matchmaker'); ?></li>
+                    </ul>
+                </div>
+
+                <!-- Column 3: Component Categories -->
+                <div style="background:#f8fafc; padding:16px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <h4 style="margin:0 0 10px; font-size:14px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:6px;">
+                        ⚙️ <?php esc_html_e('Subsystem Categories', 'matchmaker'); ?>
+                    </h4>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700;">FORM</span> <small><?php esc_html_e('Questionnaire wizard & updates', 'matchmaker'); ?></small><br>
+                        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700;">PMPRO</span> <small><?php esc_html_e('Paid memberships & tier sync', 'matchmaker'); ?></small><br>
+                        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700;">MATCH_ENGINE</span> <small><?php esc_html_e('Calculations & hard gates', 'matchmaker'); ?></small><br>
+                        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700;">REPOSITORY</span> <small><?php esc_html_e('Database inserts & updates', 'matchmaker'); ?></small><br>
+                        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700;">EMAIL</span> <small><?php esc_html_e('Transactional email dispatches', 'matchmaker'); ?></small><br>
+                        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700;">ADMIN</span> <small><?php esc_html_e('Approvals, rejections, settings', 'matchmaker'); ?></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </details>
 
     <!-- Active Log Meta Bar -->
     <div class="mm-log-meta-card" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:14px; margin-bottom:18px; background:#fff; padding:16px 20px; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
@@ -183,7 +237,7 @@ if (!function_exists('mm_render_log_entry_html')) {
             <!-- Keyword search -->
             <div style="position:relative;">
                 <span class="dashicons dashicons-search" style="position:absolute; left:10px; top:8px; color:#94a3b8; font-size:16px;"></span>
-                <input type="text" id="mm-log-filter-input" placeholder="<?php esc_attr_e('Filter by keyword, user ID, email...', 'matchmaker'); ?>" style="padding:6px 12px 6px 32px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; min-width:260px;">
+                <input type="text" id="mm-log-filter-input" placeholder="<?php esc_attr_e('Search keyword, user ID, email, trigger...', 'matchmaker'); ?>" style="padding:6px 12px 6px 32px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; min-width:280px;">
             </div>
             
             <!-- Level Filter -->

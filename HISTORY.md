@@ -6,7 +6,26 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 117: Fix System Logs Client-Side Search/Filters & Add Interactive Log Interpretation Guide
+- **Objective**:
+  1. Fix the System File Logs interactive filters (Keyword Search, Level dropdown, Category dropdown) so that typing or selecting filters immediately filters logs on initial page load without requiring prior tab switching or manual reload.
+  2. Embed initial log content directly into DOM script tags (`#mm-initial-info-log-data` and `#mm-initial-error-log-data`) to populate the JS cache automatically on load.
+  3. Support multi-term keyword search (splitting terms by whitespace and performing case-insensitive AND matching across message, category, level, timestamp, and context JSON payload).
+  4. Add an interactive, collapsible **"📖 How to Read & Understand System Logs"** guide component to the admin logs tab detailing log file purposes (`info.log` vs `error.log`), level badge meanings (`INFO`, `WARNING`, `ERROR`, `DEBUG`), and a subsystem component glossary (`FORM`, `PMPRO`, `MATCH_ENGINE`, `REPOSITORY`, `EMAIL`, `ADMIN`, `REGISTRATION`).
+- **Implemented**:
+  - `src/View/admin/logs/tab-file-logs.php`:
+    - Embedded `<script id="mm-initial-info-log-data" type="text/plain">` and `<script id="mm-initial-error-log-data" type="text/plain">` for instant cache hydration.
+    - Added collapsible reference guide `<details class="mm-log-guide-accordion">` with clean 3-column breakdown for Log Files, Log Levels, and Subsystem Categories.
+  - `assets/js/admin-matchmaker.js`:
+    - Added `getActiveRawContent()` helper that seamlessly retrieves and caches embedded DOM data on load or fallback.
+    - Updated `renderLogLines()` with multi-word search splitting and comprehensive AND matching.
+    - Attached input/keyup and change listeners to instant-filter the active log content.
+  - `tests/Unit/FileLoggerTest.php`:
+    - Verified structured card rendering, category badges, level pills, and context parameters.
+- **Verification**: Ran full automated test suite with **197/197 tests passing** (0 failures, 0 errors).
+
 ### Task 116: Comprehensive File Logging Instrumentation & Redesigned High-Legibility Log Viewer UI
+
 - **Objective**:
   1. Add comprehensive disk file logging via `FileLoggerService` across all key plugin lifecycle events: form submission, profile updates, photo validation and uploads, PMPro checkout and level sync, matching engine executions, database operations (with error logging), admin actions (match approvals, rejections, cancellations, manual match creation, settings saves), user registration, and email notifications.
   2. Redesign the System File Logs admin tab (`tab-file-logs.php`, `admin-matchmaker.js`, `admin-matchmaker.css`) with structured entry cards, level badges (INFO, WARNING, ERROR, DEBUG), category tags, timestamp pills, and expandable JSON context payload viewers for maximum legibility and scanability.

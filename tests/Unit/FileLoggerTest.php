@@ -235,7 +235,7 @@ class FileLoggerTest
         if (!str_contains($html, 'mm-log-category-badge') || !str_contains($html, 'FORM') || !str_contains($html, 'REPOSITORY')) {
             throw new \RuntimeException("Expected tab-file-logs.php to output category badges.");
         }
-        if (!str_contains($html, 'mm-log-context-details') || !str_contains($html, 'Context Payload (JSON)')) {
+        if (!str_contains($html, 'mm-log-context-details') || !str_contains($html, 'Context Parameters')) {
             throw new \RuntimeException("Expected tab-file-logs.php to output structured context payload details.");
         }
     }
