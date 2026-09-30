@@ -621,12 +621,14 @@ class MatchRepository
     }
 
     /**
-     * Search and filter the candidate pool with optional filters.
+     * Search and filter the candidate pool with optional filters and pagination.
      *
-     * @param array<string, string> $filters Assoc of filter key => value (search, user_type, gender).
-     * @return array<int, object> Array of pool rows with joined user data.
+     * @param array<string, string> $filters Assoc of filter key => value (search, user_type, gender, etc.).
+     * @param int                  $limit   Optional limit for pagination (0 = no limit).
+     * @param int                  $offset  Optional offset for pagination.
+     * @return array<int, array<string, mixed>> Array of pool rows with joined user data.
      */
-    public function search_pool(array $filters = []): array
+    public function search_pool(array $filters = [], int $limit = 0, int $offset = 0): array
     {
         global $wpdb;
         $pool_table    = $wpdb->prefix . 'matchmaking_pool';
@@ -678,11 +680,72 @@ class MatchRepository
             ORDER BY p.updated_at DESC
         ";
 
+        if ($limit > 0) {
+            $query .= " LIMIT %d OFFSET %d";
+            $args[] = $limit;
+            $args[] = max(0, $offset);
+        }
+
         $results = !empty($args)
             ? $wpdb->get_results($wpdb->prepare($query, ...$args), ARRAY_A)
             : $wpdb->get_results($query, ARRAY_A);
 
         return $results ?: [];
+    }
+
+    /**
+     * Get total count of candidate pool records matching filters for pagination.
+     *
+     * @param array<string, string> $filters Assoc of filter key => value.
+     * @return int Total matching records count.
+     */
+    public function search_pool_count(array $filters = []): int
+    {
+        global $wpdb;
+        $pool_table = $wpdb->prefix . 'matchmaking_pool';
+
+        $where = ['1=1'];
+        $args  = [];
+
+        if (!empty($filters['user_type'])) {
+            $where[] = 'p.user_type = %s';
+            $args[]  = $filters['user_type'];
+        }
+        if (isset($filters['has_one_on_one']) && $filters['has_one_on_one'] !== '') {
+            $is_one_on_one_filter = (int) $filters['has_one_on_one'];
+            if ($is_one_on_one_filter === 1) {
+                $where[] = '(p.has_one_on_one = 1 OR p.user_type = \'one_on_one\')';
+            } else {
+                $where[] = '(p.has_one_on_one = 0 AND p.user_type != \'one_on_one\')';
+            }
+        }
+        if (!empty($filters['gender'])) {
+            $where[] = 'p.gender = %s';
+            $args[]  = $filters['gender'];
+        }
+        if (isset($filters['is_parent_applying']) && $filters['is_parent_applying'] !== '') {
+            $where[] = 'p.is_parent_applying = %d';
+            $args[]  = (int) $filters['is_parent_applying'];
+        }
+        if (!empty($filters['search'])) {
+            $where[] = '(u.user_email LIKE %s OR u.display_name LIKE %s OR p.country LIKE %s OR p.city LIKE %s)';
+            $wc      = '%' . $wpdb->esc_like($filters['search']) . '%';
+            $args[]  = $wc;
+            $args[]  = $wc;
+            $args[]  = $wc;
+            $args[]  = $wc;
+        }
+
+        $where_sql = implode(' AND ', $where);
+
+        $query = "
+            SELECT COUNT(*)
+            FROM {$pool_table} p
+            INNER JOIN {$wpdb->users} u ON p.user_id = u.ID
+            WHERE {$where_sql}
+        ";
+
+        return (int) (!empty($args) ? $wpdb->get_var($wpdb->prepare($query, ...$args)) : $wpdb->get_var($query));
     }
 
     /**
@@ -1251,23 +1314,27 @@ class MatchRepository
     }
 
     /**
-     * Search and retrieve matches for the admin matches queue, filtered by status / search / source.
+     * Search and retrieve matches for the admin matches queue, filtered by status / search / source with optional pagination.
      *
      * @param array<string, mixed> $filters Optional filters (status, search, source).
+     * @param int                  $limit   Optional limit for pagination (0 = no limit).
+     * @param int                  $offset  Optional offset for pagination.
      * @return array<int, array<string, mixed>> Match records.
      */
-    public function search_matches(array $filters = []): array
+    public function search_matches(array $filters = [], int $limit = 0, int $offset = 0): array
     {
-        return $this->get_all_matches($filters);
+        return $this->get_all_matches($filters, $limit, $offset);
     }
 
     /**
-     * Get all matches for the admin matches queue, filtered by status / search / source.
+     * Get all matches for the admin matches queue, filtered by status / search / source with optional pagination.
      *
      * @param array<string, mixed> $filters Optional filters (status, search, source).
+     * @param int                  $limit   Optional limit for pagination (0 = no limit).
+     * @param int                  $offset  Optional offset for pagination.
      * @return array<int, array<string, mixed>> Match records.
      */
-    public function get_all_matches(array $filters = []): array
+    public function get_all_matches(array $filters = [], int $limit = 0, int $offset = 0): array
     {
         global $wpdb;
         $matches_table = $wpdb->prefix . 'matches';
@@ -1312,6 +1379,12 @@ class MatchRepository
             ORDER BY (m.status = 'pending_review') DESC, m.created_at DESC
         ";
 
+        if ($limit > 0) {
+            $query .= " LIMIT %d OFFSET %d";
+            $args[] = $limit;
+            $args[] = max(0, $offset);
+        }
+
         $results = !empty($args)
             ? $wpdb->get_results($wpdb->prepare($query, ...$args), ARRAY_A)
             : $wpdb->get_results($query, ARRAY_A);
@@ -1340,6 +1413,55 @@ class MatchRepository
         }
 
         return $results ?: [];
+    }
+
+    /**
+     * Get total count of matches matching filters for pagination.
+     *
+     * @param array<string, mixed> $filters Optional filters (status, search, source).
+     * @return int Total matching matches count.
+     */
+    public function search_matches_count(array $filters = []): int
+    {
+        global $wpdb;
+        $matches_table = $wpdb->prefix . 'matches';
+        $pool_table    = $wpdb->prefix . 'matchmaking_pool';
+
+        $where = ['1=1'];
+        $args  = [];
+
+        if (!empty($filters['status'])) {
+            $where[] = 'm.status = %s';
+            $args[]  = $filters['status'];
+        }
+
+        if (!empty($filters['source'])) {
+            $where[] = 'm.match_source = %s';
+            $args[]  = $filters['source'];
+        }
+
+        if (!empty($filters['search'])) {
+            $where[] = '(u1.display_name LIKE %s OR u1.user_email LIKE %s OR u2.display_name LIKE %s OR u2.user_email LIKE %s)';
+            $wc      = '%' . $wpdb->esc_like($filters['search']) . '%';
+            $args[]  = $wc;
+            $args[]  = $wc;
+            $args[]  = $wc;
+            $args[]  = $wc;
+        }
+
+        $where_sql = implode(' AND ', $where);
+
+        $query = "
+            SELECT COUNT(*)
+            FROM {$matches_table} m
+            LEFT JOIN {$wpdb->users} u1 ON m.user_one_id = u1.ID
+            LEFT JOIN {$wpdb->users} u2 ON m.user_two_id = u2.ID
+            LEFT JOIN {$pool_table} p1 ON m.user_one_id = p1.user_id
+            LEFT JOIN {$pool_table} p2 ON m.user_two_id = p2.user_id
+            WHERE {$where_sql}
+        ";
+
+        return (int) (!empty($args) ? $wpdb->get_var($wpdb->prepare($query, ...$args)) : $wpdb->get_var($query));
     }
 
     /**

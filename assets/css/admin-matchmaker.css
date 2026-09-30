@@ -898,5 +898,27 @@ body.mm-lightbox-open {
     }
 }
 
+.mm-admin-notes-textarea {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif !important;
+    line-height: 1.5 !important;
+    resize: vertical !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}
+
+.mm-admin-notes-textarea:focus {
+    border-color: #CC723F !important;
+    box-shadow: 0 0 0 2px rgba(204, 114, 63, 0.2) !important;
+    outline: none !important;
+}
+
+
 
 

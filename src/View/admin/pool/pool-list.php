@@ -228,6 +228,24 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
     </tbody>
 </table>
 
+<?php if (!empty($total_pages) && $total_pages > 1) : ?>
+    <div class="tablenav bottom" style="margin-top:15px;">
+        <div class="tablenav-pages">
+            <span class="displaying-num"><?php echo esc_html(sprintf(_n('%d candidate', '%d candidates', (int) ($total_candidates ?? count($candidates)), 'matchmaker'), (int) ($total_candidates ?? count($candidates)))); ?></span>
+            <?php
+            echo paginate_links([
+                'base'      => add_query_arg('paged', '%#%'),
+                'format'    => '',
+                'prev_text' => __('&laquo; Previous', 'matchmaker'),
+                'next_text' => __('Next &raquo;', 'matchmaker'),
+                'total'     => (int) $total_pages,
+                'current'   => (int) ($current_page ?? 1),
+            ]);
+            ?>
+        </div>
+    </div>
+<?php endif; ?>
+
 <!-- Admin Notes Modal Popup -->
 <div id="mm-admin-notes-modal" class="mm-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="mm-notes-modal-title">
     <div class="mm-modal-backdrop mm-close-notes-modal"></div>
@@ -247,21 +265,7 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
                 <p class="description" style="margin-top:0; margin-bottom:10px;">
                     <?php esc_html_e('Internal staff notes for this candidate. Visible only to Matchmakers and Administrators.', 'matchmaker'); ?>
                 </p>
-                <?php
-                $modal_editor_id = 'mm_modal_admin_notes_editor';
-                $modal_settings  = [
-                    'textarea_name' => 'mm_modal_admin_notes',
-                    'textarea_rows' => 10,
-                    'media_buttons' => false,
-                    'teeny'         => true,
-                    'quicktags'     => true,
-                    'tinymce'       => [
-                        'toolbar1' => 'bold,italic,underline,bullist,numlist,link,unlink,undo,redo',
-                        'toolbar2' => '',
-                    ],
-                ];
-                wp_editor('', $modal_editor_id, $modal_settings);
-                ?>
+                <textarea id="mm-modal-admin-notes-textarea" name="mm_modal_admin_notes" rows="8" class="large-text mm-admin-notes-textarea" placeholder="<?php esc_attr_e('Enter private notes, observations, or follow-up details for this candidate...', 'matchmaker'); ?>" style="width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; font-size:14px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica Neue',sans-serif; line-height:1.5; resize:vertical;"></textarea>
             </div>
         </div>
         <div class="mm-modal-footer" style="padding:14px 20px; border-top:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:flex-end; align-items:center; gap:10px;">

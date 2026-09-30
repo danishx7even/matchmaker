@@ -304,24 +304,10 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
                 <?php esc_html_e('Internal staff notes for this candidate. Visible only to Matchmakers and Admins.', 'matchmaker'); ?>
             </p>
             <div class="mm-admin-notes-editor-wrap">
-                <?php
-                $sidebar_editor_id = 'mm_sidebar_admin_notes_editor';
-                $sidebar_settings  = [
-                    'textarea_name' => 'mm_sidebar_admin_notes',
-                    'textarea_rows' => 12,
-                    'media_buttons' => false,
-                    'teeny'         => true,
-                    'quicktags'     => true,
-                    'tinymce'       => [
-                        'toolbar1' => 'bold,italic,underline,bullist,numlist,link,unlink,undo,redo',
-                        'toolbar2' => '',
-                    ],
-                ];
-                wp_editor($admin_notes ?? $repo->get_admin_notes($user_id), $sidebar_editor_id, $sidebar_settings);
-                ?>
+                <textarea id="mm-sidebar-admin-notes-textarea" name="mm_sidebar_admin_notes" rows="12" class="large-text mm-admin-notes-textarea" placeholder="<?php esc_attr_e('Enter private notes, observations, or follow-up details for this candidate...', 'matchmaker'); ?>" style="width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; font-size:13px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica Neue',sans-serif; line-height:1.5; resize:vertical;"><?php echo esc_textarea($admin_notes ?? $repo->get_admin_notes($user_id)); ?></textarea>
             </div>
             <div style="margin-top:14px; display:flex; align-items:center; gap:10px;">
-                <button type="button" class="button button-primary mm-save-notes-btn" data-user-id="<?php echo (int) $user_id; ?>" data-editor-id="mm_sidebar_admin_notes_editor">
+                <button type="button" class="button button-primary mm-save-notes-btn" data-user-id="<?php echo (int) $user_id; ?>" data-editor-id="mm-sidebar-admin-notes-textarea">
                     <?php esc_html_e('Save Notes', 'matchmaker'); ?>
                 </button>
                 <span class="mm-notes-save-status" style="font-size:12px; font-weight:600; display:none;"></span>

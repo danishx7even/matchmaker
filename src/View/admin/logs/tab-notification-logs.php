@@ -138,9 +138,9 @@ if (!defined('ABSPATH')) {
     </table>
 
     <?php if ($total_pages > 1) : ?>
-        <div class="tablenav" style="margin-top:15px;">
+        <div class="tablenav bottom" style="margin-top:15px;">
             <div class="tablenav-pages">
-                <span class="displaying-num"><?php echo esc_html(sprintf(__('%d items', 'matchmaker'), $total_logs)); ?></span>
+                <span class="displaying-num"><?php echo esc_html(sprintf(_n('%d item', '%d items', $total_logs, 'matchmaker'), $total_logs)); ?></span>
                 <?php
                 echo paginate_links([
                     'base'      => add_query_arg('paged', '%#%'),

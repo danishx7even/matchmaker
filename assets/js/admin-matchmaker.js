@@ -1036,8 +1036,12 @@
          * Admin Notes System (Modal Popup & Candidate Profile Sidebar Card)
          * ========================================================================= */
 
-        function getEditorContent(editorId) {
-            var ed = window.tinymce ? window.tinymce.get(editorId) : null;
+        function getEditorContent(fieldId) {
+            var $el = $('#' + fieldId);
+            if ($el.length) {
+                return $el.val() || '';
+            }
+            var ed = window.tinymce ? window.tinymce.get(fieldId) : null;
             if (ed && !ed.isHidden()) {
                 try {
                     return ed.getContent();
@@ -1045,23 +1049,22 @@
                     // Fallback
                 }
             }
-            var $el = $('#' + editorId);
-            return $el.length ? $el.val() : '';
+            return '';
         }
 
-        function setEditorContent(editorId, content) {
+        function setEditorContent(fieldId, content) {
             var val = content || '';
-            var ed = window.tinymce ? window.tinymce.get(editorId) : null;
+            var $el = $('#' + fieldId);
+            if ($el.length) {
+                $el.val(val);
+            }
+            var ed = window.tinymce ? window.tinymce.get(fieldId) : null;
             if (ed) {
                 try {
                     ed.setContent(val);
                 } catch (e) {
                     // Fallback
                 }
-            }
-            var $el = $('#' + editorId);
-            if ($el.length) {
-                $el.val(val);
             }
         }
 
@@ -1093,12 +1096,17 @@
             $('#mm-notes-modal-editor-wrap').css('opacity', '0.4');
             $('#mm-modal-notes-status').hide().text('');
 
-            // Reset modal editor content
-            setEditorContent('mm_modal_admin_notes_editor', '');
+            // Reset modal textarea content
+            setEditorContent('mm-modal-admin-notes-textarea', '');
 
             modalEl.style.setProperty('display', 'flex', 'important');
             modalEl.classList.add('is-open');
             modalEl.setAttribute('aria-hidden', 'false');
+
+            // Focus textarea after modal displays
+            setTimeout(function () {
+                $('#mm-modal-admin-notes-textarea').focus();
+            }, 100);
 
             // Fetch existing notes via AJAX
             $.ajax({
@@ -1112,7 +1120,7 @@
                 dataType: 'json',
                 success: function (res) {
                     if (res && res.success && res.data) {
-                        setEditorContent('mm_modal_admin_notes_editor', res.data.notes || '');
+                        setEditorContent('mm-modal-admin-notes-textarea', res.data.notes || '');
                         if (res.data.user_name) {
                             $('#mm-notes-modal-username').text(res.data.user_name);
                         }
@@ -1167,7 +1175,7 @@
             var userId = parseInt($btn.attr('data-user-id'), 10) || 0;
             if (userId <= 0) return;
 
-            var notes = getEditorContent('mm_modal_admin_notes_editor');
+            var notes = getEditorContent('mm-modal-admin-notes-textarea');
             var $status = $('#mm-modal-notes-status');
 
             $btn.prop('disabled', true);
@@ -1208,7 +1216,7 @@
             e.preventDefault();
             var $btn = $(this);
             var userId = parseInt($btn.attr('data-user-id'), 10) || 0;
-            var editorId = $btn.attr('data-editor-id') || 'mm_sidebar_admin_notes_editor';
+            var editorId = $btn.attr('data-editor-id') || 'mm-sidebar-admin-notes-textarea';
             var $status = $btn.siblings('.mm-notes-save-status');
 
             if (userId <= 0) return;

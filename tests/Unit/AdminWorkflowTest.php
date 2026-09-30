@@ -879,6 +879,124 @@ class AdminWorkflowTest
             // Success response
         }
     }
+
+    public function test_search_pool_count_and_pagination(): void
+    {
+        global $wpdb;
+        $wpdb->queries = [];
+
+        $filters = [
+            'search'    => 'Fatima',
+            'gender'    => 'female',
+            'user_type' => 'monthly',
+        ];
+
+        $this->repo->search_pool($filters, 20, 40);
+        $queries_str = implode("\n", $wpdb->queries);
+        if (!str_contains($queries_str, 'LIMIT 20 OFFSET 40')) {
+            throw new \RuntimeException("Expected search_pool with limit and offset to contain 'LIMIT 20 OFFSET 40', got: {$queries_str}");
+        }
+
+        $wpdb->queries = [];
+        $this->repo->search_pool_count($filters);
+        $count_queries_str = implode("\n", $wpdb->queries);
+        if (!str_contains($count_queries_str, 'SELECT COUNT(*)') || !str_contains($count_queries_str, 'wp_matchmaking_pool')) {
+            throw new \RuntimeException("Expected search_pool_count to execute SELECT COUNT(*), got: {$count_queries_str}");
+        }
+    }
+
+    public function test_search_matches_count_and_pagination(): void
+    {
+        global $wpdb;
+        $wpdb->queries = [];
+
+        $filters = [
+            'status' => 'pending_review',
+            'source' => 'auto',
+        ];
+
+        $this->repo->search_matches($filters, 25, 50);
+        $queries_str = implode("\n", $wpdb->queries);
+        if (!str_contains($queries_str, 'LIMIT 25 OFFSET 50')) {
+            throw new \RuntimeException("Expected search_matches with limit and offset to contain 'LIMIT 25 OFFSET 50', got: {$queries_str}");
+        }
+
+        $wpdb->queries = [];
+        $this->repo->search_matches_count($filters);
+        $count_queries_str = implode("\n", $wpdb->queries);
+        if (!str_contains($count_queries_str, 'SELECT COUNT(*)') || !str_contains($count_queries_str, 'wp_matches')) {
+            throw new \RuntimeException("Expected search_matches_count to execute SELECT COUNT(*), got: {$count_queries_str}");
+        }
+    }
+
+    public function test_pool_list_view_renders_textarea_and_pagination(): void
+    {
+        $candidates = [
+            [
+                'user_id'             => 101,
+                'gender'              => 'male',
+                'user_type'           => 'monthly',
+                'birth_date'          => '1990-01-01',
+                'country'             => 'AE',
+                'created_at'          => '2026-09-01 10:00:00',
+                'cycle_matches_count' => 1,
+            ]
+        ];
+        $total_candidates = 50;
+        $current_page     = 2;
+        $per_page         = 20;
+        $total_pages      = 3;
+        $search           = '';
+        $gender           = '';
+        $tier             = '';
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/pool/pool-list.php';
+        $html = (string) ob_get_clean();
+
+        if (!str_contains($html, 'id="mm-modal-admin-notes-textarea"')) {
+            throw new \RuntimeException("Expected pool-list.php to render textarea with id mm-modal-admin-notes-textarea");
+        }
+        if (!str_contains($html, 'tablenav-pages')) {
+            throw new \RuntimeException("Expected pool-list.php to render tablenav-pages pagination container");
+        }
+        if (!str_contains($html, '50 candidates')) {
+            throw new \RuntimeException("Expected pool-list.php to render '50 candidates' displaying-num text");
+        }
+    }
+
+    public function test_matches_list_view_renders_pagination(): void
+    {
+        $matches = [
+            [
+                'id'            => 1,
+                'user_one_id'   => 101,
+                'user_two_id'   => 102,
+                'score'         => 5,
+                'status'        => 'pending_review',
+                'match_source'  => 'auto',
+                'created_at'    => '2026-09-20 12:00:00',
+            ]
+        ];
+        $total_matches = 45;
+        $current_page  = 1;
+        $per_page      = 20;
+        $total_pages   = 3;
+        $search        = '';
+        $status        = '';
+        $source        = '';
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/matches-list.php';
+        $html = (string) ob_get_clean();
+
+        if (!str_contains($html, 'tablenav-pages')) {
+            throw new \RuntimeException("Expected matches-list.php to render tablenav-pages pagination container");
+        }
+        if (!str_contains($html, '45 matches')) {
+            throw new \RuntimeException("Expected matches-list.php to render '45 matches' displaying-num text");
+        }
+    }
 }
 
 

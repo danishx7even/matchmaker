@@ -11,15 +11,17 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
 1. **Candidate Pool Browser (`page=matchmaking-pool`)** — Template: `src/View/admin/pool/pool-list.php`:
    - Filter by tier (`All`, `Monthly`, `1-on-1 VIP`, `Event`, `Free`), search by name/email.
    - Status indicators (Active/Inactive, In Pool, Quota Used vs Configured Max).
-   - **Notes Action CTA & Popup**: Action button in each row opening the `#mm-admin-notes-modal` WYSIWYG editor popup for reading and editing internal candidate notes without leaving the pool browser.
+   - **WordPress Default Pagination**: Standard `.tablenav` pagination (20 candidates per page) with item counts, page links, and filter query preservation.
+   - **Notes Action CTA & Popup**: Action button in each row opening the `#mm-admin-notes-modal` simple textarea popup for reading and editing internal candidate notes without leaving the pool browser.
    - **Single User Detail View (`view_user=ID`, template: `src/View/admin/pool/user-single.php`)**:
      - Header displays candidate name, tier badges, contact information, monthly quota, and **`Date joined: MM/DD/YYYY`** (subscription start date of current period).
-     - Two-column profile display (Candidate Self Profile & Match Preferences) alongside a dedicated **Admin Notes Sidebar Card** with WordPress rich text (WYSIWYG) editor and instant AJAX save.
+     - Two-column profile display (Candidate Self Profile & Match Preferences) alongside a dedicated **Admin Notes Sidebar Card** with simple textarea field and instant AJAX save.
      - Match history, auto-match scoring & manual matchmaker triggers.
    - Manual Matchmaker View (`manual_match=ID`, template: `src/View/admin/pool/manual-match.php`): Advanced filtering and compatibility score preview.
 
 2. **Matches Queue (`page=matchmaking-matches`)** — Template: `src/View/admin/matches/matches-list.php`:
    - Global match list with status filter (`pending_review`, `approved`, `matched`, `admin_rejected`, `rejected`, `expired`).
+   - **WordPress Default Pagination**: Standard `.tablenav` pagination (20 matches per page) with item counts and filter query preservation.
    - Single Match View (`view_match=ID`, template: `src/View/admin/matches/match-single.php`): Dual-column side-by-side comparison of User 1 vs User 2, compatibility score, user response statuses, and action buttons.
 
 3. **Settings & Plan Connector (`page=matchmaking-settings`)** — Template: `src/View/admin/settings/settings.php`:

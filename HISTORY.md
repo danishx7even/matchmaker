@@ -2500,6 +2500,49 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ---
 
+## 2026-09-30 — Task 121: Replace WYSIWYG Admin Notes with Simple Textarea and Add Default WordPress Table Pagination
+
+- **Objective**:
+  1. Replace the WYSIWYG `wp_editor()` for internal Admin Notes in both the Candidate Pool Browser modal popup (`pool-list.php`) and Candidate Profile sidebar card (`user-single.php`) with simple `<textarea>` fields.
+  2. Implement WordPress default table pagination (`.tablenav .tablenav-pages`, `paginate_links()`, `displaying-num`) for:
+     - **Candidate Pool Browser** (`page=matchmaking-pool`): 20 items per page with filter preservation.
+     - **Matches Queue** (`page=matchmaking-matches`): 20 items per page with status and source filter preservation.
+     - **Match & Notification Logs** (`page=matchmaking-logs`): Verified standard `.tablenav` classes and `_n()` item count pluralization.
+  3. Support `$limit` and `$offset` parameters in `MatchRepository::search_pool()` and `search_matches()` / `get_all_matches()`, and add dedicated `search_pool_count()` and `search_matches_count()` methods.
+- **Changes**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `search_pool(array $filters = [], int $limit = 0, int $offset = 0): array` with `LIMIT` and `OFFSET` clauses.
+    - Added `search_pool_count(array $filters = []): int` executing `SELECT COUNT(*) FROM wp_matchmaking_pool` with exact filter conditions.
+    - Updated `search_matches(array $filters = [], int $limit = 0, int $offset = 0): array` and `get_all_matches()`.
+    - Added `search_matches_count(array $filters = []): int` executing `SELECT COUNT(*) FROM wp_matches` with exact filter conditions.
+  - `src/Admin/AdminPortal.php`:
+    - In `render_pool_list_view()`: Extracted `paged` parameter, computed total candidates and total pages, and fetched paginated slice of pool records.
+    - In `render_matches_list_view()`: Extracted `paged` parameter, computed total matches and total pages, and fetched paginated slice of match records.
+  - `src/View/admin/pool/pool-list.php`:
+    - Replaced `wp_editor()` in `#mm-admin-notes-modal` with `<textarea id="mm-modal-admin-notes-textarea" name="mm_modal_admin_notes" rows="8" class="large-text mm-admin-notes-textarea">`.
+    - Added `<div class="tablenav bottom">` pagination bar with item counter and `paginate_links()`.
+  - `src/View/admin/pool/user-single.php`:
+    - Replaced `wp_editor()` in `.mm-admin-notes-sidebar-card` with `<textarea id="mm-sidebar-admin-notes-textarea" name="mm_sidebar_admin_notes" rows="12" class="large-text mm-admin-notes-textarea">`.
+  - `src/View/admin/matches/matches-list.php`:
+    - Added `<div class="tablenav bottom">` pagination bar with item counter and `paginate_links()`.
+  - `src/View/admin/logs/tab-match-logs.php` & `tab-notification-logs.php`:
+    - Standardized `.tablenav bottom` classes and `_n()` string pluralization.
+  - `assets/js/admin-matchmaker.js`:
+    - Simplified `getEditorContent(fieldId)` and `setEditorContent(fieldId, content)` to interact directly with textarea elements.
+    - Updated modal open/close and sidebar save event handlers to target `#mm-modal-admin-notes-textarea` and `#mm-sidebar-admin-notes-textarea`.
+  - `assets/css/admin-matchmaker.css`:
+    - Added styling for `.mm-admin-notes-textarea` with brand focus states (`#CC723F`).
+  - `tests/bootstrap.php`:
+    - Added `_n()` and `paginate_links()` test mock stubs.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Added `test_search_pool_count_and_pagination`, `test_search_matches_count_and_pagination`, `test_pool_list_view_renders_textarea_and_pagination`, and `test_matches_list_view_renders_pagination`.
+  - `matchmaker.php`:
+    - Synced `Version:` header to `2.13.0`.
+  - `context/admin_portal.md`:
+    - Updated documentation for textarea notes and table pagination.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 207 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
 
 
 

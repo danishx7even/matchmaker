@@ -105,3 +105,21 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <?php endif; ?>
     </tbody>
 </table>
+
+<?php if (!empty($total_pages) && $total_pages > 1) : ?>
+    <div class="tablenav bottom" style="margin-top:15px;">
+        <div class="tablenav-pages">
+            <span class="displaying-num"><?php echo esc_html(sprintf(_n('%d match', '%d matches', (int) ($total_matches ?? count($matches)), 'matchmaker'), (int) ($total_matches ?? count($matches)))); ?></span>
+            <?php
+            echo paginate_links([
+                'base'      => add_query_arg('paged', '%#%'),
+                'format'    => '',
+                'prev_text' => __('&laquo; Previous', 'matchmaker'),
+                'next_text' => __('Next &raquo;', 'matchmaker'),
+                'total'     => (int) $total_pages,
+                'current'   => (int) ($current_page ?? 1),
+            ]);
+            ?>
+        </div>
+    </div>
+<?php endif; ?>

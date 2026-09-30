@@ -933,7 +933,13 @@ class AdminPortal
             'is_parent_applying' => $parent_applying,
         ];
 
-        $candidates = $repo->search_pool($filters);
+        $current_page     = max(1, (int) ($_GET['paged'] ?? 1));
+        $per_page         = 20;
+        $total_candidates = $repo->search_pool_count($filters);
+        $total_pages      = (int) ceil($total_candidates / $per_page);
+        $offset           = ($current_page - 1) * $per_page;
+
+        $candidates       = $repo->search_pool($filters, $per_page, $offset);
 
         require dirname(__DIR__) . '/View/admin/pool/pool-list.php';
     }
@@ -1083,7 +1089,13 @@ class AdminPortal
             'source' => $source,
         ];
 
-        $matches = $repo->search_matches($filters);
+        $current_page  = max(1, (int) ($_GET['paged'] ?? 1));
+        $per_page      = 20;
+        $total_matches = $repo->search_matches_count($filters);
+        $total_pages   = (int) ceil($total_matches / $per_page);
+        $offset        = ($current_page - 1) * $per_page;
+
+        $matches       = $repo->search_matches($filters, $per_page, $offset);
 
         require dirname(__DIR__) . '/View/admin/matches/matches-list.php';
     }

@@ -458,6 +458,39 @@ function esc_attr_e($text, $domain = 'default') {
     echo esc_attr($text);
 }
 
+function _n($single, $plural, $number, $domain = 'default') {
+    return (int) $number === 1 ? $single : $plural;
+}
+
+function paginate_links($args = '') {
+    if (is_array($args)) {
+        $total = (int) ($args['total'] ?? 1);
+        $current = (int) ($args['current'] ?? 1);
+        $prev_text = $args['prev_text'] ?? '&laquo; Previous';
+        $next_text = $args['next_text'] ?? 'Next &raquo;';
+        if ($total <= 1) {
+            return '';
+        }
+        $out = '<span class="pagination-links">';
+        if ($current > 1) {
+            $out .= '<a class="prev page-numbers" href="?paged=' . ($current - 1) . '">' . $prev_text . '</a> ';
+        }
+        for ($i = 1; $i <= $total; $i++) {
+            if ($i === $current) {
+                $out .= '<span aria-current="page" class="page-numbers current">' . $i . '</span> ';
+            } else {
+                $out .= '<a class="page-numbers" href="?paged=' . $i . '">' . $i . '</a> ';
+            }
+        }
+        if ($current < $total) {
+            $out .= '<a class="next page-numbers" href="?paged=' . ($current + 1) . '">' . $next_text . '</a>';
+        }
+        $out .= '</span>';
+        return $out;
+    }
+    return '';
+}
+
 function esc_textarea($text) {
     return htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8');
 }
