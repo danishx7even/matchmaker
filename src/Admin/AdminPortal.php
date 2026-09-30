@@ -407,21 +407,28 @@ class AdminPortal
             return;
         }
 
+        if (function_exists('wp_enqueue_editor')) {
+            wp_enqueue_editor();
+        }
+
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
-        $version    = defined('MM_VERSION') ? MM_VERSION : '2.4.0';
+        $css_file   = dirname(dirname(__DIR__)) . '/assets/css/admin-matchmaker.css';
+        $js_file    = dirname(dirname(__DIR__)) . '/assets/js/admin-matchmaker.js';
+        $css_ver    = file_exists($css_file) ? (string) filemtime($css_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
+        $js_ver     = file_exists($js_file) ? (string) filemtime($js_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
 
         wp_enqueue_style(
             'mm-admin-styles',
             $plugin_url . 'assets/css/admin-matchmaker.css',
             [],
-            $version
+            $css_ver
         );
 
         wp_enqueue_script(
             'mm-admin-script',
             $plugin_url . 'assets/js/admin-matchmaker.js',
             ['jquery'],
-            $version,
+            $js_ver,
             true
         );
 

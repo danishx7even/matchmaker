@@ -803,28 +803,57 @@ body.mm-lightbox-open {
     line-height: 1.5;
 }
 
+.mm-action-btns-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.mm-action-btns-wrap .button {
+    margin: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    line-height: 26px;
+    padding: 0 10px;
+    font-size: 12px;
+}
+
 /* Modal Popup Styles */
 .mm-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 100050;
-    display: flex;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 999999 !important;
+    display: none;
     align-items: center;
     justify-content: center;
     padding: 20px;
+    box-sizing: border-box;
+}
+
+.mm-modal.is-open {
+    display: flex !important;
 }
 
 .mm-modal-backdrop {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(2px);
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(15, 23, 42, 0.65) !important;
+    backdrop-filter: blur(3px);
+    z-index: 1;
 }
 
 .mm-modal-dialog {
@@ -832,13 +861,25 @@ body.mm-lightbox-open {
     z-index: 10;
     background: #ffffff;
     border-radius: 8px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
     width: 100%;
     max-width: 650px;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    animation: mmModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mmModalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }
 
 .mm-modal-body {

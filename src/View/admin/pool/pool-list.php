@@ -125,14 +125,14 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
     <thead>
         <tr>
             <th style="width:50px;"><?php esc_html_e('Photo', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Name / Email', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Gender', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Age', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Location', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Tier & Services', 'matchmaker'); ?></th>
-            <th style="width:80px; text-align:center;"><?php esc_html_e('Quota', 'matchmaker'); ?></th>
-            <th><?php esc_html_e('Active Matches', 'matchmaker'); ?></th>
-            <th style="width:100px; text-align:center;"><?php esc_html_e('Actions', 'matchmaker'); ?></th>
+            <th style="width:20%; min-width:160px;"><?php esc_html_e('Name / Email', 'matchmaker'); ?></th>
+            <th style="width:75px;"><?php esc_html_e('Gender', 'matchmaker'); ?></th>
+            <th style="width:60px;"><?php esc_html_e('Age', 'matchmaker'); ?></th>
+            <th style="width:13%; min-width:110px;"><?php esc_html_e('Location', 'matchmaker'); ?></th>
+            <th style="width:14%; min-width:130px;"><?php esc_html_e('Tier & Services', 'matchmaker'); ?></th>
+            <th style="width:75px; text-align:center;"><?php esc_html_e('Quota', 'matchmaker'); ?></th>
+            <th style="width:14%; min-width:120px;"><?php esc_html_e('Active Matches', 'matchmaker'); ?></th>
+            <th style="width:150px; text-align:center;"><?php esc_html_e('Actions', 'matchmaker'); ?></th>
         </tr>
     </thead>
     <tbody>
@@ -213,12 +213,14 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
                         <?php endif; ?>
                     </td>
                     <td style="text-align:center; white-space:nowrap;">
-                        <a href="<?php echo esc_url($view_url); ?>" class="button button-small button-primary">
-                            <?php esc_html_e('View', 'matchmaker'); ?>
-                        </a>
-                        <button type="button" class="button button-small button-secondary mm-open-notes-btn" data-user-id="<?php echo (int) $uid; ?>" data-user-name="<?php echo esc_attr($user_obj ? $user_obj->display_name : 'User #' . $uid); ?>" title="<?php esc_attr_e('View or edit admin notes for this candidate', 'matchmaker'); ?>" style="margin-left:4px;">
-                            📝 <?php esc_html_e('Notes', 'matchmaker'); ?>
-                        </button>
+                        <div class="mm-action-btns-wrap" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <a href="<?php echo esc_url($view_url); ?>" class="button button-small button-primary">
+                                <?php esc_html_e('View', 'matchmaker'); ?>
+                            </a>
+                            <button type="button" class="button button-small button-secondary mm-open-notes-btn" data-user-id="<?php echo (int) $uid; ?>" data-user-name="<?php echo esc_attr($user_obj ? $user_obj->display_name : 'User #' . $uid); ?>" title="<?php esc_attr_e('View or edit admin notes for this candidate', 'matchmaker'); ?>">
+                                📝 <?php esc_html_e('Notes', 'matchmaker'); ?>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             <?php endforeach; ?>

@@ -1037,8 +1037,13 @@
          * ========================================================================= */
 
         function getEditorContent(editorId) {
-            if (window.tinymce && window.tinymce.get(editorId) && !window.tinymce.get(editorId).isHidden()) {
-                return window.tinymce.get(editorId).getContent();
+            var ed = window.tinymce ? window.tinymce.get(editorId) : null;
+            if (ed && !ed.isHidden()) {
+                try {
+                    return ed.getContent();
+                } catch (e) {
+                    // Fallback
+                }
             }
             var $el = $('#' + editorId);
             return $el.length ? $el.val() : '';
@@ -1046,9 +1051,10 @@
 
         function setEditorContent(editorId, content) {
             var val = content || '';
-            if (window.tinymce && window.tinymce.get(editorId)) {
+            var ed = window.tinymce ? window.tinymce.get(editorId) : null;
+            if (ed) {
                 try {
-                    window.tinymce.get(editorId).setContent(val);
+                    ed.setContent(val);
                 } catch (e) {
                     // Fallback
                 }
@@ -1059,27 +1065,29 @@
             }
         }
 
+        function ensureModalInBody() {
+            var modalEl = document.getElementById('mm-admin-notes-modal');
+            if (modalEl && modalEl.parentNode !== document.body) {
+                document.body.appendChild(modalEl);
+            }
+        }
+
         function closeNotesModal() {
-            var $notesModal = $('#mm-admin-notes-modal');
-            if ($notesModal.length) {
-                $notesModal.hide();
+            var modalEl = document.getElementById('mm-admin-notes-modal');
+            if (modalEl) {
+                modalEl.style.setProperty('display', 'none', 'important');
+                modalEl.classList.remove('is-open');
+                modalEl.setAttribute('aria-hidden', 'true');
                 $('#mm-modal-notes-status').hide().text('');
             }
         }
 
-        /* Open Notes Modal from Candidate Pool Row */
-        $(document).on('click', '.mm-open-notes-btn', function (e) {
-            e.preventDefault();
-            var $btn = $(this);
-            var userId = parseInt($btn.attr('data-user-id'), 10) || 0;
-            var userName = $btn.attr('data-user-name') || ('User #' + userId);
+        function openNotesModal(userId, userName) {
+            ensureModalInBody();
+            var modalEl = document.getElementById('mm-admin-notes-modal');
+            if (!modalEl) return;
 
-            if (userId <= 0) return;
-
-            var $modal = $('#mm-admin-notes-modal');
-            if (!$modal.length) return;
-
-            $('#mm-notes-modal-username').text(userName);
+            $('#mm-notes-modal-username').text(userName || ('User #' + userId));
             $('#mm-save-modal-notes-btn').attr('data-user-id', userId).prop('disabled', true);
             $('#mm-notes-modal-loading').show();
             $('#mm-notes-modal-editor-wrap').css('opacity', '0.4');
@@ -1088,7 +1096,9 @@
             // Reset modal editor content
             setEditorContent('mm_modal_admin_notes_editor', '');
 
-            $modal.css('display', 'flex');
+            modalEl.style.setProperty('display', 'flex', 'important');
+            modalEl.classList.add('is-open');
+            modalEl.setAttribute('aria-hidden', 'false');
 
             // Fetch existing notes via AJAX
             $.ajax({
@@ -1117,6 +1127,16 @@
                     $('#mm-save-modal-notes-btn').prop('disabled', false);
                 }
             });
+        }
+
+        /* Open Notes Modal from Candidate Pool Row */
+        $(document).on('click', '.mm-open-notes-btn', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $btn = $(this);
+            var userId = parseInt($btn.attr('data-user-id'), 10) || 0;
+            var userName = $btn.attr('data-user-name') || ('User #' + userId);
+            openNotesModal(userId, userName);
         });
 
         /* Close Notes Modal */
@@ -1128,6 +1148,15 @@
         $(document).on('click', '#mm-admin-notes-modal', function (e) {
             if (e.target === this) {
                 closeNotesModal();
+            }
+        });
+
+        $(document).on('keydown', function (e) {
+            if (e.key === 'Escape') {
+                var modalEl = document.getElementById('mm-admin-notes-modal');
+                if (modalEl && (modalEl.classList.contains('is-open') || modalEl.style.display !== 'none')) {
+                    closeNotesModal();
+                }
             }
         });
 

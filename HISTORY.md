@@ -6,6 +6,29 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 120: Fix Notes Popup Display & Optimize Pool Browser Column Widths
+- **Objective**:
+  1. Fix table column widths in the Candidate Pool Browser (`pool-list.php`) so the Actions column width (`width:150px;`) comfortably accommodates both "View" and "Notes" action buttons without wrapping or overflowing outside the table boundary.
+  2. Fix the Admin Notes modal popup opening and visibility by ensuring the modal element is attached directly to `document.body` (bypassing `#wpwrap` and table overflow clipping), enforcing `display: flex !important` and `.is-open` visibility rules in CSS/JS, and calling `wp_enqueue_editor()` in `enqueue_admin_assets()`.
+  3. Ensure immediate browser cache invalidation using `filemtime` for admin styles and scripts and bumping `MM_VERSION` to `2.13.0`.
+- **Implemented**:
+  - `src/Admin/AdminPortal.php`:
+    - Added `wp_enqueue_editor()` call to load WordPress TinyMCE and Quicktags assets.
+    - Updated asset enqueueing to use `filemtime` for `admin-matchmaker.css` and `admin-matchmaker.js`.
+  - `src/View/admin/pool/pool-list.php`:
+    - Adjusted table header widths (`Actions` column set to `width:150px; text-align:center;`).
+    - Wrapped action buttons in `<div class="mm-action-btns-wrap">` with inline flex alignment and zero margin.
+  - `assets/css/admin-matchmaker.css`:
+    - Added `.mm-action-btns-wrap` rules with `gap: 6px; white-space: nowrap;`.
+    - Enhanced `.mm-modal` with `position: fixed !important`, `z-index: 999999 !important`, `.is-open` state, backdrop blur, and smooth entrance scale animation.
+  - `assets/js/admin-matchmaker.js`:
+    - Added `ensureModalInBody()` to dynamically append `#mm-admin-notes-modal` to `document.body`.
+    - Updated `openNotesModal()` and `closeNotesModal()` to use `style.setProperty('display', ...)` and `.classList.add('is-open')`.
+    - Added Escape key dismiss listener.
+  - `matchmaker.php`:
+    - Bumped `MM_VERSION` to `'2.13.0'`.
+- **Verification**: Ran full automated test suite with **203/203 tests passing** (0 failures, 0 errors).
+
 ### Task 119: Add Internal Admin Notes System & Candidate Subscription Start Date
 - **Objective**:
   1. Add an internal Admin Notes system accessible via a **"Notes"** CTA button next to "View" in the Candidate Pool Browser actions column, allowing admins to inspect and update candidate notes within an AJAX modal popup.
