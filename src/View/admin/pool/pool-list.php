@@ -212,13 +212,64 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
                             <br><span style="color:#2e7d32;font-size:11px;font-weight:bold;">★ <?php esc_html_e('Mutually Matched', 'matchmaker'); ?></span>
                         <?php endif; ?>
                     </td>
-                    <td style="text-align:center;">
+                    <td style="text-align:center; white-space:nowrap;">
                         <a href="<?php echo esc_url($view_url); ?>" class="button button-small button-primary">
                             <?php esc_html_e('View', 'matchmaker'); ?>
                         </a>
+                        <button type="button" class="button button-small button-secondary mm-open-notes-btn" data-user-id="<?php echo (int) $uid; ?>" data-user-name="<?php echo esc_attr($user_obj ? $user_obj->display_name : 'User #' . $uid); ?>" title="<?php esc_attr_e('View or edit admin notes for this candidate', 'matchmaker'); ?>" style="margin-left:4px;">
+                            📝 <?php esc_html_e('Notes', 'matchmaker'); ?>
+                        </button>
                     </td>
                 </tr>
             <?php endforeach; ?>
         <?php endif; ?>
     </tbody>
 </table>
+
+<!-- Admin Notes Modal Popup -->
+<div id="mm-admin-notes-modal" class="mm-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="mm-notes-modal-title">
+    <div class="mm-modal-backdrop mm-close-notes-modal"></div>
+    <div class="mm-modal-dialog" style="max-width:650px;">
+        <div class="mm-modal-header" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #e2e8f0;">
+            <h3 id="mm-notes-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                📝 <?php esc_html_e('Admin Notes', 'matchmaker'); ?>: <span id="mm-notes-modal-username" style="color:#CC723F;"></span>
+            </h3>
+            <button type="button" class="mm-modal-close mm-close-notes-modal" aria-label="<?php esc_attr_e('Close', 'matchmaker'); ?>" style="background:none; border:none; font-size:22px; cursor:pointer; color:#64748b; line-height:1;">&times;</button>
+        </div>
+        <div class="mm-modal-body" style="padding:20px;">
+            <div id="mm-notes-modal-loading" style="text-align:center; padding:30px; display:none;">
+                <span class="spinner is-active" style="float:none; margin:0 8px 0 0;"></span>
+                <?php esc_html_e('Loading candidate notes...', 'matchmaker'); ?>
+            </div>
+            <div id="mm-notes-modal-editor-wrap">
+                <p class="description" style="margin-top:0; margin-bottom:10px;">
+                    <?php esc_html_e('Internal staff notes for this candidate. Visible only to Matchmakers and Administrators.', 'matchmaker'); ?>
+                </p>
+                <?php
+                $modal_editor_id = 'mm_modal_admin_notes_editor';
+                $modal_settings  = [
+                    'textarea_name' => 'mm_modal_admin_notes',
+                    'textarea_rows' => 10,
+                    'media_buttons' => false,
+                    'teeny'         => true,
+                    'quicktags'     => true,
+                    'tinymce'       => [
+                        'toolbar1' => 'bold,italic,underline,bullist,numlist,link,unlink,undo,redo',
+                        'toolbar2' => '',
+                    ],
+                ];
+                wp_editor('', $modal_editor_id, $modal_settings);
+                ?>
+            </div>
+        </div>
+        <div class="mm-modal-footer" style="padding:14px 20px; border-top:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:flex-end; align-items:center; gap:10px;">
+            <span id="mm-modal-notes-status" style="font-size:13px; font-weight:600; display:none;"></span>
+            <button type="button" class="button button-secondary mm-close-notes-modal">
+                <?php esc_html_e('Cancel', 'matchmaker'); ?>
+            </button>
+            <button type="button" class="button button-primary" id="mm-save-modal-notes-btn" data-user-id="0">
+                <?php esc_html_e('Save Notes', 'matchmaker'); ?>
+            </button>
+        </div>
+    </div>
+</div>

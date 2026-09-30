@@ -1031,6 +1031,193 @@
                 }
             });
         });
+
+        /* =========================================================================
+         * Admin Notes System (Modal Popup & Candidate Profile Sidebar Card)
+         * ========================================================================= */
+
+        function getEditorContent(editorId) {
+            if (window.tinymce && window.tinymce.get(editorId) && !window.tinymce.get(editorId).isHidden()) {
+                return window.tinymce.get(editorId).getContent();
+            }
+            var $el = $('#' + editorId);
+            return $el.length ? $el.val() : '';
+        }
+
+        function setEditorContent(editorId, content) {
+            var val = content || '';
+            if (window.tinymce && window.tinymce.get(editorId)) {
+                try {
+                    window.tinymce.get(editorId).setContent(val);
+                } catch (e) {
+                    // Fallback
+                }
+            }
+            var $el = $('#' + editorId);
+            if ($el.length) {
+                $el.val(val);
+            }
+        }
+
+        function closeNotesModal() {
+            var $notesModal = $('#mm-admin-notes-modal');
+            if ($notesModal.length) {
+                $notesModal.hide();
+                $('#mm-modal-notes-status').hide().text('');
+            }
+        }
+
+        /* Open Notes Modal from Candidate Pool Row */
+        $(document).on('click', '.mm-open-notes-btn', function (e) {
+            e.preventDefault();
+            var $btn = $(this);
+            var userId = parseInt($btn.attr('data-user-id'), 10) || 0;
+            var userName = $btn.attr('data-user-name') || ('User #' + userId);
+
+            if (userId <= 0) return;
+
+            var $modal = $('#mm-admin-notes-modal');
+            if (!$modal.length) return;
+
+            $('#mm-notes-modal-username').text(userName);
+            $('#mm-save-modal-notes-btn').attr('data-user-id', userId).prop('disabled', true);
+            $('#mm-notes-modal-loading').show();
+            $('#mm-notes-modal-editor-wrap').css('opacity', '0.4');
+            $('#mm-modal-notes-status').hide().text('');
+
+            // Reset modal editor content
+            setEditorContent('mm_modal_admin_notes_editor', '');
+
+            $modal.css('display', 'flex');
+
+            // Fetch existing notes via AJAX
+            $.ajax({
+                url: getAjaxUrl(),
+                type: 'POST',
+                data: {
+                    action: 'mm_get_admin_notes',
+                    nonce: getAdminNonce(),
+                    user_id: userId
+                },
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.success && res.data) {
+                        setEditorContent('mm_modal_admin_notes_editor', res.data.notes || '');
+                        if (res.data.user_name) {
+                            $('#mm-notes-modal-username').text(res.data.user_name);
+                        }
+                    }
+                },
+                error: function () {
+                    $('#mm-modal-notes-status').text('Failed to load notes.').css('color', '#dc2626').show();
+                },
+                complete: function () {
+                    $('#mm-notes-modal-loading').hide();
+                    $('#mm-notes-modal-editor-wrap').css('opacity', '1');
+                    $('#mm-save-modal-notes-btn').prop('disabled', false);
+                }
+            });
+        });
+
+        /* Close Notes Modal */
+        $(document).on('click', '.mm-close-notes-modal', function (e) {
+            e.preventDefault();
+            closeNotesModal();
+        });
+
+        $(document).on('click', '#mm-admin-notes-modal', function (e) {
+            if (e.target === this) {
+                closeNotesModal();
+            }
+        });
+
+        /* Save Notes from Modal */
+        $(document).on('click', '#mm-save-modal-notes-btn', function (e) {
+            e.preventDefault();
+            var $btn = $(this);
+            var userId = parseInt($btn.attr('data-user-id'), 10) || 0;
+            if (userId <= 0) return;
+
+            var notes = getEditorContent('mm_modal_admin_notes_editor');
+            var $status = $('#mm-modal-notes-status');
+
+            $btn.prop('disabled', true);
+            $status.text('Saving...').css('color', '#0284c7').show();
+
+            $.ajax({
+                url: getAjaxUrl(),
+                type: 'POST',
+                data: {
+                    action: 'mm_save_admin_notes',
+                    nonce: getAdminNonce(),
+                    user_id: userId,
+                    notes: notes
+                },
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.success) {
+                        $status.text('✓ Saved!').css('color', '#16a34a');
+                        setTimeout(function () {
+                            closeNotesModal();
+                        }, 800);
+                    } else {
+                        var msg = (res && res.data && res.data.message) ? res.data.message : 'Error saving notes.';
+                        $status.text(msg).css('color', '#dc2626');
+                    }
+                },
+                error: function () {
+                    $status.text('Error saving notes. Please try again.').css('color', '#dc2626');
+                },
+                complete: function () {
+                    $btn.prop('disabled', false);
+                }
+            });
+        });
+
+        /* Save Notes from Profile Sidebar Card */
+        $(document).on('click', '.mm-save-notes-btn', function (e) {
+            e.preventDefault();
+            var $btn = $(this);
+            var userId = parseInt($btn.attr('data-user-id'), 10) || 0;
+            var editorId = $btn.attr('data-editor-id') || 'mm_sidebar_admin_notes_editor';
+            var $status = $btn.siblings('.mm-notes-save-status');
+
+            if (userId <= 0) return;
+
+            var notes = getEditorContent(editorId);
+
+            $btn.prop('disabled', true);
+            $status.text('Saving...').css('color', '#0284c7').show();
+
+            $.ajax({
+                url: getAjaxUrl(),
+                type: 'POST',
+                data: {
+                    action: 'mm_save_admin_notes',
+                    nonce: getAdminNonce(),
+                    user_id: userId,
+                    notes: notes
+                },
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.success) {
+                        $status.text('✓ Notes saved successfully.').css('color', '#16a34a');
+                        setTimeout(function () {
+                            $status.fadeOut(400);
+                        }, 3000);
+                    } else {
+                        var msg = (res && res.data && res.data.message) ? res.data.message : 'Failed to save notes.';
+                        $status.text(msg).css('color', '#dc2626');
+                    }
+                },
+                error: function () {
+                    $status.text('Error saving notes. Please try again.').css('color', '#dc2626');
+                },
+                complete: function () {
+                    $btn.prop('disabled', false);
+                }
+            });
+        });
     }
 
     function escapeHtml(str) {

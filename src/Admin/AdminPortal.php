@@ -66,6 +66,8 @@ class AdminPortal
         add_action('wp_ajax_mm_save_bulk_email_default',  [$this, 'ajax_save_bulk_email_default']);
         add_action('wp_ajax_mm_get_file_log',             [$this, 'ajax_get_file_log']);
         add_action('wp_ajax_mm_clear_file_log',           [$this, 'ajax_clear_file_log']);
+        add_action('wp_ajax_mm_get_admin_notes',          [$this, 'ajax_get_admin_notes']);
+        add_action('wp_ajax_mm_save_admin_notes',         [$this, 'ajax_save_admin_notes']);
 
         // Admin bar restrictions for restricted roles
         add_action('admin_bar_menu',                      [$this, 'restrict_admin_bar_for_restricted_roles'], 999);
@@ -438,6 +440,10 @@ class AdminPortal
                     'saving'         => __('Saving default template...', 'matchmaker'),
                     'confirm_send'   => __('Are you sure you want to queue this bulk email campaign?', 'matchmaker'),
                     'no_recipients'  => __('No recipients matched the selected criteria.', 'matchmaker'),
+                    'saving_notes'   => __('Saving notes...', 'matchmaker'),
+                    'notes_saved'    => __('Notes saved successfully.', 'matchmaker'),
+                    'notes_error'    => __('Failed to save notes. Please try again.', 'matchmaker'),
+                    'loading_notes'  => __('Loading notes...', 'matchmaker'),
                 ],
             ]
         );
@@ -954,8 +960,10 @@ class AdminPortal
 
         $age          = $repo->calc_age($pool['birth_date'] ?? '');
         $height       = $repo->cm_to_feet((int) ($pool['height_cm'] ?? 0));
-        $quota_used   = $repo->maybe_reset_monthly_quota($user_id);
-        $has_mutual   = $repo->has_mutual_match_this_month($user_id);
+        $quota_used              = $repo->maybe_reset_monthly_quota($user_id);
+        $has_mutual              = $repo->has_mutual_match_this_month($user_id);
+        $subscription_start_date = $repo->get_subscription_start_date($user_id);
+        $admin_notes             = $repo->get_admin_notes($user_id);
 
         $back_url     = admin_url('admin.php?page=matchmaking-pool');
         $manual_url   = admin_url("admin.php?page=matchmaking-pool&manual_match={$user_id}");
@@ -1721,5 +1729,69 @@ class AdminPortal
         } else {
             wp_send_json_error(['message' => __('Failed to clear log file.', 'matchmaker')]);
         }
+    }
+
+    /**
+     * AJAX handler: Get private admin notes for a user.
+     *
+     * @return void
+     */
+    public function ajax_get_admin_notes(): void
+    {
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized permission.', 'matchmaker')], 403);
+        }
+
+        $user_id = isset($_POST['user_id']) ? (int) $_POST['user_id'] : 0;
+        if ($user_id <= 0) {
+            wp_send_json_error(['message' => __('Invalid user ID.', 'matchmaker')]);
+        }
+
+        $notes = MatchRepository::instance()->get_admin_notes($user_id);
+        $user  = get_userdata($user_id);
+        $name  = $user ? $user->display_name : ('User #' . $user_id);
+
+        wp_send_json_success([
+            'user_id'   => $user_id,
+            'user_name' => $name,
+            'notes'     => $notes,
+        ]);
+    }
+
+    /**
+     * AJAX handler: Save private admin notes for a user.
+     *
+     * @return void
+     */
+    public function ajax_save_admin_notes(): void
+    {
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized permission.', 'matchmaker')], 403);
+        }
+
+        $user_id = isset($_POST['user_id']) ? (int) $_POST['user_id'] : 0;
+        if ($user_id <= 0) {
+            wp_send_json_error(['message' => __('Invalid user ID.', 'matchmaker')]);
+        }
+
+        $notes = isset($_POST['notes']) ? (string) wp_unslash($_POST['notes']) : '';
+        MatchRepository::instance()->save_admin_notes($user_id, $notes);
+
+        if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+            \Matchmaker\Service\FileLoggerService::info(
+                'Admin notes updated for user #' . $user_id . '.',
+                ['user_id' => $user_id, 'admin_id' => get_current_user_id()],
+                'admin'
+            );
+        }
+
+        wp_send_json_success([
+            'user_id' => $user_id,
+            'message' => __('Admin notes saved successfully.', 'matchmaker'),
+        ]);
     }
 }

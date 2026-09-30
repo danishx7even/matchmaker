@@ -350,6 +350,12 @@ function wp_kses_post($val) {
     return $val;
 }
 
+function wp_editor(string $content, string $editor_id, array $settings = []): void {
+    $rows = $settings['textarea_rows'] ?? 10;
+    $name = $settings['textarea_name'] ?? $editor_id;
+    echo '<div class="wp-editor-wrap" id="wp-' . esc_attr($editor_id) . '-wrap"><textarea name="' . esc_attr($name) . '" id="' . esc_attr($editor_id) . '" rows="' . esc_attr((string)$rows) . '" class="wp-editor-area">' . esc_textarea($content) . '</textarea></div>';
+}
+
 function trailingslashit($string) {
     return untrailingslashit($string) . '/';
 }

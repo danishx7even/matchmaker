@@ -62,6 +62,7 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
             <?php if (($pool['user_type'] ?? 'free') === 'monthly') : ?>
                 &nbsp;|&nbsp; <strong><?php esc_html_e('Monthly Quota Used:', 'matchmaker'); ?></strong> <?php echo (int) $quota_used; ?> / <?php echo (int) $repo->get_max_cycle_matches(); ?>
             <?php endif; ?>
+            &nbsp;|&nbsp; <strong><?php esc_html_e('Date joined:', 'matchmaker'); ?></strong> <?php echo esc_html($subscription_start_date ?? $repo->get_subscription_start_date($user_id)); ?>
         </p>
     </div>
     <div>
@@ -86,8 +87,11 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
     </div>
 <?php endif; ?>
 
-<!-- Two-Column Profile Cards -->
-<div class="mm-grid-two">
+<!-- Main Layout Container: Main Column (Profile Cards + Match History) & Sidebar Column (Admin Notes) -->
+<div class="mm-profile-layout-wrap">
+    <div class="mm-profile-main-column">
+        <!-- Two-Column Profile Cards -->
+        <div class="mm-grid-two">
     <!-- Candidate Self Profile Card -->
     <div class="mm-card">
         <h3><?php esc_html_e('Candidate Self Profile', 'matchmaker'); ?></h3>
@@ -288,5 +292,40 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
     </table>
 </div>
 
-    </div>
-</div>
+    </div><!-- /.mm-profile-main-column -->
+
+    <!-- Right-Hand Sidebar Column: Admin Notes -->
+    <div class="mm-profile-sidebar-column">
+        <div class="mm-card mm-admin-notes-sidebar-card">
+            <h3 style="margin:0 0 8px; display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:#0f172a;">
+                📝 <?php esc_html_e('Admin Notes', 'matchmaker'); ?>
+            </h3>
+            <p class="description" style="margin:0 0 12px; font-size:12px; line-height:1.4;">
+                <?php esc_html_e('Internal staff notes for this candidate. Visible only to Matchmakers and Admins.', 'matchmaker'); ?>
+            </p>
+            <div class="mm-admin-notes-editor-wrap">
+                <?php
+                $sidebar_editor_id = 'mm_sidebar_admin_notes_editor';
+                $sidebar_settings  = [
+                    'textarea_name' => 'mm_sidebar_admin_notes',
+                    'textarea_rows' => 12,
+                    'media_buttons' => false,
+                    'teeny'         => true,
+                    'quicktags'     => true,
+                    'tinymce'       => [
+                        'toolbar1' => 'bold,italic,underline,bullist,numlist,link,unlink,undo,redo',
+                        'toolbar2' => '',
+                    ],
+                ];
+                wp_editor($admin_notes ?? $repo->get_admin_notes($user_id), $sidebar_editor_id, $sidebar_settings);
+                ?>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:10px;">
+                <button type="button" class="button button-primary mm-save-notes-btn" data-user-id="<?php echo (int) $user_id; ?>" data-editor-id="mm_sidebar_admin_notes_editor">
+                    <?php esc_html_e('Save Notes', 'matchmaker'); ?>
+                </button>
+                <span class="mm-notes-save-status" style="font-size:12px; font-weight:600; display:none;"></span>
+            </div>
+        </div>
+    </div><!-- /.mm-profile-sidebar-column -->
+</div><!-- /.mm-profile-layout-wrap -->

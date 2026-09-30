@@ -719,6 +719,166 @@ class AdminWorkflowTest
             throw new \RuntimeException("Expected pool-list.php table thumbnails NOT to contain data-mm-lightbox");
         }
     }
+
+    public function test_admin_notes_get_and_save_in_repository(): void
+    {
+        $user_id = 301;
+        $test_notes = '<p>Candidate is <strong>highly recommended</strong>. Prefers relocation to UAE.</p>';
+
+        $saved = $this->repo->save_admin_notes($user_id, $test_notes);
+        if (!$saved) {
+            throw new \RuntimeException("Expected save_admin_notes to return true");
+        }
+
+        $retrieved = $this->repo->get_admin_notes($user_id);
+        if ($retrieved !== $test_notes) {
+            throw new \RuntimeException("Expected get_admin_notes to return saved HTML content. Got: {$retrieved}");
+        }
+
+        // Test empty / unassigned notes
+        $empty_notes = $this->repo->get_admin_notes(9999);
+        if ($empty_notes !== '') {
+            throw new \RuntimeException("Expected empty string for user without notes. Got: {$empty_notes}");
+        }
+    }
+
+    public function test_get_subscription_start_date(): void
+    {
+        $user_id = 302;
+        $user = new \FakeWP_User($user_id, 'Start Date Candidate', 'startdate@example.com');
+        $user->user_registered = '2026-06-26 14:00:00';
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        $date_joined = $this->repo->get_subscription_start_date($user_id);
+        if ($date_joined !== '06/26/2026') {
+            throw new \RuntimeException("Expected get_subscription_start_date fallback to format m/d/Y '06/26/2026'. Got: {$date_joined}");
+        }
+    }
+
+    public function test_pool_list_view_renders_notes_cta_and_modal(): void
+    {
+        $candidates = [
+            [
+                'user_id'             => 202,
+                'display_name'        => 'Notes Candidate',
+                'user_email'          => 'notes_cand@example.com',
+                'gender'              => 'female',
+                'birth_date'          => '1995-05-15',
+                'location'            => 'Dubai, UAE',
+                'city'                => 'Dubai',
+                'state'               => 'Dubai',
+                'country'             => 'AE',
+                'origin'              => 'Emirati',
+                'religion'            => 'Muslim',
+                'modesty'             => 'Hijab',
+                'user_photo1'         => 'https://example.com/photo1.jpg',
+                'status'              => 'active',
+                'created_at'          => '2026-09-01 10:00:00',
+                'cycle_matches_count' => 2,
+            ]
+        ];
+        $total_users = 1;
+        $page = 1;
+        $per_page = 20;
+        $total_pages = 1;
+        $filters = [];
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/pool/pool-list.php';
+        $html = (string) ob_get_clean();
+
+        if (!str_contains($html, 'mm-open-notes-btn')) {
+            throw new \RuntimeException("Expected pool-list.php to render mm-open-notes-btn CTA");
+        }
+        if (!str_contains($html, 'Notes')) {
+            throw new \RuntimeException("Expected pool-list.php to render 'Notes' button text");
+        }
+        if (!str_contains($html, 'id="mm-admin-notes-modal"')) {
+            throw new \RuntimeException("Expected pool-list.php to render #mm-admin-notes-modal popup container");
+        }
+    }
+
+    public function test_user_single_view_renders_date_joined_and_notes_sidebar(): void
+    {
+        $user_id = 203;
+        $user_obj = new \FakeWP_User($user_id, 'Ruoa Hafid', 'ruoahafid@gmail.com');
+        $user_obj->user_registered = '2026-06-26 10:00:00';
+        $GLOBALS['__mm_users'][$user_id] = $user_obj;
+
+        $pool = [
+            'user_id'    => $user_id,
+            'gender'     => 'female',
+            'user_type'  => 'monthly',
+            'birth_date' => '1995-01-01',
+            'height_cm'  => 165,
+            'city'       => 'Dubai',
+            'state'      => 'Dubai',
+            'country'    => 'AE',
+        ];
+        $meta = [
+            'phone_number' => '9297968652',
+            'user_photo1'  => 'https://example.com/photo.jpg',
+        ];
+        $matches = [];
+        $age = '30';
+        $height = "5' 5\"";
+        $quota_used = 1;
+        $has_mutual = false;
+        $back_url = '#';
+        $manual_url = '#';
+        $trigger_url = '#';
+        $subscription_start_date = '06/26/2026';
+        $admin_notes = '<p>Candidate requested preferred match in Dubai.</p>';
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/pool/user-single.php';
+        $html = (string) ob_get_clean();
+
+        if (!str_contains($html, 'Date joined:')) {
+            throw new \RuntimeException("Expected user-single.php to render 'Date joined:' label in header");
+        }
+        if (!str_contains($html, '06/26/2026')) {
+            throw new \RuntimeException("Expected user-single.php to render '06/26/2026' in header");
+        }
+        if (!str_contains($html, 'mm-admin-notes-sidebar-card')) {
+            throw new \RuntimeException("Expected user-single.php to render mm-admin-notes-sidebar-card in sidebar");
+        }
+        if (!str_contains($html, 'mm-save-notes-btn')) {
+            throw new \RuntimeException("Expected user-single.php to render mm-save-notes-btn");
+        }
+    }
+
+    public function test_ajax_get_and_save_admin_notes(): void
+    {
+        $user_id = 303;
+        $user_obj = new \FakeWP_User($user_id, 'Ajax Candidate', 'ajax@example.com');
+        $GLOBALS['__mm_users'][$user_id] = $user_obj;
+        $GLOBALS['__mm_current_user_id'] = 1;
+        $GLOBALS['__mm_is_admin'] = true;
+
+        // Save notes via AJAX
+        $_POST['nonce'] = wp_create_nonce('mm_admin_nonce');
+        $_POST['user_id'] = $user_id;
+        $_POST['notes'] = '<p>Saved via <em>AJAX</em> handler.</p>';
+
+        try {
+            $this->admin->ajax_save_admin_notes();
+        } catch (\RuntimeException $e) {
+            // Success response throws wp_send_json_success RuntimeException in mock environment
+        }
+
+        $saved_in_repo = $this->repo->get_admin_notes($user_id);
+        if (!str_contains($saved_in_repo, 'Saved via <em>AJAX</em> handler.')) {
+            throw new \RuntimeException("Expected ajax_save_admin_notes to save formatted notes to repo. Got: {$saved_in_repo}");
+        }
+
+        // Retrieve notes via AJAX
+        try {
+            $this->admin->ajax_get_admin_notes();
+        } catch (\RuntimeException $e) {
+            // Success response
+        }
+    }
 }
 
 

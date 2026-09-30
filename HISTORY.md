@@ -6,6 +6,39 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 119: Add Internal Admin Notes System & Candidate Subscription Start Date
+- **Objective**:
+  1. Add an internal Admin Notes system accessible via a **"Notes"** CTA button next to "View" in the Candidate Pool Browser actions column, allowing admins to inspect and update candidate notes within an AJAX modal popup.
+  2. Embed the same Admin Notes in a dedicated right-hand sidebar card on the Single Candidate Profile page (`user-single.php`) with WordPress rich-text (WYSIWYG) editor and instant AJAX save without full-page reloads.
+  3. Ensure admin notes are stored privately in `wp_usermeta` under `mm_admin_notes`, sanitized with `wp_kses_post()`, and strictly hidden from member-facing portal and frontend API views.
+  4. Display the candidate's current subscription start date formatted as **`Date joined: MM/DD/YYYY`** (e.g. `Date joined: 06/26/2026`) in the candidate profile header card, dynamically resolving PMPro level `startdate` with user registration date as fallback.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Added `'mm_admin_notes'` to `MatchRepository::META_KEYS`.
+    - Added `get_admin_notes(int $user_id): string`, `save_admin_notes(int $user_id, string $notes): bool`, and `get_subscription_start_date(int $user_id): string`.
+  - `src/Admin/AdminPortal.php`:
+    - Registered AJAX endpoints `wp_ajax_mm_get_admin_notes` and `wp_ajax_mm_save_admin_notes` with permission validation (`manage_matchmaker`) and action logging (`FileLoggerService::info`).
+    - Passed `$subscription_start_date` and `$admin_notes` into `render_single_user_view()`.
+    - Enqueued localized UI strings for notes in `enqueue_admin_assets()`.
+  - `src/View/admin/pool/pool-list.php`:
+    - Added "Notes" button (`.mm-open-notes-btn`) to candidate actions column.
+    - Added `#mm-admin-notes-modal` popup container with `wp_editor()` rich text editing.
+  - `src/View/admin/pool/user-single.php`:
+    - Added `Date joined: MM/DD/YYYY` display in candidate profile header metadata row.
+    - Wrapped profile views in `.mm-profile-layout-wrap` with main column and right-hand `.mm-profile-sidebar-column` containing the Admin Notes card with `wp_editor()` and instant AJAX save button.
+  - `assets/js/admin-matchmaker.js`:
+    - Added TinyMCE/textarea content getter/setter helpers (`getEditorContent`, `setEditorContent`).
+    - Implemented modal open/close, AJAX fetching into modal editor, modal AJAX save, and sidebar card AJAX save with status feedback.
+  - `assets/css/admin-matchmaker.css`:
+    - Styled `.mm-profile-layout-wrap`, `.mm-profile-sidebar-column`, `.mm-admin-notes-sidebar-card`, and `#mm-admin-notes-modal` modal dialog.
+  - `tests/bootstrap.php`:
+    - Added `wp_editor()` stub function.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Added `test_admin_notes_get_and_save_in_repository()`, `test_get_subscription_start_date()`, `test_pool_list_view_renders_notes_cta_and_modal()`, `test_user_single_view_renders_date_joined_and_notes_sidebar()`, and `test_ajax_get_and_save_admin_notes()`.
+  - `context/admin_portal.md`:
+    - Updated Candidate Pool Browser and Single User Detail View specifications.
+- **Verification**: Ran full automated test suite with **203/203 tests passing** (0 failures, 0 errors).
+
 ### Task 118: Fix Multi-Select Preferences Column Truncation DB Error & Schema Migration
 - **Objective**:
   1. Fix the recurring database error: `DB error: upsert_pool failed (WordPress database error: Processing the value for the following field failed: pref_origin. The supplied value may be too long or contains invalid data.)`.

@@ -11,7 +11,11 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
 1. **Candidate Pool Browser (`page=matchmaking-pool`)** — Template: `src/View/admin/pool/pool-list.php`:
    - Filter by tier (`All`, `Monthly`, `1-on-1 VIP`, `Event`, `Free`), search by name/email.
    - Status indicators (Active/Inactive, In Pool, Quota Used vs Configured Max).
-   - Single User Detail View (`view_user=ID`, template: `src/View/admin/pool/user-single.php`): Side-by-side profile & search preferences, photo gallery, match history, auto-match scoring & manual matchmaker triggers.
+   - **Notes Action CTA & Popup**: Action button in each row opening the `#mm-admin-notes-modal` WYSIWYG editor popup for reading and editing internal candidate notes without leaving the pool browser.
+   - **Single User Detail View (`view_user=ID`, template: `src/View/admin/pool/user-single.php`)**:
+     - Header displays candidate name, tier badges, contact information, monthly quota, and **`Date joined: MM/DD/YYYY`** (subscription start date of current period).
+     - Two-column profile display (Candidate Self Profile & Match Preferences) alongside a dedicated **Admin Notes Sidebar Card** with WordPress rich text (WYSIWYG) editor and instant AJAX save.
+     - Match history, auto-match scoring & manual matchmaker triggers.
    - Manual Matchmaker View (`manual_match=ID`, template: `src/View/admin/pool/manual-match.php`): Advanced filtering and compatibility score preview.
 
 2. **Matches Queue (`page=matchmaking-matches`)** — Template: `src/View/admin/matches/matches-list.php`:

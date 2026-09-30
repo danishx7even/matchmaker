@@ -43,6 +43,7 @@ class MatchRepository
         'user_photo1', 'user_photo2', 'user_photo3',
         'cycle_matches_count', 'mm_last_match_run',
         'user_type', 'mm_has_one_on_one', 'is_parent_applying',
+        'mm_admin_notes',
     ];
 
     /**
@@ -386,6 +387,61 @@ class MatchRepository
             'user_photo2' => (string) get_user_meta($user_id, 'user_photo2', true),
             'user_photo3' => (string) get_user_meta($user_id, 'user_photo3', true),
         ];
+    }
+
+    /**
+     * Get private admin notes for a user.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return string Sanitized HTML string of notes.
+     */
+    public function get_admin_notes(int $user_id): string
+    {
+        return (string) get_user_meta($user_id, 'mm_admin_notes', true);
+    }
+
+    /**
+     * Save private admin notes for a user.
+     *
+     * @param int    $user_id WordPress user ID.
+     * @param string $notes   HTML/text content of notes.
+     * @return bool
+     */
+    public function save_admin_notes(int $user_id, string $notes): bool
+    {
+        $sanitized = wp_kses_post($notes);
+        return update_user_meta($user_id, 'mm_admin_notes', $sanitized) !== false;
+    }
+
+    /**
+     * Get candidate subscription start date formatted as MM/DD/YYYY.
+     * Resolves PMPro current level startdate, falling back to account registration date.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return string Formatted date string (m/d/Y).
+     */
+    public function get_subscription_start_date(int $user_id): string
+    {
+        if (function_exists('pmpro_getMembershipLevelForUser')) {
+            $level = pmpro_getMembershipLevelForUser($user_id);
+            if (!empty($level) && !empty($level->startdate)) {
+                $ts = is_numeric($level->startdate) ? (int) $level->startdate : strtotime((string) $level->startdate);
+                if ($ts > 0) {
+                    return date('m/d/Y', $ts);
+                }
+            }
+        }
+
+        // Fallback to user registration date
+        $user = get_userdata($user_id);
+        if ($user && !empty($user->user_registered)) {
+            $ts = strtotime((string) $user->user_registered);
+            if ($ts > 0) {
+                return date('m/d/Y', $ts);
+            }
+        }
+
+        return date('m/d/Y');
     }
 
     /**
