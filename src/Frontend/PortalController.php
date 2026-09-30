@@ -171,6 +171,8 @@ class PortalController
         $meta          = $repo->get_meta_block($user_id);
         $stats         = $repo->get_match_stats($user_id);
         $matches       = $repo->find_approved_matches_for_user($user_id);
+        $active_mid    = !empty($matches[0]['match_id']) ? (int) $matches[0]['match_id'] : 0;
+        $match_history = $repo->find_match_history_for_user($user_id, $active_mid);
         $unread_count  = \Matchmaker\Service\NotificationService::instance()->get_user_unread_count($user_id);
         $photos        = $repo->get_user_photos($user_id);
         $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
@@ -183,6 +185,7 @@ class PortalController
             'is_premium'     => $is_premium,
             'pool'           => $pool,
             'matches'        => $matches,
+            'match_history'  => $match_history,
             'stats'          => $stats,
             'unread_count'   => $unread_count,
             'photos'         => $photos,
@@ -305,6 +308,8 @@ class PortalController
     {
         $repo = \Matchmaker\Repository\MatchRepository::instance();
         $matches = $repo->find_approved_matches_for_user($user_id);
+        $active_mid = !empty($matches[0]['match_id']) ? (int) $matches[0]['match_id'] : 0;
+        $match_history = $repo->find_match_history_for_user($user_id, $active_mid);
         $has_one_on_one = $repo->has_one_on_one($user_id);
         $is_premium = in_array($user_type, ['monthly'], true);
         

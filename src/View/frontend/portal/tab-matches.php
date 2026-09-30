@@ -7,6 +7,7 @@
  *   @var string                     $user_type
  *   @var bool                       $is_premium
  *   @var array<int, array>          $matches
+ *   @var array<int, array>|null     $match_history
  *
  * @package Matchmaker\View
  */
@@ -15,12 +16,17 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$pmpro_url    = \Matchmaker\Service\ProfileService::instance()->get_membership_checkout_url();
-$expiry_days  = \Matchmaker\Repository\MatchRepository::instance()->get_match_expiry_days();
-$active_match = !empty($matches) ? $matches[0] : null;
-$my_resp      = strtolower((string) ($active_match['my_response'] ?? 'pending'));
-$their_resp   = strtolower((string) ($active_match['their_response'] ?? 'pending'));
-$is_mutual    = ($my_resp === 'accepted' && $their_resp === 'accepted') || (($active_match['status'] ?? '') === 'matched');
+$pmpro_url       = \Matchmaker\Service\ProfileService::instance()->get_membership_checkout_url();
+$expiry_days     = \Matchmaker\Repository\MatchRepository::instance()->get_match_expiry_days();
+$active_match    = !empty($matches) ? $matches[0] : null;
+$active_match_id = !empty($active_match['match_id']) ? (int) $active_match['match_id'] : 0;
+$my_resp         = strtolower((string) ($active_match['my_response'] ?? 'pending'));
+$their_resp      = strtolower((string) ($active_match['their_response'] ?? 'pending'));
+$is_mutual       = ($my_resp === 'accepted' && $their_resp === 'accepted') || (($active_match['status'] ?? '') === 'matched');
+
+if (!isset($match_history)) {
+    $match_history = \Matchmaker\Repository\MatchRepository::instance()->find_match_history_for_user($user_id, $active_match_id);
+}
 
 $default_step = 1;
 if ($is_mutual) {
@@ -86,5 +92,71 @@ if ($is_mutual) {
                 </div>
             </div>
         <?php endif; ?>
+    <?php endif; ?>
+
+    <?php if (!empty($match_history)) : ?>
+        <div class="mm-matches-history-section">
+            <div class="mm-matches-history-card">
+                <div class="mm-history-header">
+                    <div class="mm-history-header-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <h3><?php esc_html_e('Match History', 'matchmaker'); ?></h3>
+                    </div>
+                    <span class="mm-history-count"><?php echo esc_html(sprintf(_n('%d Past Match', '%d Past Matches', count($match_history), 'matchmaker'), count($match_history))); ?></span>
+                </div>
+                <div class="mm-history-list">
+                    <?php foreach ($match_history as $hist_item) : ?>
+                        <div class="mm-history-item">
+                            <div class="mm-history-avatar">
+                                <?php if (!empty($hist_item['photo'])) : ?>
+                                    <img src="<?php echo esc_url($hist_item['photo']); ?>" alt="<?php echo esc_attr($hist_item['name']); ?>" class="mm-history-photo" />
+                                <?php else : ?>
+                                    <div class="mm-history-photo-placeholder">
+                                        <?php echo esc_html(strtoupper(substr($hist_item['name'] ?: 'M', 0, 1))); ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="mm-history-details">
+                                <div class="mm-history-name-row">
+                                    <h4 class="mm-history-name">
+                                        <?php echo esc_html($hist_item['name']); ?><?php if (!empty($hist_item['age'])) : ?><span class="mm-history-age">, <?php echo (int) $hist_item['age']; ?></span><?php endif; ?>
+                                    </h4>
+                                </div>
+                                <div class="mm-history-meta-row">
+                                    <?php if (!empty($hist_item['location']) && $hist_item['location'] !== '—') : ?>
+                                        <span class="mm-history-meta-item mm-history-location">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                                <circle cx="12" cy="10" r="3"></circle>
+                                            </svg>
+                                            <?php echo esc_html($hist_item['location']); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($hist_item['date_formatted']) && $hist_item['date_formatted'] !== '—') : ?>
+                                        <span class="mm-history-meta-item mm-history-date">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                                            </svg>
+                                            <?php echo esc_html($hist_item['date_formatted']); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="mm-history-status">
+                                <span class="mm-history-badge <?php echo esc_attr($hist_item['status_class'] ?? 'mm-history-badge-approved'); ?>">
+                                    <?php echo esc_html($hist_item['status_label'] ?? __('Approved', 'matchmaker')); ?>
+                                </span>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
     <?php endif; ?>
 </div>

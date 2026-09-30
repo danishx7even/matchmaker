@@ -280,6 +280,10 @@ function sanitize_file_name(string $filename): string {
     return preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename);
 }
 
+function get_avatar_url($id_or_email, array $args = []): string {
+    return 'https://secure.gravatar.com/avatar/?s=150&d=mm&r=g';
+}
+
 function wp_check_filetype(string $filename, ?array $mimes = null): array {
     $ext = pathinfo($filename, PATHINFO_EXTENSION);
     $mime_map = [

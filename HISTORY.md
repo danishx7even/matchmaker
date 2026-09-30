@@ -2543,6 +2543,37 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — **all 207 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+### Task 122: Fix Match Cancellation Database Error & Add Matches History to Member Portal
+- **Objective**:
+  1. Fix the error admin encounters when cancelling/reverting an approved match (`"Database error while cancelling match."`). Identified root cause: `$wpdb->update()` in `cancel_approved_match()` included non-existent columns (`user_one_responded_at` and `user_two_responded_at`), causing MySQL unknown column errors.
+  2. Implement a dedicated **Matches History** section on the frontend Member Portal in the **Matches tab** beneath the active match flow.
+  3. Ensure the past matches history displays only admin-approved matches for the logged-in user (`status IN ('approved', 'matched', 'rejected', 'expired')`), strictly excluding the currently active match displayed above.
+  4. Display clean, responsive list item summary cards containing candidate avatar/photo, name, age, formatted location (City, State, Country), match date, and outcome status badges (`Mutual Match`, `Declined`, `Expired`, `Approved`) with brand design tokens (`#CC723F`).
+  5. Strictly exclude compatibility scores and details popups/view buttons from the history list as requested.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Fixed `cancel_approved_match()`: Removed `user_one_responded_at` and `user_two_responded_at` from the update payload and format array.
+    - Implemented `find_match_history_for_user(int $user_id, int $exclude_match_id = 0): array`: Queries past admin-approved matches, excludes active match, and enriches records with candidate photo, display name, age, formatted location string, formatted date, and status badges.
+  - `src/Frontend/PortalController.php`:
+    - Updated `render_portal()` and `render_matches_html()` to fetch `$match_history` and pass it to `portal.php` and `tab-matches.php`.
+  - `src/View/frontend/portal/tab-matches.php`:
+    - Added the `.mm-matches-history-section` and `.mm-matches-history-card` container beneath the active match flow.
+    - Rendered past match items with avatar/photo thumbnail, full name, age, location with map pin icon, date with calendar icon, and status badge pill.
+  - `src/View/frontend/portal/steps/step-1-discovery.php`:
+    - Safely guarded candidate photo access and fallback avatar.
+  - `assets/css/member-portal.css`:
+    - Added styling for `.mm-matches-history-section`, `.mm-matches-history-card`, `.mm-history-header`, `.mm-history-list`, `.mm-history-item`, thumbnail/avatar, name, meta icons, and color-coded status badges (`.mm-history-badge-matched`, `.mm-history-badge-declined`, `.mm-history-badge-expired`, `.mm-history-badge-approved`), including responsive adjustments for mobile screens.
+  - `tests/bootstrap.php`:
+    - Added `get_avatar_url()` mock stub.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Added `test_cancel_approved_match_updates_status_without_invalid_columns()`.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added `test_find_match_history_for_user_excludes_active_and_enriches_fields()`.
+    - Added `test_tab_matches_renders_matches_history_card_without_scores_or_popup_buttons()`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 210 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+
 
 
 

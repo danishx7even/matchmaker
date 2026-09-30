@@ -642,7 +642,167 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('href="https://instagram.com/user1"', $out_multi);
         $this->assertStringContainsString('href="https://facebook.com/user2"', $out_multi);
     }
+
+    public function test_find_match_history_for_user_excludes_active_and_enriches_fields(): void
+    {
+        global $wpdb;
+        $repo = MatchRepository::instance();
+        $user_id = 1001;
+        $active_match_id = 50;
+
+        // Mock past match rows for user 1001
+        $wpdb->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = 1001 OR user_two_id = 1001) AND status IN ('approved', 'matched', 'rejected', 'expired') AND id != 50\n                 ORDER BY COALESCE(approved_at, created_at) DESC, id DESC"] = [
+            [
+                'id'                => 49,
+                'user_one_id'       => 1001,
+                'user_two_id'       => 1002,
+                'status'            => 'matched',
+                'user_one_response' => 'accepted',
+                'user_two_response' => 'accepted',
+                'approved_at'       => '2026-09-20 14:00:00',
+                'created_at'        => '2026-09-19 10:00:00',
+                'updated_at'        => '2026-09-20 15:00:00',
+            ],
+            [
+                'id'                => 48,
+                'user_one_id'       => 1003,
+                'user_two_id'       => 1001,
+                'status'            => 'rejected',
+                'user_one_response' => 'rejected',
+                'user_two_response' => 'pending',
+                'approved_at'       => '2026-09-10 12:00:00',
+                'created_at'        => '2026-09-09 10:00:00',
+                'updated_at'        => '2026-09-11 12:00:00',
+            ],
+        ];
+
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 1002"] = [
+            'user_id'    => 1002,
+            'city'       => 'Dubai',
+            'state'      => 'Dubai',
+            'country'    => 'United Arab Emirates',
+            'birth_date' => '1995-05-15',
+        ];
+
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 1003"] = [
+            'user_id'    => 1003,
+            'city'       => 'London',
+            'state'      => '',
+            'country'    => 'United Kingdom',
+            'birth_date' => '1992-03-20',
+        ];
+
+        $history = $repo->find_match_history_for_user($user_id, $active_match_id);
+
+        $this->assertCount(2, $history);
+
+        // First item: match 49 (Mutual Match)
+        $this->assertEquals(49, $history[0]['match_id']);
+        $this->assertEquals(1002, $history[0]['candidate_id']);
+        $this->assertEquals('Dubai, Dubai, United Arab Emirates', $history[0]['location']);
+        $this->assertEquals('Mutual Match', $history[0]['status_label']);
+        $this->assertEquals('mm-history-badge-matched', $history[0]['status_class']);
+
+        // Second item: match 48 (Declined)
+        $this->assertEquals(48, $history[1]['match_id']);
+        $this->assertEquals(1003, $history[1]['candidate_id']);
+        $this->assertEquals('London, United Kingdom', $history[1]['location']);
+        $this->assertEquals('Declined', $history[1]['status_label']);
+        $this->assertEquals('mm-history-badge-declined', $history[1]['status_class']);
+    }
+
+    public function test_tab_matches_renders_matches_history_card_without_scores_or_popup_buttons(): void
+    {
+        $user_id    = 1001;
+        $user_type  = 'monthly';
+        $is_premium = true;
+
+        // Active match present
+        $matches = [
+            [
+                'match_id'       => 50,
+                'candidate_id'   => 1005,
+                'name'           => 'Layla Active',
+                'status'         => 'approved',
+                'my_response'    => 'pending',
+                'their_response' => 'pending',
+                'score'          => 5,
+                'score_pct'      => 83,
+                'location'       => 'Riyadh, Saudi Arabia',
+                'age'            => 27,
+                'height'         => 165,
+                'religiosity'    => 'Practicing',
+                'profession'     => 'Doctor',
+                'education'      => 'Master',
+                'citizenship'    => 'Saudi Arabia',
+                'origin'         => 'Arab',
+                'marital_status' => 'Single',
+                'has_children'   => 'No',
+                'bio'            => 'Active potential match profile bio...',
+                'photos'         => ['https://example.com/p1.jpg'],
+            ]
+        ];
+
+        // Past match history
+        $match_history = [
+            [
+                'match_id'       => 49,
+                'candidate_id'   => 1002,
+                'name'           => 'Fatima Past',
+                'photo'          => 'https://example.com/fatima.jpg',
+                'location'       => 'Dubai, UAE',
+                'age'            => 28,
+                'date_formatted' => 'Sep 20, 2026',
+                'status'         => 'matched',
+                'status_label'   => 'Mutual Match',
+                'status_class'   => 'mm-history-badge-matched',
+            ],
+            [
+                'match_id'       => 48,
+                'candidate_id'   => 1003,
+                'name'           => 'Amina Past',
+                'photo'          => '',
+                'location'       => 'London, UK',
+                'age'            => 30,
+                'date_formatted' => 'Sep 10, 2026',
+                'status'         => 'rejected',
+                'status_label'   => 'Declined',
+                'status_class'   => 'mm-history-badge-declined',
+            ]
+        ];
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-matches.php';
+        $html = (string) ob_get_clean();
+
+        // 1. History container & header
+        $this->assertStringContainsString('mm-matches-history-section', $html);
+        $this->assertStringContainsString('mm-matches-history-card', $html);
+        $this->assertStringContainsString('Match History', $html);
+        $this->assertStringContainsString('2 Past Matches', $html);
+
+        // 2. Candidate items
+        $this->assertStringContainsString('Fatima Past', $html);
+        $this->assertStringContainsString('Dubai, UAE', $html);
+        $this->assertStringContainsString('Mutual Match', $html);
+        $this->assertStringContainsString('mm-history-badge-matched', $html);
+        $this->assertStringContainsString('https://example.com/fatima.jpg', $html);
+
+        $this->assertStringContainsString('Amina Past', $html);
+        $this->assertStringContainsString('London, UK', $html);
+        $this->assertStringContainsString('Declined', $html);
+        $this->assertStringContainsString('mm-history-badge-declined', $html);
+
+        // 3. Confirm NO compatibility score and NO details/view popup CTA in history section
+        // Extract history section chunk to inspect
+        $history_chunk = substr($html, strpos($html, 'mm-matches-history-section'));
+        $this->assertStringNotContainsString('Compatibility', $history_chunk);
+        $this->assertStringNotContainsString('% Match', $history_chunk);
+        $this->assertStringNotContainsString('mm-action="view-match"', $history_chunk);
+        $this->assertStringNotContainsString('View Details', $history_chunk);
+    }
 }
+
 
 
 

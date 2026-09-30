@@ -997,6 +997,45 @@ class AdminWorkflowTest
             throw new \RuntimeException("Expected matches-list.php to render '45 matches' displaying-num text");
         }
     }
+
+    public function test_cancel_approved_match_updates_status_without_invalid_columns(): void
+    {
+        global $wpdb;
+        $match_id = 88;
+        $admin_id = 1;
+
+        $wpdb->mock_rows["SELECT * FROM wp_matches WHERE id = 88"] = [
+            'id'                => 88,
+            'user_one_id'       => 601,
+            'user_two_id'       => 602,
+            'initiator_user_id' => 601,
+            'status'            => 'approved',
+            'approved_by'       => 1,
+            'approved_at'       => '2026-09-25 10:00:00',
+            'user_one_response' => 'pending',
+            'user_two_response' => 'pending',
+        ];
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 601"] = [
+            'user_id'   => 601,
+            'user_type' => 'monthly',
+        ];
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 602"] = [
+            'user_id'   => 602,
+            'user_type' => 'free',
+        ];
+
+        $res = $this->repo->cancel_approved_match($match_id, $admin_id);
+        if (empty($res['success'])) {
+            throw new \RuntimeException("Expected cancel_approved_match to succeed, got: " . json_encode($res));
+        }
+
+        // Verify update calls on wp_matches do NOT contain user_one_responded_at
+        $queries_str = implode("\n", $wpdb->queries);
+        if (str_contains($queries_str, 'user_one_responded_at') || str_contains($queries_str, 'user_two_responded_at')) {
+            throw new \RuntimeException("cancel_approved_match should not reference non-existent responded_at columns in query: {$queries_str}");
+        }
+    }
 }
+
 
 

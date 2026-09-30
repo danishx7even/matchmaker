@@ -2220,6 +2220,227 @@ body.mm-lightbox-open .entry-content {
     }
 }
 
+/* ----------------------------------------------------
+   Matches History Section (Past Matches)
+---------------------------------------------------- */
+.mm-matches-history-section {
+    padding: 24px 32px 32px;
+    border-top: 1px solid #ece7de;
+    background: #faf8f5;
+}
+
+.mm-matches-history-card {
+    background: #ffffff;
+    border: 1px solid #ece7de;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+}
+
+.mm-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f1ece4;
+}
+
+.mm-history-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mm-history-header-title svg {
+    color: var(--primary, #CC723F);
+}
+
+.mm-history-header-title h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--obsidian, #1D1E20);
+}
+
+.mm-history-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: #8c7b6f;
+    background: #f4efe8;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.mm-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mm-history-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #ffffff;
+    border: 1px solid #ece7de;
+    border-radius: 12px;
+    padding: 14px 18px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mm-history-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.mm-history-avatar {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #f1ede6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.mm-history-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mm-history-photo-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--primary, #CC723F);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.mm-history-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.mm-history-name-row {
+    margin-bottom: 4px;
+}
+
+.mm-history-name {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--obsidian, #1D1E20);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mm-history-age {
+    font-weight: 400;
+    color: #64748b;
+}
+
+.mm-history-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.mm-history-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.mm-history-meta-item svg {
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.mm-history-status {
+    flex-shrink: 0;
+}
+
+.mm-history-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 20px;
+    text-align: center;
+    letter-spacing: 0.3px;
+}
+
+.mm-history-badge-matched {
+    background: #e8f5e9;
+    color: #1e7e34;
+    border: 1px solid #c8e6c9;
+}
+
+.mm-history-badge-declined {
+    background: #fee8e8;
+    color: #d93025;
+    border: 1px solid #fcc;
+}
+
+.mm-history-badge-expired {
+    background: #fff8e1;
+    color: #b78103;
+    border: 1px solid #ffe082;
+}
+
+.mm-history-badge-approved {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+@media (max-width: 640px) {
+    .mm-matches-history-section {
+        padding: 16px 16px 24px;
+    }
+
+    .mm-matches-history-card {
+        padding: 16px;
+    }
+
+    .mm-history-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .mm-history-item-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+    }
+
+    .mm-history-status {
+        width: 100%;
+    }
+
+    .mm-history-badge {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+
+
 
 
 

@@ -1263,6 +1263,119 @@ class MatchRepository
     }
 
     /**
+     * Get past match history for a user, strictly excluding the active match record.
+     * Only includes matches that were approved by admin (status: approved, matched, rejected, expired).
+     *
+     * @param int $user_id          WordPress user ID.
+     * @param int $exclude_match_id Optional active match ID to omit.
+     * @return array<int, array<string, mixed>> Array of past match summary records.
+     */
+    public function find_match_history_for_user(int $user_id, int $exclude_match_id = 0): array
+    {
+        if ($user_id <= 0) {
+            return [];
+        }
+
+        global $wpdb;
+        $table      = $wpdb->prefix . 'matches';
+        $pool_table = $wpdb->prefix . 'matchmaking_pool';
+
+        $where = [
+            "(user_one_id = %d OR user_two_id = %d)",
+            "status IN ('approved', 'matched', 'rejected', 'expired')",
+        ];
+        $args = [$user_id, $user_id];
+
+        if ($exclude_match_id > 0) {
+            $where[] = "id != %d";
+            $args[]  = $exclude_match_id;
+        }
+
+        $where_sql = implode(' AND ', $where);
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$table}
+                 WHERE {$where_sql}
+                 ORDER BY COALESCE(approved_at, created_at) DESC, id DESC",
+                ...$args
+            ),
+            ARRAY_A
+        );
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $out = [];
+        $date_format = get_option('date_format', 'M j, Y');
+
+        foreach ((array) $rows as $row) {
+            $is_user_one    = ((int) $row['user_one_id'] === $user_id);
+            $other_id       = $is_user_one ? (int) $row['user_two_id'] : (int) $row['user_one_id'];
+            $my_response    = strtolower(trim((string) ($is_user_one ? ($row['user_one_response'] ?? 'pending') : ($row['user_two_response'] ?? 'pending'))));
+            $their_response = strtolower(trim((string) ($is_user_one ? ($row['user_two_response'] ?? 'pending') : ($row['user_one_response'] ?? 'pending'))));
+            $status         = (string) ($row['status'] ?? 'approved');
+
+            // Determine if mutual match
+            if (in_array($my_response, ['accepted', 'accept'], true) && in_array($their_response, ['accepted', 'accept'], true)) {
+                $status = 'matched';
+            }
+
+            $other_user = get_userdata($other_id);
+            $other_pool = $wpdb->get_row(
+                $wpdb->prepare("SELECT * FROM {$pool_table} WHERE user_id = %d", $other_id),
+                ARRAY_A
+            );
+
+            $candidate_loc_parts = array_filter([
+                $other_pool['city'] ?? '',
+                $other_pool['state'] ?? '',
+                $other_pool['country'] ?? ($other_pool['location'] ?? ''),
+            ]);
+            $candidate_loc = !empty($candidate_loc_parts) ? implode(', ', $candidate_loc_parts) : '—';
+
+            $raw_date = !empty($row['approved_at']) ? $row['approved_at'] : (!empty($row['created_at']) ? $row['created_at'] : $row['updated_at']);
+            $formatted_date = !empty($raw_date) ? (function_exists('date_i18n') ? date_i18n($date_format, strtotime($raw_date)) : date($date_format, strtotime($raw_date))) : '—';
+
+            // Status label & badge class
+            $status_label = match ($status) {
+                'matched'  => __('Mutual Match', 'matchmaker'),
+                'rejected' => ($my_response === 'rejected' || $my_response === 'declined') ? __('Declined', 'matchmaker') : __('Declined', 'matchmaker'),
+                'expired'  => __('Expired', 'matchmaker'),
+                default    => __('Approved', 'matchmaker'),
+            };
+
+            $status_class = match ($status) {
+                'matched'  => 'mm-history-badge-matched',
+                'rejected' => 'mm-history-badge-declined',
+                'expired'  => 'mm-history-badge-expired',
+                default    => 'mm-history-badge-approved',
+            };
+
+            $photo = (string) get_user_meta($other_id, 'user_photo1', true);
+
+            $out[] = [
+                'match_id'       => (int) $row['id'],
+                'candidate_id'   => $other_id,
+                'name'           => $other_user ? $other_user->display_name : ('User #' . $other_id),
+                'photo'          => $photo,
+                'location'       => $candidate_loc,
+                'age'            => $this->calc_age($other_pool['birth_date'] ?? ''),
+                'date_formatted' => $formatted_date,
+                'raw_date'       => $raw_date,
+                'status'         => $status,
+                'status_label'   => $status_label,
+                'status_class'   => $status_class,
+                'my_response'    => $my_response,
+                'their_response' => $their_response,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Get all match records involving a user (for admin view), with candidate pivot columns.
      *
      * @param int $user_id WordPress user ID.
@@ -2001,17 +2114,15 @@ class MatchRepository
         $updated = $wpdb->update(
             $table,
             [
-                'status'                => 'pending_review',
-                'approved_by'           => null,
-                'approved_at'           => null,
-                'user_one_response'     => 'pending',
-                'user_two_response'     => 'pending',
-                'user_one_responded_at' => null,
-                'user_two_responded_at' => null,
-                'updated_at'            => current_time('mysql'),
+                'status'            => 'pending_review',
+                'approved_by'       => null,
+                'approved_at'       => null,
+                'user_one_response' => 'pending',
+                'user_two_response' => 'pending',
+                'updated_at'        => current_time('mysql'),
             ],
             ['id' => $match_id],
-            ['%s', null, null, '%s', '%s', null, null, '%s'],
+            ['%s', null, null, '%s', '%s', '%s'],
             ['%d']
         );
 
