@@ -39,7 +39,7 @@ Expected: **168 tests, 0 failures, 0 errors.**
 
 | Test File | Coverage Area |
 | :--- | :--- |
-| `DBMigratorTest.php` | Verifies creation of `wp_matchmaking_pool`, `wp_matches`, `wp_matchmaker_notifications`, and `wp_matchmaker_event_clicks` tables; schema version assertion (`2.9.0`). |
+| `DBMigratorTest.php` | Verifies creation of `wp_matchmaking_pool`, `wp_matches`, `wp_matchmaker_notifications`, and `wp_matchmaker_event_clicks` tables; schema version assertion (`2.10.0`). |
 | `Unit/SettingsAndPlanMappingTest.php` | Dynamic PMPro fallback and custom matrix mapping; page routing options; Elementor form ID resolution. |
 | `Unit/QuotaAndExpiryTest.php` | Quota limit gatekeeping and expiration calculations. |
 | `Unit/MatchingEngineTest.php` | 0–6 flexible compatibility point calculations and candidate limit enforcement. |

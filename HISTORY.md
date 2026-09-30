@@ -6,6 +6,27 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 118: Fix Multi-Select Preferences Column Truncation DB Error & Schema Migration
+- **Objective**:
+  1. Fix the recurring database error: `DB error: upsert_pool failed (WordPress database error: Processing the value for the following field failed: pref_origin. The supplied value may be too long or contains invalid data.)`.
+  2. Identify when this error occurs: WordPress `$wpdb->process_field_formats()` checks column length definitions and rejects strings longer than the declared column size (previously `varchar(255)` in `wp_matchmaking_pool`). With full multi-select country, ethnicity/origin, state, and language lists, concatenated values easily exceed 255 bytes.
+  3. Permanently resolve the issue by upgrading multi-select preference and list columns in `wp_matchmaking_pool` to `TEXT DEFAULT NULL` and adding automated `ALTER TABLE` migration scripts.
+  4. Ensure `$normalize_list` deduplicates selection arrays and strings before saving to database.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`:
+    - Updated `CREATE TABLE {$pool_table}` schema: changed `pref_country`, `pref_state`, `pref_city`, `pref_religion`, `pref_modesty`, `pref_origin`, `languages`, `pref_languages` from `varchar(255)` to `TEXT DEFAULT NULL`. Changed `pref_smoking` and `pref_drinking` to `varchar(255)`.
+    - Added explicit `$wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN ...")` statements in `maybe_migrate()` to upgrade existing databases on production without relying solely on `dbDelta()`.
+    - Bumped schema migration version to `2.10.0`.
+  - `src/Frontend/FormController.php`:
+    - Updated `$normalize_list` helper to run `$clean = array_values(array_unique($clean));` to eliminate duplicate entries from multi-select dropdown submissions.
+  - `tests/DBMigratorTest.php`:
+    - Updated schema migration version assertions from `2.9.0` to `2.10.0`.
+  - `tests/Unit/LocationCascadeTest.php`:
+    - Added `test_long_multiselect_preference_list_handling_and_deduplication()` verifying large origin/ethnicity multi-select arrays (>255 characters) upsert cleanly into `wp_matchmaking_pool`.
+  - `AGENTS.md`, `README.md`, `context/testing_guide.md`:
+    - Updated DBMigrator version references and test suite documentation to v2.10.0 and 198 tests.
+- **Verification**: Ran full automated test suite with **198/198 tests passing** (0 failures, 0 errors).
+
 ### Task 117: Fix System Logs Client-Side Search/Filters & Add Interactive Log Interpretation Guide
 - **Objective**:
   1. Fix the System File Logs interactive filters (Keyword Search, Level dropdown, Category dropdown) so that typing or selecting filters immediately filters logs on initial page load without requiring prior tab switching or manual reload.

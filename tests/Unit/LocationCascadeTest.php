@@ -182,6 +182,50 @@ final class LocationCascadeTest extends TestCase
         $this->assertStringContainsString('custom-multiselect-wrapper', $rel_html);
         $this->assertStringContainsString('multiple', $rel_html);
     }
+
+    public function test_long_multiselect_preference_list_handling_and_deduplication(): void
+    {
+        // Generate a large list of 50+ origins (>500 characters) to simulate multi-select values
+        $all_origins = FieldGenerator::instance()->options_pref_origin();
+        $sample_origins = array_slice($all_origins, 1, 30); // 30 ethnicities
+        $long_origin_string = implode(', ', $sample_origins);
+        
+        $this->assertGreaterThan(255, strlen($long_origin_string));
+
+        // Test upsert_pool with long payload
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $payload = [
+            'user_id'              => 9991,
+            'gender'               => 'male',
+            'pref_gender'          => 'female',
+            'birth_date'           => '1992-05-10',
+            'preferred_age_min'    => 20,
+            'preferred_age_max'    => 35,
+            'country'              => 'United States',
+            'state'                => 'California',
+            'city'                 => 'Los Angeles',
+            'pref_country'         => 'United States, Canada, United Kingdom',
+            'pref_state'           => 'California, Ontario, London',
+            'pref_city'            => 'Los Angeles, Toronto, London',
+            'religion'             => 'Islam',
+            'pref_religion'        => 'Islam, Christianity, Judaism',
+            'modesty'              => 'Moderate',
+            'pref_modesty'         => 'Modest, Very Modest, Moderate',
+            'origin'               => 'Egyptian',
+            'pref_origin'          => $long_origin_string,
+            'languages'            => 'Arabic, English, French',
+            'pref_languages'       => 'Arabic, English, French, Spanish, German',
+            'user_type'            => 'monthly',
+        ];
+
+        $inserted = $repo->upsert_pool($payload);
+        $this->assertNotFalse($inserted);
+
+        // Verify query recorded by wpdb contains the long preference string
+        $last_query = end($GLOBALS['wpdb']->queries);
+        $this->assertStringContainsString('REPLACE INTO wp_matchmaking_pool', $last_query);
+        $this->assertStringContainsString('Egyptian', $last_query);
+    }
 }
 
 

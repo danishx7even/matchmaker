@@ -76,7 +76,7 @@ matchmaker/
 │   │   ├── ProfileService.php         # Profile data assembly, dynamic page URL resolvers
 │   │   └── NotificationService.php    # Email dispatch, Heartbeat API & notifications
 │   ├── Core/
-│   │   ├── DBMigrator.php             # Database schema installer & dbDelta migration (v2.9.0)
+│   │   ├── DBMigrator.php             # Database schema installer & dbDelta migration (v2.10.0)
 │   │   ├── MatchingEngine.php         # Async matching calculation & Action Scheduler batch workers
 │   │   ├── PMProSync.php              # Dynamic PMPro plan mapping & user_type synchronization
 │   │   ├── FreeRegHandler.php         # Decoupled Elementor Free Registration handler

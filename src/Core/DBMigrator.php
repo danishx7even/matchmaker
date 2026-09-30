@@ -41,7 +41,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.9.0';
+        $new_version = '2.10.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -76,25 +76,25 @@ class DBMigrator {
             country varchar(100) NOT NULL DEFAULT '',
             state varchar(100) NOT NULL DEFAULT '',
             city varchar(100) NOT NULL DEFAULT '',
-            pref_country varchar(255) NOT NULL DEFAULT '',
-            pref_state varchar(255) NOT NULL DEFAULT '',
-            pref_city varchar(255) NOT NULL DEFAULT '',
+            pref_country text DEFAULT NULL,
+            pref_state text DEFAULT NULL,
+            pref_city text DEFAULT NULL,
             religion varchar(100) NOT NULL,
-            pref_religion varchar(255) NOT NULL,
+            pref_religion text DEFAULT NULL,
             modesty varchar(50) NOT NULL,
-            pref_modesty varchar(255) NOT NULL,
+            pref_modesty text DEFAULT NULL,
             origin varchar(100) DEFAULT NULL,
-            pref_origin varchar(255) DEFAULT NULL,
-            languages varchar(255) DEFAULT NULL,
-            pref_languages varchar(255) DEFAULT NULL,
+            pref_origin text DEFAULT NULL,
+            languages text DEFAULT NULL,
+            pref_languages text DEFAULT NULL,
             height_cm smallint(5) unsigned DEFAULT NULL,
             preferred_height_min smallint(5) unsigned DEFAULT NULL,
             preferred_height_max smallint(5) unsigned DEFAULT NULL,
             job varchar(150) DEFAULT NULL,
             smoking varchar(50) DEFAULT NULL,
-            pref_smoking varchar(100) DEFAULT NULL,
+            pref_smoking varchar(255) DEFAULT NULL,
             drinking varchar(50) DEFAULT NULL,
-            pref_drinking varchar(100) DEFAULT NULL,
+            pref_drinking varchar(255) DEFAULT NULL,
             user_type enum('monthly','one_on_one','free','event') NOT NULL,
             has_one_on_one tinyint(1) NOT NULL DEFAULT 0,
             is_parent_applying tinyint(1) NOT NULL DEFAULT 0,
@@ -227,6 +227,18 @@ class DBMigrator {
             }
             // Auto backfill has_one_on_one from user_type = 'one_on_one'
             $wpdb->query("UPDATE {$pool_table} SET has_one_on_one = 1 WHERE user_type = 'one_on_one'");
+
+            // Ensure all multi-select preference and list columns are TEXT to prevent varchar(255) truncation errors
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_country text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_state text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_city text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_religion text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_modesty text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_origin text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN languages text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_languages text DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_smoking varchar(255) DEFAULT NULL");
+            $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_drinking varchar(255) DEFAULT NULL");
         }
 
         // Synchronize all user types strictly to base tiers ('free', 'monthly', 'event')

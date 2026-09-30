@@ -572,6 +572,7 @@ class FormController {
                     $clean[] = $val;
                 }
             }
+            $clean = array_values(array_unique($clean));
             return implode(',', $clean);
         };
 
