@@ -1341,7 +1341,7 @@ class MatchRepository
             // Status label & badge class
             $status_label = match ($status) {
                 'matched'  => __('Mutual Match', 'matchmaker'),
-                'rejected' => ($my_response === 'rejected' || $my_response === 'declined') ? __('Declined', 'matchmaker') : __('Declined', 'matchmaker'),
+                'rejected' => __('Declined', 'matchmaker'),
                 'expired'  => __('Expired', 'matchmaker'),
                 default    => __('Approved', 'matchmaker'),
             };
@@ -1353,22 +1353,55 @@ class MatchRepository
                 default    => 'mm-history-badge-approved',
             };
 
+            // Individual response helper formatting
+            $format_response = function (string $resp, string $match_status): array {
+                if (in_array($resp, ['accepted', 'accept'], true)) {
+                    return [
+                        'label' => __('Accepted', 'matchmaker'),
+                        'class' => 'mm-response-val-accepted',
+                    ];
+                }
+                if (in_array($resp, ['rejected', 'decline', 'declined'], true)) {
+                    return [
+                        'label' => __('Declined', 'matchmaker'),
+                        'class' => 'mm-response-val-declined',
+                    ];
+                }
+                if ($match_status === 'expired') {
+                    return [
+                        'label' => __('Expired (No response)', 'matchmaker'),
+                        'class' => 'mm-response-val-expired',
+                    ];
+                }
+                return [
+                    'label' => __('Pending', 'matchmaker'),
+                    'class' => 'mm-response-val-pending',
+                ];
+            };
+
+            $my_fmt    = $format_response($my_response, $status);
+            $their_fmt = $format_response($their_response, $status);
+
             $photo = (string) get_user_meta($other_id, 'user_photo1', true);
 
             $out[] = [
-                'match_id'       => (int) $row['id'],
-                'candidate_id'   => $other_id,
-                'name'           => $other_user ? $other_user->display_name : ('User #' . $other_id),
-                'photo'          => $photo,
-                'location'       => $candidate_loc,
-                'age'            => $this->calc_age($other_pool['birth_date'] ?? ''),
-                'date_formatted' => $formatted_date,
-                'raw_date'       => $raw_date,
-                'status'         => $status,
-                'status_label'   => $status_label,
-                'status_class'   => $status_class,
-                'my_response'    => $my_response,
-                'their_response' => $their_response,
+                'match_id'             => (int) $row['id'],
+                'candidate_id'         => $other_id,
+                'name'                 => $other_user ? $other_user->display_name : ('User #' . $other_id),
+                'photo'                => $photo,
+                'location'             => $candidate_loc,
+                'age'                  => $this->calc_age($other_pool['birth_date'] ?? ''),
+                'date_formatted'       => $formatted_date,
+                'raw_date'             => $raw_date,
+                'status'               => $status,
+                'status_label'         => $status_label,
+                'status_class'         => $status_class,
+                'my_response'          => $my_response,
+                'my_response_label'    => $my_fmt['label'],
+                'my_response_class'    => $my_fmt['class'],
+                'their_response'       => $their_response,
+                'their_response_label' => $their_fmt['label'],
+                'their_response_class' => $their_fmt['class'],
             ];
         }
 

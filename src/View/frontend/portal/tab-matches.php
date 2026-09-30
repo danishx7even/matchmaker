@@ -147,6 +147,20 @@ if ($is_mutual) {
                                         </span>
                                     <?php endif; ?>
                                 </div>
+                                <div class="mm-history-responses-row">
+                                    <div class="mm-response-tag mm-response-tag-you">
+                                        <span class="mm-response-tag-label"><?php esc_html_e('Your Response:', 'matchmaker'); ?></span>
+                                        <span class="mm-response-tag-value <?php echo esc_attr($hist_item['my_response_class'] ?? 'mm-response-val-pending'); ?>">
+                                            <?php echo esc_html($hist_item['my_response_label'] ?? ucfirst((string) ($hist_item['my_response'] ?? 'Pending'))); ?>
+                                        </span>
+                                    </div>
+                                    <div class="mm-response-tag mm-response-tag-candidate">
+                                        <span class="mm-response-tag-label"><?php esc_html_e('Candidate Response:', 'matchmaker'); ?></span>
+                                        <span class="mm-response-tag-value <?php echo esc_attr($hist_item['their_response_class'] ?? 'mm-response-val-pending'); ?>">
+                                            <?php echo esc_html($hist_item['their_response_label'] ?? ucfirst((string) ($hist_item['their_response'] ?? 'Pending'))); ?>
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mm-history-status">
                                 <span class="mm-history-badge <?php echo esc_attr($hist_item['status_class'] ?? 'mm-history-badge-approved'); ?>">

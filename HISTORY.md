@@ -2573,6 +2573,23 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — **all 210 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+### Task 123: Display Individual Member & Candidate Response Statuses in Matches History
+- **Objective**:
+  1. Clearly state the individual response status for both the member ("Your Response: [Status]") and the candidate ("Candidate Response: [Status]") in the Matches History section so the user can easily see what their answer was and what the candidate's answer was.
+  2. Ensure the Matches History section continues to display when the user has an active match, while strictly omitting the active match from the past history list.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `find_match_history_for_user()` to compute individual response data: `my_response_label`, `my_response_class`, `their_response_label`, and `their_response_class`. Handles `Accepted`, `Declined`, `Pending`, and `Expired (No response)`.
+  - `src/View/frontend/portal/tab-matches.php`:
+    - Added `.mm-history-responses-row` within each match item showing formatted response pills for both member and candidate.
+  - `assets/css/member-portal.css`:
+    - Added styles for `.mm-history-responses-row`, `.mm-response-tag`, `.mm-response-tag-label`, `.mm-response-tag-value`, `.mm-response-val-accepted`, `.mm-response-val-declined`, `.mm-response-val-expired`, and `.mm-response-val-pending`.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Updated test assertions in `test_find_match_history_for_user_excludes_active_and_enriches_fields` and `test_tab_matches_renders_matches_history_card_without_scores_or_popup_buttons` to verify individual response data and rendered markup.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 210 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+
 
 
 

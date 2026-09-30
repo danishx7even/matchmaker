@@ -2406,6 +2406,62 @@ body.mm-lightbox-open .entry-content {
     border: 1px solid #e2e8f0;
 }
 
+.mm-history-responses-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #f1ece4;
+    font-size: 13px;
+}
+
+.mm-response-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mm-response-tag-label {
+    font-weight: 500;
+    color: #475569;
+    font-size: 12px;
+}
+
+.mm-response-tag-value {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.2px;
+}
+
+.mm-response-val-accepted {
+    background: #e8f5e9;
+    color: #1e7e34;
+    border: 1px solid #c8e6c9;
+}
+
+.mm-response-val-declined {
+    background: #fee8e8;
+    color: #d93025;
+    border: 1px solid #fcc;
+}
+
+.mm-response-val-expired {
+    background: #fff8e1;
+    color: #b78103;
+    border: 1px solid #ffe082;
+}
+
+.mm-response-val-pending {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
 @media (max-width: 640px) {
     .mm-matches-history-section {
         padding: 16px 16px 24px;
@@ -2422,10 +2478,10 @@ body.mm-lightbox-open .entry-content {
         padding: 12px;
     }
 
-    .mm-history-item-top {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+    .mm-history-responses-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
         width: 100%;
     }
 

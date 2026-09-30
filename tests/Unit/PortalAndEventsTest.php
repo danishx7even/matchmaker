@@ -702,6 +702,10 @@ final class PortalAndEventsTest extends TestCase
         $this->assertEquals('Dubai, Dubai, United Arab Emirates', $history[0]['location']);
         $this->assertEquals('Mutual Match', $history[0]['status_label']);
         $this->assertEquals('mm-history-badge-matched', $history[0]['status_class']);
+        $this->assertEquals('Accepted', $history[0]['my_response_label']);
+        $this->assertEquals('mm-response-val-accepted', $history[0]['my_response_class']);
+        $this->assertEquals('Accepted', $history[0]['their_response_label']);
+        $this->assertEquals('mm-response-val-accepted', $history[0]['their_response_class']);
 
         // Second item: match 48 (Declined)
         $this->assertEquals(48, $history[1]['match_id']);
@@ -709,6 +713,10 @@ final class PortalAndEventsTest extends TestCase
         $this->assertEquals('London, United Kingdom', $history[1]['location']);
         $this->assertEquals('Declined', $history[1]['status_label']);
         $this->assertEquals('mm-history-badge-declined', $history[1]['status_class']);
+        $this->assertEquals('Pending', $history[1]['my_response_label']);
+        $this->assertEquals('mm-response-val-pending', $history[1]['my_response_class']);
+        $this->assertEquals('Declined', $history[1]['their_response_label']);
+        $this->assertEquals('mm-response-val-declined', $history[1]['their_response_class']);
     }
 
     public function test_tab_matches_renders_matches_history_card_without_scores_or_popup_buttons(): void
@@ -746,28 +754,36 @@ final class PortalAndEventsTest extends TestCase
         // Past match history
         $match_history = [
             [
-                'match_id'       => 49,
-                'candidate_id'   => 1002,
-                'name'           => 'Fatima Past',
-                'photo'          => 'https://example.com/fatima.jpg',
-                'location'       => 'Dubai, UAE',
-                'age'            => 28,
-                'date_formatted' => 'Sep 20, 2026',
-                'status'         => 'matched',
-                'status_label'   => 'Mutual Match',
-                'status_class'   => 'mm-history-badge-matched',
+                'match_id'             => 49,
+                'candidate_id'         => 1002,
+                'name'                 => 'Fatima Past',
+                'photo'                => 'https://example.com/fatima.jpg',
+                'location'             => 'Dubai, UAE',
+                'age'                  => 28,
+                'date_formatted'       => 'Sep 20, 2026',
+                'status'               => 'matched',
+                'status_label'         => 'Mutual Match',
+                'status_class'         => 'mm-history-badge-matched',
+                'my_response_label'    => 'Accepted',
+                'my_response_class'    => 'mm-response-val-accepted',
+                'their_response_label' => 'Accepted',
+                'their_response_class' => 'mm-response-val-accepted',
             ],
             [
-                'match_id'       => 48,
-                'candidate_id'   => 1003,
-                'name'           => 'Amina Past',
-                'photo'          => '',
-                'location'       => 'London, UK',
-                'age'            => 30,
-                'date_formatted' => 'Sep 10, 2026',
-                'status'         => 'rejected',
-                'status_label'   => 'Declined',
-                'status_class'   => 'mm-history-badge-declined',
+                'match_id'             => 48,
+                'candidate_id'         => 1003,
+                'name'                 => 'Amina Past',
+                'photo'                => '',
+                'location'             => 'London, UK',
+                'age'                  => 30,
+                'date_formatted'       => 'Sep 10, 2026',
+                'status'               => 'rejected',
+                'status_label'         => 'Declined',
+                'status_class'         => 'mm-history-badge-declined',
+                'my_response_label'    => 'Declined',
+                'my_response_class'    => 'mm-response-val-declined',
+                'their_response_label' => 'Pending',
+                'their_response_class' => 'mm-response-val-pending',
             ]
         ];
 
@@ -793,8 +809,13 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('Declined', $html);
         $this->assertStringContainsString('mm-history-badge-declined', $html);
 
-        // 3. Confirm NO compatibility score and NO details/view popup CTA in history section
-        // Extract history section chunk to inspect
+        // 3. Response breakdowns for both user and candidate
+        $this->assertStringContainsString('Your Response:', $html);
+        $this->assertStringContainsString('Candidate Response:', $html);
+        $this->assertStringContainsString('mm-response-val-accepted', $html);
+        $this->assertStringContainsString('mm-response-val-declined', $html);
+
+        // 4. Confirm NO compatibility score and NO details/view popup CTA in history section
         $history_chunk = substr($html, strpos($html, 'mm-matches-history-section'));
         $this->assertStringNotContainsString('Compatibility', $history_chunk);
         $this->assertStringNotContainsString('% Match', $history_chunk);
