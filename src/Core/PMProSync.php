@@ -71,6 +71,7 @@ class PMProSync {
         add_filter('pmprommpu_checkout_level', [$this, 'filter_pmprommpu_checkout_level'], 10, 2);
         add_filter('pmpro_can_cancel_membership_level', [$this, 'filter_pmpro_can_cancel_membership_level'], 10, 3);
         add_filter('pmpro_cancel_membership_level', [$this, 'block_base_membership_cancellation_with_active_services'], 10, 3);
+        add_filter('pmpro_cancel_membership_level', [$this, 'defer_cancellation_to_end_of_period'], 20, 3);
         add_filter('pmpro_member_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_filter('pmpro_account_membership_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_filter('pmpro_account_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
@@ -639,6 +640,185 @@ class PMProSync {
     }
 
     /**
+     * Intercepts PMPro membership cancellation to defer cancellation until the end of the current billing cycle.
+     * Preserves active tier status (monthly/event) and quota during the paid period, cancels payment gateway auto-renewals,
+     * and sets the level's enddate in PMPro.
+     *
+     * @param bool $okay
+     * @param int  $level_id
+     * @param int  $user_id
+     * @return bool False to halt immediate PMPro level removal, True if cancellation should proceed immediately.
+     */
+    public function defer_cancellation_to_end_of_period(bool $okay, int $level_id, int $user_id): bool
+    {
+        if (!$okay) {
+            return false;
+        }
+
+        if ($user_id <= 0 || $level_id <= 0) {
+            return $okay;
+        }
+
+        // If level is an add-on service, cancellation can proceed immediately
+        if ($this->is_service_level($level_id)) {
+            return $okay;
+        }
+
+        $tier = $this->get_user_type_by_level_id($level_id);
+
+        // If it's already a free tier level, no billing period exists; allow standard cancellation
+        if ($tier === 'free') {
+            return $okay;
+        }
+
+        // Calculate the end of the current billing period
+        $enddate_ts = $this->calculate_subscription_cycle_end($user_id, $level_id);
+
+        // Ensure enddate is in the future (at least current time + 1 hour)
+        $now = current_time('timestamp');
+        if ($enddate_ts <= $now) {
+            $enddate_ts = $now + (30 * DAY_IN_SECONDS);
+        }
+
+        $enddate_mysql = date('Y-m-d H:i:s', $enddate_ts);
+
+        // 1. Update PMPro database record for user's membership level
+        global $wpdb;
+        $table_memberships_users = $wpdb->prefix . 'pmpro_memberships_users';
+
+        if (!empty($wpdb)) {
+            $wpdb->update(
+                $table_memberships_users,
+                ['enddate' => $enddate_mysql],
+                [
+                    'user_id'       => $user_id,
+                    'membership_id' => $level_id,
+                    'status'        => 'active',
+                ]
+            );
+        }
+
+        // Update memory stubs for test environments
+        if (isset($GLOBALS['__mm_user_pmpro_levels'][$user_id])) {
+            foreach ($GLOBALS['__mm_user_pmpro_levels'][$user_id] as &$lvl_obj) {
+                if (is_object($lvl_obj) && ((int) ($lvl_obj->id ?? 0) === $level_id)) {
+                    $lvl_obj->enddate = $enddate_mysql;
+                }
+            }
+            unset($lvl_obj);
+        }
+        if (isset($GLOBALS['__mm_pmpro_levels'][$user_id])) {
+            $single = $GLOBALS['__mm_pmpro_levels'][$user_id];
+            if (is_object($single) && ((int) ($single->id ?? 0) === $level_id)) {
+                $single->enddate = $enddate_mysql;
+            }
+        }
+
+        // 2. Cancel recurring billing at payment gateway so no future charges occur
+        if (class_exists('PMPro_Subscription') && method_exists('PMPro_Subscription', 'get_subscriptions_for_user')) {
+            $subs = \PMPro_Subscription::get_subscriptions_for_user($user_id, $level_id);
+            if (!empty($subs)) {
+                foreach ($subs as $sub) {
+                    if (is_object($sub) && method_exists($sub, 'cancel')) {
+                        $sub->cancel();
+                    }
+                }
+            }
+        }
+
+        // 3. Store user metadata tracking cancellation
+        update_user_meta($user_id, 'mm_subscription_cancelled_at', current_time('mysql'));
+        update_user_meta($user_id, 'mm_subscription_expires_at', $enddate_mysql);
+        update_user_meta($user_id, 'mm_cancelled_level_id', $level_id);
+
+        // 4. Log cancellation event
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info(
+                'PMPro membership cancellation deferred to end of billing cycle for user #' . $user_id . ' (level ' . $level_id . ', expires ' . $enddate_mysql . ').',
+                [
+                    'user_id'    => $user_id,
+                    'level_id'   => $level_id,
+                    'expires_at' => $enddate_mysql,
+                ],
+                'pmpro'
+            );
+        }
+
+        // 5. If running on frontend HTTP request, redirect with friendly notice
+        if (!defined('MM_UNIT_TESTS') && !wp_doing_ajax() && !wp_doing_cron()) {
+            $account_url  = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
+            $redirect_url = add_query_arg('msg', 'subscription_cancelled', $account_url);
+            if (function_exists('pmpro_setMessage')) {
+                pmpro_setMessage(__('Your subscription has been cancelled. You will continue to have access to your plan until the end of your current billing period.', 'matchmaker'), 'pmpro_alert');
+            }
+            wp_safe_redirect($redirect_url);
+            exit;
+        }
+
+        // Returning false prevents PMPro from immediately dropping the level to 0
+        return false;
+    }
+
+    /**
+     * Calculates the timestamp for the end of the current billing cycle for a user and level.
+     *
+     * @param int $user_id
+     * @param int $level_id
+     * @return int Unix timestamp of expiration
+     */
+    public function calculate_subscription_cycle_end(int $user_id, int $level_id): int
+    {
+        $now = current_time('timestamp');
+
+        // 1. Check PMPro_Subscription next payment timestamp
+        if (class_exists('PMPro_Subscription') && method_exists('PMPro_Subscription', 'get_subscriptions_for_user')) {
+            $subs = \PMPro_Subscription::get_subscriptions_for_user($user_id, $level_id);
+            if (!empty($subs) && is_object($subs[0]) && method_exists($subs[0], 'get_next_payment_date')) {
+                $next_date_str = $subs[0]->get_next_payment_date('Y-m-d H:i:s');
+                if (!empty($next_date_str) && $next_date_str !== '—') {
+                    $next_ts = strtotime($next_date_str);
+                    if ($next_ts > $now) {
+                        return $next_ts;
+                    }
+                }
+            }
+        }
+
+        // 2. Check MemberOrder / last order date
+        if (class_exists('MemberOrder')) {
+            if (method_exists('MemberOrder', 'getLastMemberOrder')) {
+                $last_order = \MemberOrder::getLastMemberOrder($user_id, 'success', $level_id);
+                if (is_object($last_order) && !empty($last_order->timestamp)) {
+                    $order_ts = is_numeric($last_order->timestamp) ? (int) $last_order->timestamp : strtotime((string) $last_order->timestamp);
+                    if ($order_ts > 0) {
+                        $cycle_days = 30;
+                        if (!empty($last_order->membership_level) && is_object($last_order->membership_level)) {
+                            $cycle_num = (int) ($last_order->membership_level->cycle_number ?? 1);
+                            $cycle_per = (string) ($last_order->membership_level->cycle_period ?? 'Month');
+                            if (strcasecmp($cycle_per, 'Day') === 0) {
+                                $cycle_days = $cycle_num;
+                            } elseif (strcasecmp($cycle_per, 'Week') === 0) {
+                                $cycle_days = $cycle_num * 7;
+                            } elseif (strcasecmp($cycle_per, 'Month') === 0) {
+                                $cycle_days = $cycle_num * 30;
+                            } elseif (strcasecmp($cycle_per, 'Year') === 0) {
+                                $cycle_days = $cycle_num * 365;
+                            }
+                        }
+                        $calculated_end = $order_ts + ($cycle_days * DAY_IN_SECONDS);
+                        if ($calculated_end > $now) {
+                            return $calculated_end;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback: 30 days from now
+        return $now + (30 * DAY_IN_SECONDS);
+    }
+
+    /**
      * Checks whether the user has an active base membership level (Free, Monthly, or Event).
      *
      * @param int $user_id
@@ -763,7 +943,8 @@ class PMProSync {
     }
 
     /**
-     * Removes the 'Cancel' link from PMPro Account membership tables for base memberships if user has active services.
+     * Removes the 'Cancel' link from PMPro Account membership tables for base memberships if user has active services,
+     * or if the subscription has already been cancelled with a pending future expiration date.
      *
      * @param array      $links
      * @param mixed      $level
@@ -776,13 +957,30 @@ class PMProSync {
             $user_id = get_current_user_id();
         }
 
-        if ($user_id <= 0 || !$this->has_active_one_on_one_service($user_id)) {
+        if ($user_id <= 0) {
             return $links;
         }
 
         $lid = is_object($level) ? (int) ($level->id ?? 0) : (int) $level;
-        if ($lid > 0 && !$this->is_service_level($lid)) {
-            unset($links['cancel'], $links['pmpro_cancel']);
+
+        // 1. If user has active services, block cancelling base level
+        if ($this->has_active_one_on_one_service($user_id)) {
+            if ($lid > 0 && !$this->is_service_level($lid)) {
+                unset($links['cancel'], $links['pmpro_cancel']);
+            }
+        }
+
+        // 2. If subscription has already been cancelled with a future enddate, remove cancel link
+        if ($lid > 0) {
+            $end_ts = 0;
+            if (is_object($level) && !empty($level->enddate)) {
+                $end_ts = is_numeric($level->enddate) ? (int) $level->enddate : strtotime((string) $level->enddate);
+            }
+            $cancelled_at  = get_user_meta($user_id, 'mm_subscription_cancelled_at', true);
+            $cancelled_lvl = (int) get_user_meta($user_id, 'mm_cancelled_level_id', true);
+            if ($end_ts > current_time('timestamp') && (!empty($cancelled_at) || $cancelled_lvl === $lid)) {
+                unset($links['cancel'], $links['pmpro_cancel']);
+            }
         }
 
         return $links;
@@ -851,7 +1049,8 @@ class PMProSync {
     }
 
     /**
-     * Displays a clean error notice on the PMPro Account page if redirected from a blocked cancellation attempt.
+     * Displays a clean error notice on the PMPro Account page if redirected from a blocked cancellation attempt
+     * or a successful deferred cancellation.
      *
      * @return void
      */
@@ -860,6 +1059,24 @@ class PMProSync {
         if (!empty($_GET['msg']) && $_GET['msg'] === 'cannot_cancel_base_with_services') {
             echo '<div class="pmpro_message pmpro_error" style="margin-bottom:20px;padding:12px 16px;background:#fef2f2;border-left:4px solid #ef4444;color:#991b1b;border-radius:6px;font-weight:500;">'
                 . esc_html__('You cannot cancel your base membership while you have active add-on services. Please contact support.', 'matchmaker')
+                . '</div>';
+        } elseif (!empty($_GET['msg']) && $_GET['msg'] === 'subscription_cancelled') {
+            $user_id = get_current_user_id();
+            $cancelled_exp = $user_id > 0 ? get_user_meta($user_id, 'mm_subscription_expires_at', true) : '';
+            $exp_date_str = '';
+            if (!empty($cancelled_exp)) {
+                $ts = strtotime((string) $cancelled_exp);
+                if ($ts > 0) {
+                    $date_format  = get_option('date_format', 'F j, Y');
+                    $exp_date_str = function_exists('date_i18n') ? date_i18n($date_format, $ts) : gmdate($date_format, $ts);
+                }
+            }
+            $msg = !empty($exp_date_str)
+                ? sprintf(__('Your subscription has been cancelled. Your access will remain active until %s and will not renew.', 'matchmaker'), $exp_date_str)
+                : __('Your subscription has been cancelled and will not renew. Your plan remains active until the end of your current billing period.', 'matchmaker');
+
+            echo '<div class="pmpro_message pmpro_alert" style="margin-bottom:20px;padding:12px 16px;background:#fffbeb;border-left:4px solid #f59e0b;color:#92400e;border-radius:6px;font-weight:500;">'
+                . esc_html($msg)
                 . '</div>';
         }
     }
@@ -998,19 +1215,36 @@ class PMProSync {
         $has_active_services = $this->has_active_one_on_one_service($user_id);
         $show_service_lock_notice = (!$is_service && $has_active_services);
 
+        // Check if subscription was cancelled with pending future expiration
+        $cancelled_at  = $user_id > 0 ? get_user_meta($user_id, 'mm_subscription_cancelled_at', true) : '';
+        $cancelled_lvl = $user_id > 0 ? (int) get_user_meta($user_id, 'mm_cancelled_level_id', true) : 0;
+        $is_subscription_cancelled = false;
+        $cancelled_notice = '';
+
+        if ($end_date_ts > current_time('timestamp') && (!empty($cancelled_at) || $cancelled_lvl === $level_id)) {
+            $is_subscription_cancelled = true;
+            $exp_formatted = function_exists('date_i18n') ? date_i18n($date_format, $end_date_ts) : gmdate($date_format, $end_date_ts);
+            $cancelled_notice = sprintf(
+                __('Subscription cancelled. Access remains active until %s and will not renew.', 'matchmaker'),
+                $exp_formatted
+            );
+        }
+
         return [
-            'level_id'                 => $level_id,
-            'name'                     => is_object($level) ? ($level->name ?? '') : '',
-            'status'                   => __('Active', 'matchmaker'),
-            'category_label'           => $category_label,
-            'category_type'            => $category_type,
-            'is_service'               => $is_service,
-            'start_date'               => $start_date_str,
-            'expiration_label'         => $expiration_label,
-            'expiration_value'         => $expiration_val,
-            'is_expiring_soon'         => $is_expiring_soon,
-            'cost_text'                => strip_tags((string) $cost_text),
-            'show_service_lock_notice' => $show_service_lock_notice,
+            'level_id'                  => $level_id,
+            'name'                      => is_object($level) ? ($level->name ?? '') : '',
+            'status'                    => __('Active', 'matchmaker'),
+            'category_label'            => $category_label,
+            'category_type'             => $category_type,
+            'is_service'                => $is_service,
+            'start_date'                => $start_date_str,
+            'expiration_label'          => $expiration_label,
+            'expiration_value'          => $expiration_val,
+            'is_expiring_soon'          => $is_expiring_soon,
+            'is_subscription_cancelled' => $is_subscription_cancelled,
+            'cancelled_notice'          => $cancelled_notice,
+            'cost_text'                 => strip_tags((string) $cost_text),
+            'show_service_lock_notice'  => $show_service_lock_notice,
         ];
     }
 
@@ -1064,6 +1298,13 @@ class PMProSync {
                     </div>
                 <?php endif; ?>
             </div>
+
+            <?php if (!empty($details['is_subscription_cancelled'])) : ?>
+                <div class="mm-account-cancelled-notice" style="margin-top:12px; padding:10px 14px; background:#fffbeb; border-left:4px solid #f59e0b; border-radius:6px; font-size:12.5px; color:#92400e; font-weight:600; display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:15px;">⚠️</span>
+                    <span><?php echo esc_html($details['cancelled_notice']); ?></span>
+                </div>
+            <?php endif; ?>
 
             <?php if (!empty($details['show_service_lock_notice'])) : ?>
                 <div class="mm-account-service-notice" style="margin-top:12px; padding-top:10px; border-top:1px dashed #cbd5e1; font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px;">

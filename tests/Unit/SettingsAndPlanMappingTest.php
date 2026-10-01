@@ -391,9 +391,11 @@ final class SettingsAndPlanMappingTest extends TestCase
         $this->assertTrue($cancel_service_result, 'Service level cancellation should be allowed');
         $this->assertFalse(pmpro_hasMembershipLevel(6, $user_id), 'Service level should now be cancelled');
 
-        // Now that no services remain, base membership cancellation is permitted
+        // Now that no services remain, cancelling base membership defers cancellation to end of cycle (preserving access during grace period)
         $cancel_base_now = pmpro_cancelMembershipLevel(3, $user_id);
-        $this->assertTrue($cancel_base_now, 'Base membership cancellation allowed once services are gone');
+        $this->assertFalse($cancel_base_now, 'Base membership cancellation is deferred to end of billing cycle');
+        $this->assertNotEmpty(get_user_meta($user_id, 'mm_subscription_cancelled_at', true));
+        $this->assertNotEmpty(get_user_meta($user_id, 'mm_subscription_expires_at', true));
 
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
@@ -780,6 +782,131 @@ final class SettingsAndPlanMappingTest extends TestCase
         } finally {
             unset($GLOBALS['__mm_user_pmpro_levels'][$user_id], $GLOBALS['__mm_current_user_id']);
         }
+    }
+
+    public function test_deferred_cancellation_preserves_paid_tier_until_cycle_end(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 940;
+
+        $monthly_level = new \FakePMProLevel(3, 'Monthly Matchmaking', '$29/mo', 0);
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [$monthly_level];
+        $sync->sync_pmpro_level_to_user_type(3, $user_id, 0);
+
+        $this->assertEquals('monthly', $sync->get_current_user_type($user_id));
+
+        // Member triggers PMPro cancellation
+        $result = pmpro_cancelMembershipLevel(3, $user_id);
+        $this->assertFalse($result, 'Cancellation filter should halt immediate removal');
+
+        // Level must still be present with future enddate
+        $this->assertTrue(pmpro_hasMembershipLevel(3, $user_id));
+        $this->assertNotEmpty($monthly_level->enddate);
+        $this->assertGreaterThan(time(), strtotime((string) $monthly_level->enddate));
+
+        // Metadata recorded
+        $this->assertNotEmpty(get_user_meta($user_id, 'mm_subscription_cancelled_at', true));
+        $this->assertNotEmpty(get_user_meta($user_id, 'mm_subscription_expires_at', true));
+        $this->assertEquals(3, (int) get_user_meta($user_id, 'mm_cancelled_level_id', true));
+
+        // User type must remain 'monthly' during grace period
+        $this->assertEquals('monthly', $sync->get_current_user_type($user_id));
+        $this->assertEquals('monthly', ProfileService::instance()->get_user_type($user_id));
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
+
+    public function test_membership_account_card_renders_cancelled_subscription_notice(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 941;
+
+        $future_exp = date('Y-m-d H:i:s', time() + (20 * 86400));
+        $monthly_level = new \FakePMProLevel(3, 'Monthly Matchmaking', '$29/mo', $future_exp);
+        $monthly_level->user_id = $user_id;
+
+        update_user_meta($user_id, 'mm_subscription_cancelled_at', date('Y-m-d H:i:s'));
+        update_user_meta($user_id, 'mm_subscription_expires_at', $future_exp);
+        update_user_meta($user_id, 'mm_cancelled_level_id', 3);
+
+        $details = $sync->get_membership_level_card_details($monthly_level, $user_id);
+        $this->assertTrue($details['is_subscription_cancelled']);
+        $this->assertStringContainsString('Subscription cancelled. Access remains active until', $details['cancelled_notice']);
+
+        ob_start();
+        $sync->render_membership_account_card_details($monthly_level);
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('mm-account-cancelled-notice', $html);
+        $this->assertStringContainsString('Subscription cancelled. Access remains active until', $html);
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
+    }
+
+    public function test_membership_action_links_hides_cancel_for_deferred_cancellation(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 942;
+
+        $future_exp = date('Y-m-d H:i:s', time() + (20 * 86400));
+        $monthly_level = new \FakePMProLevel(3, 'Monthly Matchmaking', '$29/mo', $future_exp);
+
+        update_user_meta($user_id, 'mm_subscription_cancelled_at', date('Y-m-d H:i:s'));
+        update_user_meta($user_id, 'mm_cancelled_level_id', 3);
+
+        $links = [
+            'change' => '<a href="/change">Change</a>',
+            'cancel' => '<a href="/cancel">Cancel</a>',
+        ];
+
+        $filtered = $sync->filter_pmpro_member_action_links($links, $monthly_level, $user_id);
+        $this->assertArrayNotHasKey('cancel', $filtered, 'Cancel link should be hidden for already cancelled subscription');
+        $this->assertArrayHasKey('change', $filtered, 'Change link should remain intact');
+    }
+
+    public function test_render_account_error_notice_for_cancelled_subscription(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 943;
+        $GLOBALS['__mm_current_user_id'] = $user_id;
+
+        $future_exp = date('Y-m-d H:i:s', time() + (25 * 86400));
+        update_user_meta($user_id, 'mm_subscription_expires_at', $future_exp);
+        $_GET['msg'] = 'subscription_cancelled';
+
+        ob_start();
+        $sync->render_account_error_notice();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('pmpro_message pmpro_alert', $html);
+        $this->assertStringContainsString('Your subscription has been cancelled', $html);
+        $this->assertStringContainsString('Your access will remain active until', $html);
+
+        unset($GLOBALS['__mm_current_user_id']);
+        $_GET = [];
+    }
+
+    public function test_post_expiry_sync_assigns_free_membership_and_free_user_type(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 944;
+
+        // Level has now expired (1 hour ago)
+        $past_exp = date('Y-m-d H:i:s', time() - 3600);
+        $expired_level = new \FakePMProLevel(3, 'Monthly Matchmaking', '$29/mo', $past_exp);
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [$expired_level];
+
+        // Should resolve to 'free'
+        $this->assertEquals('free', $sync->get_current_user_type($user_id));
+
+        // When expiration cron runs
+        $sync->handle_expiry_sync($user_id, 3);
+
+        $this->assertEquals('free', get_user_meta($user_id, 'user_type', true));
+        $this->assertEquals('free', ProfileService::instance()->get_user_type($user_id));
+        $this->assertTrue(pmpro_hasMembershipLevel(2, $user_id), 'Free membership level must be automatically assigned on expiration');
+
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
 }
 

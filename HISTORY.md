@@ -6,6 +6,33 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 124: Defer Membership Cancellation to End of Current Paid Billing Period
+- **Objective**:
+  1. Intercept PMPro membership cancellation when a member cancels a recurring paid tier (`monthly` or `event`).
+  2. Rather than immediately dropping the membership to Free and resetting `user_type`, calculate the end date of the current paid billing cycle and set `enddate` on the level in PMPro (`wp_pmpro_memberships_users`).
+  3. Cancel recurring billing at the payment gateway so no future charges occur.
+  4. Preserve full plan access, active `user_type` (`monthly` / `event`), matching engine eligibility, and quota throughout the remaining paid grace period.
+  5. Render a clear warning notice on the Membership Account card: *"Subscription cancelled. Access remains active until MM/DD/YYYY and will not renew."*
+  6. Hide the "Cancel" action link on the Membership Account page if the subscription has already been cancelled and has a future expiration date.
+  7. When the billing cycle ends and the expiration date passes, PMPro's daily expiration cron fires `pmpro_membership_post_membership_expiry` (`handle_expiry_sync`), which automatically assigns the default Free level and updates `user_type = 'free'` across `wp_usermeta` and `wp_matchmaking_pool`.
+- **Implemented**:
+  - `src/Core/PMProSync.php`:
+    - Registered `add_filter('pmpro_cancel_membership_level', [$this, 'defer_cancellation_to_end_of_period'], 20, 3)` in `PMProSync::__construct()`.
+    - Added `defer_cancellation_to_end_of_period(bool $okay, int $level_id, int $user_id): bool` to calculate billing cycle end date, set `enddate` in DB/memory, cancel payment gateway subscriptions via `PMPro_Subscription`, record metadata (`mm_subscription_cancelled_at`, `mm_subscription_expires_at`, `mm_cancelled_level_id`), log via `FileLoggerService::info()`, and redirect on frontend requests.
+    - Added `calculate_subscription_cycle_end(int $user_id, int $level_id): int` to resolve renewal timestamp from `PMPro_Subscription::get_next_payment_date()`, `MemberOrder`, or 30-day default.
+    - Updated `filter_pmpro_member_action_links()` to remove `'cancel'` and `'pmpro_cancel'` links if subscription is already cancelled with future `enddate`.
+    - Updated `render_account_error_notice()` to display banner when `$_GET['msg'] === 'subscription_cancelled'`.
+    - Updated `get_membership_level_card_details()` to compute `is_subscription_cancelled` and `cancelled_notice`.
+    - Updated `render_membership_account_card_details()` to render the amber cancellation notice card.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_deferred_cancellation_preserves_paid_tier_until_cycle_end()`.
+    - Added `test_membership_account_card_renders_cancelled_subscription_notice()`.
+    - Added `test_membership_action_links_hides_cancel_for_deferred_cancellation()`.
+    - Added `test_render_account_error_notice_for_cancelled_subscription()`
+    - Added `test_post_expiry_sync_assigns_free_membership_and_free_user_type()`.
+    - Updated `test_active_services_block_base_membership_cancellation()` assertion for deferred cancellation.
+- **Verification**: Ran automated test suite with **215/215 tests passing** (0 failures, 0 errors).
+
 ### Task 120: Fix Notes Popup Display & Optimize Pool Browser Column Widths
 - **Objective**:
   1. Fix table column widths in the Candidate Pool Browser (`pool-list.php`) so the Actions column width (`width:150px;`) comfortably accommodates both "View" and "Notes" action buttons without wrapping or overflowing outside the table boundary.

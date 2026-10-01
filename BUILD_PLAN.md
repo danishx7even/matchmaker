@@ -2,9 +2,12 @@
 
 **Status**: `IDLE`
 **Active Task**: None
-**Current Phase**: Idle
+**Current Phase**: N/A
 
 ## Objectives
-*No active tasks currently assigned. Ready for next prompt.*
+*No active tasks. Waiting for requirements.*
+
+## Checklist
+- [ ] Ready for next assignment
 
 
