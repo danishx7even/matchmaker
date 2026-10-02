@@ -6,6 +6,34 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 128: Relocate Admin Notes to the Bottom of Match History
+- **Objective**:
+  1. Move the Admin Notes card on the single candidate profile view (`user-single.php`) from the right-hand sidebar to the bottom of the page, directly beneath the Match History & Approval Queue table.
+  2. Remove the rigid 2-column sidebar layout wrapper so Candidate Self Profile, Partner Preferences, and Match History table take the full content width.
+- **Implemented**:
+  - `src/View/admin/pool/user-single.php`:
+    - Removed `.mm-profile-layout-wrap`, `.mm-profile-main-column`, and `.mm-profile-sidebar-column`.
+    - Placed `.mm-admin-notes-card` full-width directly below the Match History table.
+- **Verification**: Ran automated test suite with **219/219 tests passing** (0 failures, 0 errors).
+
+### Task 127: Fix Column Compression & Vertical Character-Wrapping in Candidate Profile Match History Table
+- **Objective**:
+  1. Fix the layout bug where "Candidate Profile" and "Member Responses" columns collapsed to 1-character-wide vertical text ribbons on the single candidate profile page in the pool browser (`user-single.php`).
+  2. Wrap admin list tables in responsive scroll containers (`.mm-table-responsive`) with `-webkit-overflow-scrolling: touch;`.
+  3. Remove the rigid `.fixed` (`table-layout: fixed;`) constraint in favor of flexible content-aware tables (`table-layout: auto !important;`) with `white-space: nowrap;` headers and explicit column min-widths.
+  4. Adjust responsive breakpoint in `admin-matchmaker.css` to `1300px` so medium desktop screens stack the admin notes sidebar gracefully instead of squeezing table columns.
+- **Implemented**:
+  - `src/View/admin/pool/user-single.php`:
+    - Wrapped Match History table in `.mm-table-responsive` with `min-width: 800px` and `table-layout: auto`.
+    - Set explicit column widths and `white-space: nowrap` on `<th>` headers.
+  - `src/View/admin/matches/matches-list.php`:
+    - Wrapped Matches Queue table in `.mm-table-responsive` with `min-width: 860px` and `table-layout: auto`.
+  - `assets/css/admin-matchmaker.css`:
+    - Added `.mm-table-responsive` container styles with border, background, and smooth horizontal scrolling.
+    - Added anti-compression rules (`table-layout: auto !important`, `word-break: normal`, `white-space: nowrap` for headers).
+    - Updated responsive breakpoint for `.mm-profile-layout-wrap` to `1300px`.
+- **Verification**: Ran automated test suite with **219/219 tests passing** (0 failures, 0 errors).
+
 ### Task 126: Fix Active Mutual Match Quota Recalculation & Dashboard Stat Cards
 - **Objective**:
   1. Fix `recalculate_user_quota()` so that active approved and mutual matches (`status IN ('approved', 'matched')`) are always counted in the active quota, regardless of whether their creation date preceded the calculated 30-day window.

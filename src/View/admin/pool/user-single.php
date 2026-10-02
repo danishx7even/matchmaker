@@ -87,11 +87,8 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
     </div>
 <?php endif; ?>
 
-<!-- Main Layout Container: Main Column (Profile Cards + Match History) & Sidebar Column (Admin Notes) -->
-<div class="mm-profile-layout-wrap">
-    <div class="mm-profile-main-column">
-        <!-- Two-Column Profile Cards -->
-        <div class="mm-grid-two">
+<!-- Two-Column Profile Cards -->
+<div class="mm-grid-two">
     <!-- Candidate Self Profile Card -->
     <div class="mm-card">
         <h3><?php esc_html_e('Candidate Self Profile', 'matchmaker'); ?></h3>
@@ -181,137 +178,134 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
         </span>
     </div>
 
-    <table class="wp-list-table widefat fixed striped">
-        <thead>
-            <tr>
-                <th style="width:65px;"><?php esc_html_e('ID', 'matchmaker'); ?></th>
-                <th><?php esc_html_e('Candidate Profile', 'matchmaker'); ?></th>
-                <th style="width:120px; text-align:center;"><?php esc_html_e('Score', 'matchmaker'); ?></th>
-                <th style="width:120px;"><?php esc_html_e('Status', 'matchmaker'); ?></th>
-                <th style="width:100px;"><?php esc_html_e('Source', 'matchmaker'); ?></th>
-                <th><?php esc_html_e('Member Responses', 'matchmaker'); ?></th>
-                <th style="width:110px;"><?php esc_html_e('Created Date', 'matchmaker'); ?></th>
-                <th style="width:180px; text-align:center;"><?php esc_html_e('Actions', 'matchmaker'); ?></th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (empty($matches)) : ?>
-                <tr><td colspan="8"><?php esc_html_e('No match history recorded for this candidate.', 'matchmaker'); ?></td></tr>
-            <?php else : ?>
-                <?php foreach ($matches as $m) :
-                    $mid       = (int) $m['id'];
-                    $is_u1     = ((int) $m['user_one_id'] === $user_id);
-                    $cand_id   = $is_u1 ? (int) $m['user_two_id'] : (int) $m['user_one_id'];
-                    $cand_user = get_userdata($cand_id);
-                    $cand_pool = $repo->get_user_pool($cand_id);
-                    $cand_photo= $repo->get_meta($cand_id, 'user_photo1');
-                    $cand_type = $cand_pool['user_type'] ?? 'free';
+    <div class="mm-table-responsive">
+        <table class="wp-list-table widefat striped" style="min-width:800px; table-layout:auto;">
+            <thead>
+                <tr>
+                    <th style="width:50px; text-align:center; white-space:nowrap;"><?php esc_html_e('ID', 'matchmaker'); ?></th>
+                    <th style="min-width:180px; white-space:nowrap;"><?php esc_html_e('Candidate Profile', 'matchmaker'); ?></th>
+                    <th style="width:75px; text-align:center; white-space:nowrap;"><?php esc_html_e('Score', 'matchmaker'); ?></th>
+                    <th style="width:110px; text-align:center; white-space:nowrap;"><?php esc_html_e('Status', 'matchmaker'); ?></th>
+                    <th style="width:75px; text-align:center; white-space:nowrap;"><?php esc_html_e('Source', 'matchmaker'); ?></th>
+                    <th style="min-width:130px; white-space:nowrap;"><?php esc_html_e('Member Responses', 'matchmaker'); ?></th>
+                    <th style="width:95px; text-align:center; white-space:nowrap;"><?php esc_html_e('Created Date', 'matchmaker'); ?></th>
+                    <th style="width:160px; text-align:center; white-space:nowrap;"><?php esc_html_e('Actions', 'matchmaker'); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($matches)) : ?>
+                    <tr><td colspan="8"><?php esc_html_e('No match history recorded for this candidate.', 'matchmaker'); ?></td></tr>
+                <?php else : ?>
+                    <?php foreach ($matches as $m) :
+                        $mid       = (int) $m['id'];
+                        $is_u1     = ((int) $m['user_one_id'] === $user_id);
+                        $cand_id   = $is_u1 ? (int) $m['user_two_id'] : (int) $m['user_one_id'];
+                        $cand_user = get_userdata($cand_id);
+                        $cand_pool = $repo->get_user_pool($cand_id);
+                        $cand_photo= $repo->get_meta($cand_id, 'user_photo1');
+                        $cand_type = $cand_pool['user_type'] ?? 'free';
 
-                    $is_event_only = ($pool['user_type'] === 'event') || ($cand_type === 'event');
+                        $is_event_only = ($pool['user_type'] === 'event') || ($cand_type === 'event');
 
-                    $view_match_url = admin_url('admin.php?page=matchmaking-matches&view_match=' . $mid);
-                    $approve_url    = wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_action=approve&match_id=' . $mid), 'mm_approve_' . $mid);
-                    $reject_url     = wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_action=reject&match_id=' . $mid), 'mm_reject_' . $mid);
-                    $st             = (string) $m['status'];
+                        $view_match_url = admin_url('admin.php?page=matchmaking-matches&view_match=' . $mid);
+                        $approve_url    = wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_action=approve&match_id=' . $mid), 'mm_approve_' . $mid);
+                        $reject_url     = wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_action=reject&match_id=' . $mid), 'mm_reject_' . $mid);
+                        $st             = (string) $m['status'];
 
-                    $u1_resp = $m['user_one_response'] ?? 'pending';
-                    $u2_resp = $m['user_two_response'] ?? 'pending';
-                ?>
-                    <tr>
-                        <td><strong>#<?php echo $mid; ?></strong></td>
-                        <td>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <?php if (!empty($cand_photo)) : ?>
-                                    <img src="<?php echo esc_url($cand_photo); ?>" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" alt="">
-                                <?php else : ?>
-                                    <div class="mm-avatar-thumb" style="width:34px;height:34px;border-radius:50%;">
-                                        <?php echo esc_html(strtoupper(substr($cand_user ? $cand_user->display_name : 'U', 0, 1))); ?>
+                        $u1_resp = $m['user_one_response'] ?? 'pending';
+                        $u2_resp = $m['user_two_response'] ?? 'pending';
+                    ?>
+                        <tr>
+                            <td style="text-align:center;"><strong>#<?php echo $mid; ?></strong></td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:10px; min-width:180px;">
+                                    <?php if (!empty($cand_photo)) : ?>
+                                        <img src="<?php echo esc_url($cand_photo); ?>" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="">
+                                    <?php else : ?>
+                                        <div class="mm-avatar-thumb" style="width:34px;height:34px;border-radius:50%;flex-shrink:0;">
+                                            <?php echo esc_html(strtoupper(substr($cand_user ? $cand_user->display_name : 'U', 0, 1))); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div style="min-width:0;">
+                                        <strong><a href="<?php echo esc_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $cand_id)); ?>" style="white-space:nowrap;"><?php echo esc_html($cand_user ? $cand_user->display_name : 'User #' . $cand_id); ?></a></strong>
+                                        <span class="mm-badge mm-badge-<?php echo esc_attr($cand_type); ?>" style="margin-left:4px; font-size:10px; padding:2px 6px;">
+                                            <?php echo esc_html($repo->format_tier_label($cand_type)); ?>
+                                        </span>
+                                        <br>
+                                        <small style="color:#666; word-break:break-all;"><?php echo esc_html($cand_user ? $cand_user->user_email : ''); ?></small>
                                     </div>
-                                <?php endif; ?>
-                                <div>
-                                    <strong><a href="<?php echo esc_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $cand_id)); ?>"><?php echo esc_html($cand_user ? $cand_user->display_name : 'User #' . $cand_id); ?></a></strong>
-                                    <span class="mm-badge mm-badge-<?php echo esc_attr($cand_type); ?>" style="margin-left:4px;">
-                                        <?php echo esc_html($repo->format_tier_label($cand_type)); ?>
-                                    </span>
-                                    <br>
-                                    <small style="color:#666;"><?php echo esc_html($cand_user ? $cand_user->user_email : ''); ?></small>
                                 </div>
-                            </div>
-                        </td>
-                        <td style="text-align:center;">
-                            <span style="display:inline-block; font-weight:700; color:#0284c7; background:#e0f2fe; padding:2px 8px; border-radius:12px; font-size:12px;">
-                                <?php echo (int) ($m['score'] ?? 0); ?> / 6
-                            </span>
-                        </td>
-                        <td>
-                            <?php $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str_replace('_', ' ', $st)); ?>
-                            <span class="mm-status mm-status-<?php echo esc_attr($st); ?>">
-                                <?php echo esc_html($st_label); ?>
-                            </span>
-                        </td>
-                        <td><small><?php echo esc_html(ucfirst($m['match_source'] ?? 'auto')); ?></small></td>
-                        <td>
-                            <small style="line-height:1.4; display:block;">
-                                <strong>Self:</strong> 
-                                <?php if (($is_u1 ? $u1_resp : $u2_resp) === 'accepted') : ?>
-                                    <span style="color:#16a34a; font-weight:600;">✓ Accepted</span>
-                                <?php elseif (($is_u1 ? $u1_resp : $u2_resp) === 'rejected') : ?>
-                                    <span style="color:#dc2626; font-weight:600;">✕ Declined</span>
+                            </td>
+                            <td style="text-align:center;">
+                                <span style="display:inline-block; font-weight:700; color:#0284c7; background:#e0f2fe; padding:2px 8px; border-radius:12px; font-size:12px; white-space:nowrap;">
+                                    <?php echo (int) ($m['score'] ?? 0); ?> / 6
+                                </span>
+                            </td>
+                            <td style="text-align:center;">
+                                <?php $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str_replace('_', ' ', $st)); ?>
+                                <span class="mm-status mm-status-<?php echo esc_attr($st); ?>" style="white-space:nowrap;">
+                                    <?php echo esc_html($st_label); ?>
+                                </span>
+                            </td>
+                            <td style="text-align:center;"><small><?php echo esc_html(ucfirst($m['match_source'] ?? 'auto')); ?></small></td>
+                            <td>
+                                <small style="line-height:1.4; display:block; white-space:nowrap;">
+                                    <strong>Self:</strong> 
+                                    <?php if (($is_u1 ? $u1_resp : $u2_resp) === 'accepted') : ?>
+                                        <span style="color:#16a34a; font-weight:600;">✓ Accepted</span>
+                                    <?php elseif (($is_u1 ? $u1_resp : $u2_resp) === 'rejected') : ?>
+                                        <span style="color:#dc2626; font-weight:600;">✕ Declined</span>
+                                    <?php else : ?>
+                                        <span style="color:#d97706;">⏳ Pending</span>
+                                    <?php endif; ?>
+                                    <br>
+                                    <strong>Candidate:</strong> 
+                                    <?php if (($is_u1 ? $u2_resp : $u1_resp) === 'accepted') : ?>
+                                        <span style="color:#16a34a; font-weight:600;">✓ Accepted</span>
+                                    <?php elseif (($is_u1 ? $u2_resp : $u1_resp) === 'rejected') : ?>
+                                        <span style="color:#dc2626; font-weight:600;">✕ Declined</span>
+                                    <?php else : ?>
+                                        <span style="color:#d97706;">⏳ Pending</span>
+                                    <?php endif; ?>
+                                </small>
+                            </td>
+                            <td style="text-align:center;"><small style="color:#555; white-space:nowrap;"><?php echo esc_html(substr($m['created_at'] ?? '', 0, 10)); ?></small></td>
+                            <td style="text-align:center; white-space:nowrap;">
+                                <?php if ($st === 'pending_review') : ?>
+                                    <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-small"><?php esc_html_e('Approve', 'matchmaker'); ?></a>
+                                    <a href="<?php echo esc_url($reject_url); ?>" class="button button-small mm-reject-link"><?php esc_html_e('Reject', 'matchmaker'); ?></a>
+                                <?php elseif ($st === 'approved') :
+                                    $cancel_url = wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_action=cancel_approved&match_id=' . $mid), 'mm_cancel_approved_' . $mid);
+                                ?>
+                                    <a href="<?php echo esc_url($view_match_url); ?>" class="button button-small"><?php esc_html_e('View Comparison', 'matchmaker'); ?></a>
+                                    <a href="<?php echo esc_url($cancel_url); ?>" class="button button-small mm-cancel-approval-link" style="color:#b91c1c; margin-left:3px;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to cancel this approved match and revert it to pending review? Member quotas will be restored.', 'matchmaker')); ?>');"><?php esc_html_e('Cancel', 'matchmaker'); ?></a>
                                 <?php else : ?>
-                                    <span style="color:#d97706;">⏳ Pending</span>
+                                    <a href="<?php echo esc_url($view_match_url); ?>" class="button button-small"><?php esc_html_e('View Comparison', 'matchmaker'); ?></a>
                                 <?php endif; ?>
-                                <br>
-                                <strong>Candidate:</strong> 
-                                <?php if (($is_u1 ? $u2_resp : $u1_resp) === 'accepted') : ?>
-                                    <span style="color:#16a34a; font-weight:600;">✓ Accepted</span>
-                                <?php elseif (($is_u1 ? $u2_resp : $u1_resp) === 'rejected') : ?>
-                                    <span style="color:#dc2626; font-weight:600;">✕ Declined</span>
-                                <?php else : ?>
-                                    <span style="color:#d97706;">⏳ Pending</span>
-                                <?php endif; ?>
-                            </small>
-                        </td>
-                        <td><small style="color:#555;"><?php echo esc_html(substr($m['created_at'] ?? '', 0, 10)); ?></small></td>
-                        <td style="text-align:center;">
-                            <?php if ($st === 'pending_review') : ?>
-                                <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-small"><?php esc_html_e('Approve', 'matchmaker'); ?></a>
-                                <a href="<?php echo esc_url($reject_url); ?>" class="button button-small mm-reject-link"><?php esc_html_e('Reject', 'matchmaker'); ?></a>
-                            <?php elseif ($st === 'approved') :
-                                $cancel_url = wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_action=cancel_approved&match_id=' . $mid), 'mm_cancel_approved_' . $mid);
-                            ?>
-                                <a href="<?php echo esc_url($view_match_url); ?>" class="button button-small"><?php esc_html_e('View Comparison', 'matchmaker'); ?></a>
-                                <a href="<?php echo esc_url($cancel_url); ?>" class="button button-small mm-cancel-approval-link" style="color:#b91c1c; margin-left:3px;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to cancel this approved match and revert it to pending review? Member quotas will be restored.', 'matchmaker')); ?>');"><?php esc_html_e('Cancel', 'matchmaker'); ?></a>
-                            <?php else : ?>
-                                <a href="<?php echo esc_url($view_match_url); ?>" class="button button-small"><?php esc_html_e('View Comparison', 'matchmaker'); ?></a>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </tbody>
-    </table>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
-    </div><!-- /.mm-profile-main-column -->
-
-    <!-- Right-Hand Sidebar Column: Admin Notes -->
-    <div class="mm-profile-sidebar-column">
-        <div class="mm-card mm-admin-notes-sidebar-card">
-            <h3 style="margin:0 0 8px; display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:#0f172a;">
-                📝 <?php esc_html_e('Admin Notes', 'matchmaker'); ?>
-            </h3>
-            <p class="description" style="margin:0 0 12px; font-size:12px; line-height:1.4;">
-                <?php esc_html_e('Internal staff notes for this candidate. Visible only to Matchmakers and Admins.', 'matchmaker'); ?>
-            </p>
-            <div class="mm-admin-notes-editor-wrap">
-                <textarea id="mm-sidebar-admin-notes-textarea" name="mm_sidebar_admin_notes" rows="12" class="large-text mm-admin-notes-textarea" placeholder="<?php esc_attr_e('Enter private notes, observations, or follow-up details for this candidate...', 'matchmaker'); ?>" style="width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; font-size:13px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica Neue',sans-serif; line-height:1.5; resize:vertical;"><?php echo esc_textarea($admin_notes ?? $repo->get_admin_notes($user_id)); ?></textarea>
-            </div>
-            <div style="margin-top:14px; display:flex; align-items:center; gap:10px;">
-                <button type="button" class="button button-primary mm-save-notes-btn" data-user-id="<?php echo (int) $user_id; ?>" data-editor-id="mm-sidebar-admin-notes-textarea">
-                    <?php esc_html_e('Save Notes', 'matchmaker'); ?>
-                </button>
-                <span class="mm-notes-save-status" style="font-size:12px; font-weight:600; display:none;"></span>
-            </div>
-        </div>
-    </div><!-- /.mm-profile-sidebar-column -->
-</div><!-- /.mm-profile-layout-wrap -->
+<!-- Admin Notes Card (Bottom of Match History) -->
+<div class="mm-card mm-admin-notes-card mm-admin-notes-sidebar-card" style="margin-top:20px;">
+    <h3 style="margin:0 0 8px; display:flex; align-items:center; gap:8px; font-size:16px; font-weight:700; color:#0f172a;">
+        📝 <?php esc_html_e('Admin Notes', 'matchmaker'); ?>
+    </h3>
+    <p class="description" style="margin:0 0 12px; font-size:13px; line-height:1.4;">
+        <?php esc_html_e('Internal staff notes for this candidate. Visible only to Matchmakers and Admins.', 'matchmaker'); ?>
+    </p>
+    <div class="mm-admin-notes-editor-wrap">
+        <textarea id="mm-sidebar-admin-notes-textarea" name="mm_sidebar_admin_notes" rows="6" class="large-text mm-admin-notes-textarea" placeholder="<?php esc_attr_e('Enter private notes, observations, or follow-up details for this candidate...', 'matchmaker'); ?>" style="width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; font-size:13px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica Neue',sans-serif; line-height:1.5; resize:vertical;"><?php echo esc_textarea($admin_notes ?? $repo->get_admin_notes($user_id)); ?></textarea>
+    </div>
+    <div style="margin-top:14px; display:flex; align-items:center; gap:10px;">
+        <button type="button" class="button button-primary mm-save-notes-btn" data-user-id="<?php echo (int) $user_id; ?>" data-editor-id="mm-sidebar-admin-notes-textarea">
+            <?php esc_html_e('Save Notes', 'matchmaker'); ?>
+        </button>
+        <span class="mm-notes-save-status" style="font-size:12px; font-weight:600; display:none;"></span>
+    </div>
+</div>

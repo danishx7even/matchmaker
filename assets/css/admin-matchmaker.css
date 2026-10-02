@@ -882,11 +882,38 @@ body.mm-lightbox-open {
     }
 }
 
-.mm-modal-body {
-    overflow-y: auto;
+/* Responsive Table Wrappers & Anti-Compression Rules */
+.mm-table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #ffffff;
 }
 
-@media (max-width: 1100px) {
+.mm-table-responsive table.wp-list-table {
+    width: 100%;
+    border: 0;
+    margin: 0;
+    table-layout: auto !important;
+}
+
+.mm-table-responsive th,
+.mm-table-responsive td {
+    vertical-align: middle;
+    word-break: normal;
+}
+
+.mm-table-responsive th {
+    white-space: nowrap !important;
+    font-weight: 600;
+    color: #334155;
+    background: #f8fafc;
+}
+
+@media (max-width: 1300px) {
     .mm-profile-layout-wrap {
         flex-direction: column;
     }
