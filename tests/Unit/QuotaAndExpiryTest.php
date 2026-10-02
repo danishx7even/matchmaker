@@ -276,15 +276,16 @@ final class QuotaAndExpiryTest extends TestCase
         $sql801 = $GLOBALS['wpdb']->prepare(
             "SELECT COUNT(*) FROM wp_matches
              WHERE (user_one_id = %d OR user_two_id = %d)
-               AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired')
                AND (
-                   (approved_at IS NOT NULL AND approved_at >= %s AND approved_at < %s)
-                   OR (approved_at IS NULL AND created_at >= %s AND created_at < %s)
+                   status IN ('approved', 'matched')
+                   OR (
+                       status IN ('archived', 'rejected', 'expired')
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) >= %s
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) < %s
+                   )
                )",
             801,
             801,
-            $cycle801['start_date'],
-            $cycle801['end_date'],
             $cycle801['start_date'],
             $cycle801['end_date']
         );
@@ -314,15 +315,16 @@ final class QuotaAndExpiryTest extends TestCase
         $sql803 = $GLOBALS['wpdb']->prepare(
             "SELECT COUNT(*) FROM wp_matches
              WHERE (user_one_id = %d OR user_two_id = %d)
-               AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired')
                AND (
-                   (approved_at IS NOT NULL AND approved_at >= %s AND approved_at < %s)
-                   OR (approved_at IS NULL AND created_at >= %s AND created_at < %s)
+                   status IN ('approved', 'matched')
+                   OR (
+                       status IN ('archived', 'rejected', 'expired')
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) >= %s
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) < %s
+                   )
                )",
             803,
             803,
-            $cycle803['start_date'],
-            $cycle803['end_date'],
             $cycle803['start_date'],
             $cycle803['end_date']
         );
@@ -350,6 +352,70 @@ final class QuotaAndExpiryTest extends TestCase
 
         // received_this_term must equal the monthly quota count (2), regardless of pending matches in DB
         $this->assertEquals(2, $stats['received_this_term']);
+    }
+
+    public function test_get_match_stats_heals_quota_and_counts_active_mutual_match(): void
+    {
+        $repo = MatchRepository::instance();
+        $user_id = 902;
+
+        // User currently has 0 in cycle_matches_count but has an active mutual match in database
+        update_user_meta($user_id, 'cycle_matches_count', 0);
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 902"] = [
+            'user_id'   => 902,
+            'user_type' => 'monthly',
+        ];
+
+        // Mock has_active query
+        $sql_active = "SELECT COUNT(*) FROM wp_matches
+                 WHERE (user_one_id = 902 OR user_two_id = 902)
+                   AND status IN ('approved', 'matched')";
+        $GLOBALS['wpdb']->mock_vars[$sql_active] = 1;
+
+        // Mock recalculate_user_quota query
+        $cycle = $repo->get_user_subscription_cycle(902);
+        $sql_recalc = $GLOBALS['wpdb']->prepare(
+            "SELECT COUNT(*) FROM wp_matches
+             WHERE (user_one_id = %d OR user_two_id = %d)
+               AND (
+                   status IN ('approved', 'matched')
+                   OR (
+                       status IN ('archived', 'rejected', 'expired')
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) >= %s
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) < %s
+                   )
+               )",
+            902,
+            902,
+            $cycle['start_date'],
+            $cycle['end_date']
+        );
+        $GLOBALS['wpdb']->mock_vars[$sql_recalc] = 1;
+
+        // Mock total_accepted query
+        $sql_accepted = $GLOBALS['wpdb']->prepare(
+            "SELECT COUNT(*) FROM wp_matches
+                 WHERE (
+                    (user_one_id = %d AND user_one_response IN ('accepted', 'accept'))
+                    OR (user_two_id = %d AND user_two_response IN ('accepted', 'accept'))
+                    OR ((user_one_id = %d OR user_two_id = %d) AND status = 'matched')
+                 )
+                 AND (
+                    status = 'matched'
+                    OR COALESCE(NULLIF(updated_at, '0000-00-00 00:00:00'), NULLIF(approved_at, '0000-00-00 00:00:00'), created_at) >= %s
+                 )",
+            902,
+            902,
+            902,
+            902,
+            $cycle['start_date']
+        );
+        $GLOBALS['wpdb']->mock_vars[$sql_accepted] = 1;
+
+        $stats = $repo->get_match_stats($user_id);
+
+        $this->assertEquals(1, $stats['received_this_term']);
+        $this->assertEquals(1, $stats['total_accepted']);
     }
 }
 

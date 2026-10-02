@@ -704,19 +704,22 @@ class MatchRepository
 
         $cycle = $this->get_user_subscription_cycle($user_id);
 
-        // Count approved/matched/archived/rejected/expired matches approved or created in the active subscription cycle
+        // Count all matches that consume the active quota:
+        // (a) Currently active approved or mutual matches (status IN ('approved', 'matched'))
+        // (b) Matches completed/archived/rejected/expired in this active subscription cycle
         $count = (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$matches_table}
              WHERE (user_one_id = %d OR user_two_id = %d)
-               AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired')
                AND (
-                   (approved_at IS NOT NULL AND approved_at >= %s AND approved_at < %s)
-                   OR (approved_at IS NULL AND created_at >= %s AND created_at < %s)
+                   status IN ('approved', 'matched')
+                   OR (
+                       status IN ('archived', 'rejected', 'expired')
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) >= %s
+                       AND COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at) < %s
+                   )
                )",
             $user_id,
             $user_id,
-            $cycle['start_date'],
-            $cycle['end_date'],
             $cycle['start_date'],
             $cycle['end_date']
         ));
@@ -2411,10 +2414,24 @@ class MatchRepository
     {
         global $wpdb;
         $table       = $wpdb->prefix . 'matches';
-        $month_start = gmdate('Y-m-01 00:00:00');
+        $cycle       = $this->get_user_subscription_cycle($user_id);
+        $cycle_start = $cycle['start_date'];
 
-        // 1. Count of matches received this month (using monthly quota count: approved / delivered matches)
+        // 1. Count of matches received this term/cycle (using monthly quota count: approved / delivered matches)
         $received_this_term = $this->maybe_reset_monthly_quota($user_id);
+
+        // Self-heal: If quota count is 0 but an active approved or mutual match exists, recalculate
+        if ($received_this_term === 0) {
+            $has_active = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table}
+                 WHERE (user_one_id = %d OR user_two_id = %d)
+                   AND status IN ('approved', 'matched')",
+                $user_id, $user_id
+            ));
+            if ($has_active > 0) {
+                $received_this_term = $this->recalculate_user_quota($user_id);
+            }
+        }
 
         // 2. Remaining days to respond to current active approved match
         $active_row = $wpdb->get_row(
@@ -2437,13 +2454,20 @@ class MatchRepository
             $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
         }
 
-        // 3. Count of total matches accepted by the user in the current month
+        // 3. Count of total matches accepted by the user in the current subscription cycle
         $total_accepted = (int) $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM {$table}
-                 WHERE ((user_one_id = %d AND user_one_response IN ('accepted', 'accept')) OR (user_two_id = %d AND user_two_response IN ('accepted', 'accept')))
-                   AND updated_at >= %s",
-                $user_id, $user_id, $month_start
+                 WHERE (
+                    (user_one_id = %d AND user_one_response IN ('accepted', 'accept'))
+                    OR (user_two_id = %d AND user_two_response IN ('accepted', 'accept'))
+                    OR ((user_one_id = %d OR user_two_id = %d) AND status = 'matched')
+                 )
+                 AND (
+                    status = 'matched'
+                    OR COALESCE(NULLIF(updated_at, '0000-00-00 00:00:00'), NULLIF(approved_at, '0000-00-00 00:00:00'), created_at) >= %s
+                 )",
+                $user_id, $user_id, $user_id, $user_id, $cycle_start
             )
         );
 
@@ -2639,8 +2663,10 @@ class MatchRepository
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM {$table}
                  WHERE (user_one_id = %d OR user_two_id = %d)
-                   AND status = 'matched'
-                   AND updated_at >= %s",
+                   AND (
+                       status = 'matched'
+                       OR (status = 'archived' AND COALESCE(NULLIF(updated_at, '0000-00-00 00:00:00'), NULLIF(approved_at, '0000-00-00 00:00:00'), created_at) >= %s)
+                   )",
                 $user_id,
                 $user_id,
                 $cycle['start_date']

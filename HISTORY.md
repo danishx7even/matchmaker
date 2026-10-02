@@ -6,6 +6,23 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 126: Fix Active Mutual Match Quota Recalculation & Dashboard Stat Cards
+- **Objective**:
+  1. Fix `recalculate_user_quota()` so that active approved and mutual matches (`status IN ('approved', 'matched')`) are always counted in the active quota, regardless of whether their creation date preceded the calculated 30-day window.
+  2. Implement robust SQL datetime comparisons using `COALESCE(NULLIF(approved_at, '0000-00-00 00:00:00'), NULLIF(created_at, '0000-00-00 00:00:00'), updated_at)` to prevent zeroes from empty strings or zero-datetime values.
+  3. Fix `get_match_stats()` to anchor `total_accepted` to the subscription cycle and self-heal quota count if an active match exists.
+  4. Update `has_mutual_match_this_cycle()` to accurately recognize active `status = 'matched'` records.
+  5. Conduct full-system audit across frontend and backend matchmaking workflows.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `recalculate_user_quota(int $user_id)` query to count all active `status IN ('approved', 'matched')` matches plus completed matches within the cycle.
+    - Updated `get_match_stats(int $user_id)` to self-heal quota if active matches exist and anchor `total_accepted` to `$cycle['start_date']`.
+    - Updated `has_mutual_match_this_cycle(int $user_id)` to recognize active `status = 'matched'` matches.
+  - `tests/Unit/QuotaAndExpiryTest.php`:
+    - Updated mock SQL strings to match the new query format.
+    - Added `test_get_match_stats_heals_quota_and_counts_active_mutual_match()` unit test.
+- **Verification**: Ran automated test suite with **219/219 tests passing** (0 failures, 0 errors).
+
 ### Task 125: Subscription-Cycle-Aligned Quota Calculation & Past Mutual Match Archiving
 - **Objective**:
   1. Anchor member match quota cycles to their individual PMPro subscription renewal dates / start dates instead of calendar month rollovers (`gmdate('Y-m')`), preventing premature quota resets when members join near month-end.
