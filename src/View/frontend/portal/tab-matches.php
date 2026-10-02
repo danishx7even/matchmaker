@@ -161,6 +161,28 @@ if ($is_mutual) {
                                         </span>
                                     </div>
                                 </div>
+                                <?php if (!empty($hist_item['is_mutual']) && (!empty($hist_item['phone_number']) || !empty($hist_item['user_social_links']) || !empty($hist_item['user_email']))) : ?>
+                                    <div class="mm-history-contacts-wrap" style="margin-top:10px; padding:10px 14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; font-size:13px; color:#166534; display:flex; flex-wrap:wrap; align-items:center; gap:12px;">
+                                        <span style="font-weight:700; color:#15803d; display:inline-flex; align-items:center; gap:4px;">
+                                            🎉 <?php esc_html_e('Contact Revealed:', 'matchmaker'); ?>
+                                        </span>
+                                        <?php if (!empty($hist_item['phone_number'])) : ?>
+                                            <span style="display:inline-flex; align-items:center; gap:4px;">
+                                                📞 <strong><?php echo esc_html($hist_item['phone_number']); ?></strong>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($hist_item['user_email'])) : ?>
+                                            <span style="display:inline-flex; align-items:center; gap:4px;">
+                                                ✉️ <a href="mailto:<?php echo esc_attr($hist_item['user_email']); ?>" style="color:#15803d; text-decoration:underline; font-weight:600;"><?php echo esc_html($hist_item['user_email']); ?></a>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($hist_item['user_social_links'])) : ?>
+                                            <span style="display:inline-flex; align-items:center; gap:4px;">
+                                                🔗 <?php echo \Matchmaker\Repository\MatchRepository::instance()->format_social_links_html($hist_item['user_social_links']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             <div class="mm-history-status">
                                 <span class="mm-history-badge <?php echo esc_attr($hist_item['status_class'] ?? 'mm-history-badge-approved'); ?>">

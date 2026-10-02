@@ -287,17 +287,17 @@ class MatchingEngine {
             return;
         }
 
-        // 3. Mutual match gate — if user already has an accepted mutual match this month, skip generating more matches.
-        if (\Matchmaker\Repository\MatchRepository::instance()->has_mutual_match_this_month($user_id)) {
+        // 3. Mutual match gate — if user already has an active mutual match in the current subscription cycle, skip generating more matches.
+        if (\Matchmaker\Repository\MatchRepository::instance()->has_mutual_match_this_cycle($user_id)) {
             if (class_exists(FileLoggerService::class)) {
-                FileLoggerService::info('Match engine: skipping user #' . $user_id . ' — already has an active mutual match this month.', ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
+                FileLoggerService::info('Match engine: skipping user #' . $user_id . ' — already has an active mutual match in the current subscription cycle.', ['user_id' => $user_id, 'trigger' => $trigger], 'match_engine');
             }
-            error_log("[Matchmaker] Skipping user #{$user_id} — user already has a mutually accepted match this month.");
+            error_log("[Matchmaker] Skipping user #{$user_id} — user already has an active mutual match in the current subscription cycle.");
             \Matchmaker\Repository\MatchRepository::instance()->log_event(
                 'match_engine',
                 'matching_skipped',
-                sprintf(__('Matching Skipped for User #%d: Already mutually matched this month', 'matchmaker'), $user_id),
-                __('User already has a mutually accepted match in the current calendar cycle.', 'matchmaker'),
+                sprintf(__('Matching Skipped for User #%d: Already mutually matched this cycle', 'matchmaker'), $user_id),
+                __('User already has an active mutual match in the current subscription billing cycle.', 'matchmaker'),
                 ['user_id' => $user_id, 'trigger' => $trigger],
                 null,
                 $user_id,

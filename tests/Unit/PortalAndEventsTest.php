@@ -651,7 +651,7 @@ final class PortalAndEventsTest extends TestCase
         $active_match_id = 50;
 
         // Mock past match rows for user 1001
-        $wpdb->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = 1001 OR user_two_id = 1001) AND status IN ('approved', 'matched', 'rejected', 'expired') AND id != 50\n                 ORDER BY COALESCE(approved_at, created_at) DESC, id DESC"] = [
+        $wpdb->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = 1001 OR user_two_id = 1001) AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired') AND id != 50\n                 ORDER BY COALESCE(approved_at, created_at) DESC, id DESC"] = [
             [
                 'id'                => 49,
                 'user_one_id'       => 1001,

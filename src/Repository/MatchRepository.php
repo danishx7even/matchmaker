@@ -471,19 +471,147 @@ class MatchRepository
     }
 
     /**
-     * Check and reset monthly quota if user has entered a new PMPro cycle month.
+     * Resolves the start and end timestamps of a user's active subscription billing cycle.
+     * Anchored to PMPro subscription next payment date / level startdate, with fallback to 30-day recurring periods.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return array{start_ts: int, end_ts: int, start_date: string, end_date: string}
+     */
+    public function get_user_subscription_cycle(int $user_id): array
+    {
+        if ($user_id <= 0) {
+            $now = current_time('timestamp');
+            return [
+                'start_ts'   => $now,
+                'end_ts'     => $now + (30 * DAY_IN_SECONDS),
+                'start_date' => date('Y-m-d H:i:s', $now),
+                'end_date'   => date('Y-m-d H:i:s', $now + (30 * DAY_IN_SECONDS)),
+            ];
+        }
+
+        $now = current_time('timestamp');
+
+        // 1. Check if user has explicitly stored cycle boundaries
+        $stored_start_ts = (int) get_user_meta($user_id, 'mm_subscription_cycle_start', true);
+        $stored_end_ts   = (int) get_user_meta($user_id, 'mm_subscription_cycle_end', true);
+
+        if ($stored_start_ts > 0 && $stored_end_ts > $stored_start_ts) {
+            // If current time is within this stored cycle
+            if ($now >= $stored_start_ts && $now < $stored_end_ts) {
+                return [
+                    'start_ts'   => $stored_start_ts,
+                    'end_ts'     => $stored_end_ts,
+                    'start_date' => date('Y-m-d H:i:s', $stored_start_ts),
+                    'end_date'   => date('Y-m-d H:i:s', $stored_end_ts),
+                ];
+            }
+        }
+
+        // 2. Resolve anchor timestamp from PMPro level or subscription
+        $anchor_ts = 0;
+        $monthly_levels = \Matchmaker\Core\PMProSync::instance()->get_levels_for_tier('monthly');
+        $primary_level_id = !empty($monthly_levels) ? reset($monthly_levels) : 3;
+
+        // Check PMPro_Subscription for next payment date
+        if (class_exists('PMPro_Subscription') && method_exists('PMPro_Subscription', 'get_subscriptions_for_user')) {
+            $subs = \PMPro_Subscription::get_subscriptions_for_user($user_id, $primary_level_id);
+            if (!empty($subs) && is_object($subs[0]) && method_exists($subs[0], 'get_next_payment_date')) {
+                $next_date_str = $subs[0]->get_next_payment_date('Y-m-d H:i:s');
+                if (!empty($next_date_str) && $next_date_str !== '—') {
+                    $next_ts = strtotime($next_date_str);
+                    if ($next_ts > 0) {
+                        $cycle_start = $next_ts - (30 * DAY_IN_SECONDS);
+                        while ($next_ts <= $now) {
+                            $cycle_start = $next_ts;
+                            $next_ts += (30 * DAY_IN_SECONDS);
+                        }
+                        return [
+                            'start_ts'   => $cycle_start,
+                            'end_ts'     => $next_ts,
+                            'start_date' => date('Y-m-d H:i:s', $cycle_start),
+                            'end_date'   => date('Y-m-d H:i:s', $next_ts),
+                        ];
+                    }
+                }
+            }
+        }
+
+        // Check PMPro level startdate
+        if (function_exists('pmpro_getMembershipLevelForUser')) {
+            $level = pmpro_getMembershipLevelForUser($user_id);
+            if (is_object($level) && !empty($level->startdate)) {
+                $anchor_ts = is_numeric($level->startdate) ? (int) $level->startdate : strtotime((string) $level->startdate);
+            }
+        }
+
+        // Fallback to user registration date if anchor is not yet set
+        if ($anchor_ts <= 0) {
+            $user_obj = get_userdata($user_id);
+            if ($user_obj && !empty($user_obj->user_registered)) {
+                $anchor_ts = strtotime($user_obj->user_registered);
+            }
+        }
+
+        if ($anchor_ts <= 0) {
+            $anchor_ts = $now;
+        }
+
+        // Calculate 30-day recurring window containing $now based on $anchor_ts
+        $cycle_len = 30 * DAY_IN_SECONDS;
+        if ($anchor_ts > $now) {
+            $start_ts = $anchor_ts;
+            $end_ts   = $anchor_ts + $cycle_len;
+        } else {
+            $elapsed_cycles = (int) floor(($now - $anchor_ts) / $cycle_len);
+            $start_ts = $anchor_ts + ($elapsed_cycles * $cycle_len);
+            $end_ts   = $start_ts + $cycle_len;
+        }
+
+        return [
+            'start_ts'   => $start_ts,
+            'end_ts'     => $end_ts,
+            'start_date' => date('Y-m-d H:i:s', $start_ts),
+            'end_date'   => date('Y-m-d H:i:s', $end_ts),
+        ];
+    }
+
+    /**
+     * Check and reset subscription cycle quota if user has entered a new subscription billing cycle.
+     * Automatically archives previous cycle mutual matches so they appear in Match History.
      *
      * @param int $user_id WordPress user ID.
      * @return int Current quota count for the term.
      */
     public function maybe_reset_monthly_quota(int $user_id): int
     {
-        $last_cycle_month = (string) get_user_meta($user_id, 'mm_cycle_month', true);
-        $current_month    = gmdate('Y-m');
+        if ($user_id <= 0) {
+            return 0;
+        }
 
-        if ($last_cycle_month !== $current_month) {
+        $now   = current_time('timestamp');
+        $cycle = $this->get_user_subscription_cycle($user_id);
+
+        $stored_cycle_start = (int) get_user_meta($user_id, 'mm_subscription_cycle_start', true);
+
+        // If cycle metadata was not stamped yet, initialize it without resetting existing counter
+        if ($stored_cycle_start <= 0) {
+            update_user_meta($user_id, 'mm_subscription_cycle_start', $cycle['start_ts']);
+            update_user_meta($user_id, 'mm_subscription_cycle_end', $cycle['end_ts']);
+            update_user_meta($user_id, 'mm_cycle_month', date('Y-m', $cycle['start_ts']));
+            return (int) get_user_meta($user_id, 'cycle_matches_count', true);
+        }
+
+        // If stored cycle start is strictly before the current active cycle start, a new cycle has started!
+        if ($stored_cycle_start < $cycle['start_ts']) {
+            // 1. Archive any mutual match from previous cycles so it moves to match history
+            $this->archive_previous_cycle_mutual_matches($user_id, $cycle['start_date']);
+
+            // 2. Reset match counter to 0 for the new cycle
             update_user_meta($user_id, 'cycle_matches_count', 0);
-            update_user_meta($user_id, 'mm_cycle_month', $current_month);
+            update_user_meta($user_id, 'mm_subscription_cycle_start', $cycle['start_ts']);
+            update_user_meta($user_id, 'mm_subscription_cycle_end', $cycle['end_ts']);
+            update_user_meta($user_id, 'mm_cycle_month', date('Y-m', $cycle['start_ts']));
+
             return 0;
         }
 
@@ -491,7 +619,63 @@ class MatchRepository
     }
 
     /**
-     * Recalculate and update the active monthly cycle match count for a user based on actual matches.
+     * Archives any previous cycle's mutual match for a user so that the active match slot
+     * is cleared for the new subscription cycle, while preserving the mutual match in Match History.
+     *
+     * @param int    $user_id
+     * @param string $cycle_start_date
+     * @return int Number of matches archived.
+     */
+    public function archive_previous_cycle_mutual_matches(int $user_id, string $cycle_start_date): int
+    {
+        if ($user_id <= 0) {
+            return 0;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'matches';
+
+        // Find mutual matches updated before current cycle start date
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id FROM {$table}
+                 WHERE (user_one_id = %d OR user_two_id = %d)
+                   AND status = 'matched'
+                   AND (updated_at < %s OR (updated_at IS NULL AND created_at < %s))",
+                $user_id,
+                $user_id,
+                $cycle_start_date,
+                $cycle_start_date
+            ),
+            ARRAY_A
+        );
+
+        if (empty($rows)) {
+            return 0;
+        }
+
+        $archived = 0;
+        foreach ($rows as $r) {
+            $mid = (int) ($r['id'] ?? 0);
+            if ($mid > 0) {
+                $wpdb->update(
+                    $table,
+                    [
+                        'status'           => 'archived',
+                        'contact_revealed' => 1,
+                        'updated_at'       => current_time('mysql'),
+                    ],
+                    ['id' => $mid]
+                );
+                $archived++;
+            }
+        }
+
+        return $archived;
+    }
+
+    /**
+     * Recalculate and update the active subscription cycle match count for a user based on actual matches.
      *
      * @param int $user_id WordPress user ID.
      * @return int Recalculated match count.
@@ -518,25 +702,29 @@ class MatchRepository
             return 0;
         }
 
-        $current_month = gmdate('Y-m');
+        $cycle = $this->get_user_subscription_cycle($user_id);
 
-        // Count approved/matched/rejected/expired matches approved or created in the active cycle month
+        // Count approved/matched/archived/rejected/expired matches approved or created in the active subscription cycle
         $count = (int) $wpdb->get_var($wpdb->prepare(
             "SELECT COUNT(*) FROM {$matches_table}
              WHERE (user_one_id = %d OR user_two_id = %d)
-               AND status IN ('approved', 'matched', 'rejected', 'expired')
+               AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired')
                AND (
-                   (approved_at IS NOT NULL AND DATE_FORMAT(approved_at, '%%Y-%%m') = %s)
-                   OR (approved_at IS NULL AND DATE_FORMAT(created_at, '%%Y-%%m') = %s)
+                   (approved_at IS NOT NULL AND approved_at >= %s AND approved_at < %s)
+                   OR (approved_at IS NULL AND created_at >= %s AND created_at < %s)
                )",
             $user_id,
             $user_id,
-            $current_month,
-            $current_month
+            $cycle['start_date'],
+            $cycle['end_date'],
+            $cycle['start_date'],
+            $cycle['end_date']
         ));
 
         update_user_meta($user_id, 'cycle_matches_count', $count);
-        update_user_meta($user_id, 'mm_cycle_month', $current_month);
+        update_user_meta($user_id, 'mm_subscription_cycle_start', $cycle['start_ts']);
+        update_user_meta($user_id, 'mm_subscription_cycle_end', $cycle['end_ts']);
+        update_user_meta($user_id, 'mm_cycle_month', date('Y-m', $cycle['start_ts']));
 
         return $count;
     }
@@ -1282,7 +1470,7 @@ class MatchRepository
 
         $where = [
             "(user_one_id = %d OR user_two_id = %d)",
-            "status IN ('approved', 'matched', 'rejected', 'expired')",
+            "status IN ('approved', 'matched', 'archived', 'rejected', 'expired')",
         ];
         $args = [$user_id, $user_id];
 
@@ -1317,9 +1505,11 @@ class MatchRepository
             $their_response = strtolower(trim((string) ($is_user_one ? ($row['user_two_response'] ?? 'pending') : ($row['user_one_response'] ?? 'pending'))));
             $status         = (string) ($row['status'] ?? 'approved');
 
-            // Determine if mutual match
-            if (in_array($my_response, ['accepted', 'accept'], true) && in_array($their_response, ['accepted', 'accept'], true)) {
-                $status = 'matched';
+            // Determine if mutual match (including archived mutual matches)
+            $is_mutual = false;
+            if (in_array($status, ['matched', 'archived'], true) || (in_array($my_response, ['accepted', 'accept'], true) && in_array($their_response, ['accepted', 'accept'], true))) {
+                $status    = 'matched';
+                $is_mutual = true;
             }
 
             $other_user = get_userdata($other_id);
@@ -1396,6 +1586,10 @@ class MatchRepository
                 'status'               => $status,
                 'status_label'         => $status_label,
                 'status_class'         => $status_class,
+                'is_mutual'            => $is_mutual,
+                'phone_number'         => $is_mutual ? (string) get_user_meta($other_id, 'phone_number', true) : '',
+                'user_social_links'    => $is_mutual ? (string) get_user_meta($other_id, 'user_social_links', true) : '',
+                'user_email'           => $is_mutual ? (string) ($other_user ? $other_user->user_email : '') : '',
                 'my_response'          => $my_response,
                 'my_response_label'    => $my_fmt['label'],
                 'my_response_class'    => $my_fmt['class'],
@@ -2426,20 +2620,20 @@ class MatchRepository
     }
 
     /**
-     * Check if a user has a mutually accepted match ('matched' status) in the current calendar month.
+     * Check if a user has an active, non-archived mutual match in their current subscription billing cycle.
      *
      * @param int $user_id WordPress user ID.
-     * @return bool True if a mutual match exists this month, false otherwise.
+     * @return bool True if an active mutual match exists in the current cycle, false otherwise.
      */
-    public function has_mutual_match_this_month(int $user_id): bool
+    public function has_mutual_match_this_cycle(int $user_id): bool
     {
         if ($user_id <= 0) {
             return false;
         }
 
         global $wpdb;
-        $table       = $wpdb->prefix . 'matches';
-        $month_start = gmdate('Y-m-01 00:00:00');
+        $table = $wpdb->prefix . 'matches';
+        $cycle = $this->get_user_subscription_cycle($user_id);
 
         $count = (int) $wpdb->get_var(
             $wpdb->prepare(
@@ -2449,11 +2643,23 @@ class MatchRepository
                    AND updated_at >= %s",
                 $user_id,
                 $user_id,
-                $month_start
+                $cycle['start_date']
             )
         );
 
         return $count > 0;
+    }
+
+    /**
+     * Check if a user has a mutually accepted match ('matched' status) in the active cycle.
+     * Alias for has_mutual_match_this_cycle.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return bool True if a mutual match exists in the current cycle, false otherwise.
+     */
+    public function has_mutual_match_this_month(int $user_id): bool
+    {
+        return $this->has_mutual_match_this_cycle($user_id);
     }
 
     // =========================================================================

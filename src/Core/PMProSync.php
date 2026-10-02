@@ -1798,7 +1798,7 @@ class PMProSync {
     }
 
     /**
-     * Resets user quota counter to 0 on subscription renewal.
+     * Resets user quota counter to 0 on subscription renewal and archives previous cycle mutual matches.
      *
      * @param int|object $user_or_order User ID or order object.
      * @return void
@@ -1813,8 +1813,19 @@ class PMProSync {
         }
 
         if ($user_id > 0) {
+            $now = current_time('timestamp');
+            $new_end = $now + (30 * DAY_IN_SECONDS);
+
+            // Archive any mutual matches from the previous billing cycle into history
+            \Matchmaker\Repository\MatchRepository::instance()->archive_previous_cycle_mutual_matches(
+                $user_id,
+                date('Y-m-d H:i:s', $now)
+            );
+
             update_user_meta($user_id, 'cycle_matches_count', 0);
-            update_user_meta($user_id, 'mm_cycle_month', gmdate('Y-m'));
+            update_user_meta($user_id, 'mm_subscription_cycle_start', $now);
+            update_user_meta($user_id, 'mm_subscription_cycle_end', $new_end);
+            update_user_meta($user_id, 'mm_cycle_month', gmdate('Y-m', $now));
         }
     }
 

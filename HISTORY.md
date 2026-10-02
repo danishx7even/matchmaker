@@ -6,6 +6,33 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 125: Subscription-Cycle-Aligned Quota Calculation & Past Mutual Match Archiving
+- **Objective**:
+  1. Anchor member match quota cycles to their individual PMPro subscription renewal dates / start dates instead of calendar month rollovers (`gmdate('Y-m')`), preventing premature quota resets when members join near month-end.
+  2. When a member enters a new subscription renewal cycle, automatically archive any existing mutual match (`status = 'matched'` $\rightarrow$ `status = 'archived'`) into their Matches History, clearing the active match slot for fresh curations in the new cycle.
+  3. In Matches History on the Member Portal, render full revealed contact details (phone number, email address, social links) for past/archived mutual matches so members never lose access to their matches' contact information.
+  4. Ensure the Matching Engine checks `has_mutual_match_this_cycle()` instead of `has_mutual_match_this_month()`, allowing fresh match generation in new subscription cycles.
+  5. Update Admin quota recalculation tools to calculate based on individual subscription cycles.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Added `get_user_subscription_cycle(int $user_id): array` to resolve active cycle start/end timestamps from `PMPro_Subscription`, level `startdate`, or user registration date with 30-day recurring windows.
+    - Updated `maybe_reset_monthly_quota(int $user_id): int` to reset only when `mm_subscription_cycle_start` advances to a new cycle.
+    - Added `archive_previous_cycle_mutual_matches(int $user_id, string $cycle_start_date): int` to transition old mutual matches to `'archived'`.
+    - Added `has_mutual_match_this_cycle(int $user_id): bool` and aliased `has_mutual_match_this_month()`.
+    - Updated `recalculate_user_quota(int $user_id): int` to count approved matches within the member's subscription billing cycle.
+    - Updated `find_match_history_for_user(int $user_id, int $exclude_match_id = 0): array` to include `status = 'archived'`, treat it as mutual match, and enrich with phone number, email, and social links.
+  - `src/Core/MatchingEngine.php`:
+    - Switched mutual match gate from calendar check to `has_mutual_match_this_cycle($user_id)`.
+  - `src/Core/PMProSync.php`:
+    - Updated `reset_user_quota_on_renewal()` to archive previous cycle mutual matches and stamp `mm_subscription_cycle_start` and `mm_subscription_cycle_end`.
+  - `src/View/frontend/portal/tab-matches.php`:
+    - Added contact details block (phone, email, social links) inside the Matches History item for all past mutual matches.
+  - `tests/Unit/SettingsAndPlanMappingTest.php`:
+    - Added `test_subscription_cycle_anchored_quota_does_not_reset_on_calendar_month_boundary()`.
+    - Added `test_subscription_cycle_rollover_resets_quota_and_archives_previous_mutual_matches()`.
+    - Added `test_archived_mutual_match_renders_contact_information_in_portal_history()`.
+- **Verification**: Ran automated test suite with **218/218 tests passing** (0 failures, 0 errors).
+
 ### Task 124: Defer Membership Cancellation to End of Current Paid Billing Period
 - **Objective**:
   1. Intercept PMPro membership cancellation when a member cancels a recurring paid tier (`monthly` or `event`).

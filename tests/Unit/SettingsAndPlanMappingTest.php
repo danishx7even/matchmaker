@@ -908,6 +908,105 @@ final class SettingsAndPlanMappingTest extends TestCase
 
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
+
+    public function test_subscription_cycle_anchored_quota_does_not_reset_on_calendar_month_boundary(): void
+    {
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $user_id = 950;
+
+        // User started subscription 10 days ago (e.g. Oct 26)
+        $start_ts = time() - (10 * 86400);
+        $end_ts   = $start_ts + (30 * 86400); // 20 days in future
+
+        update_user_meta($user_id, 'mm_subscription_cycle_start', $start_ts);
+        update_user_meta($user_id, 'mm_subscription_cycle_end', $end_ts);
+        update_user_meta($user_id, 'cycle_matches_count', 4);
+
+        // Even if calendar month changes, quota must NOT reset because current time is inside the 30-day window
+        $quota = $repo->maybe_reset_monthly_quota($user_id);
+        $this->assertEquals(4, $quota, 'Quota should be retained while within active subscription cycle');
+        $this->assertEquals(4, (int) get_user_meta($user_id, 'cycle_matches_count', true));
+    }
+
+    public function test_subscription_cycle_rollover_resets_quota_and_archives_previous_mutual_matches(): void
+    {
+        global $wpdb;
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $user_id = 951;
+
+        // User previous cycle was 35 days ago (expired 5 days ago)
+        $old_start_ts = time() - (35 * 86400);
+        $old_end_ts   = time() - (5 * 86400);
+
+        update_user_meta($user_id, 'mm_subscription_cycle_start', $old_start_ts);
+        update_user_meta($user_id, 'mm_subscription_cycle_end', $old_end_ts);
+        update_user_meta($user_id, 'cycle_matches_count', 7);
+
+        // Mock old mutual match in previous cycle
+        $wpdb->mock_results["SELECT id FROM wp_matches\n                 WHERE (user_one_id = 951 OR user_two_id = 951)\n                   AND status = 'matched'\n                   AND (updated_at < '" . date('Y-m-d H:i:s', time() - (5 * 86400)) . "' OR (updated_at IS NULL AND created_at < '" . date('Y-m-d H:i:s', time() - (5 * 86400)) . "'))"] = [
+            ['id' => 88],
+        ];
+
+        // When checking or resetting quota, new cycle starts
+        $quota = $repo->maybe_reset_monthly_quota($user_id);
+        $this->assertEquals(0, $quota, 'Quota must reset to 0 when entering a new cycle');
+        $this->assertEquals(0, (int) get_user_meta($user_id, 'cycle_matches_count', true));
+        $this->assertGreaterThanOrEqual(time() - (5 * 86400), (int) get_user_meta($user_id, 'mm_subscription_cycle_start', true));
+    }
+
+    public function test_archived_mutual_match_renders_contact_information_in_portal_history(): void
+    {
+        global $wpdb;
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $user_id = 952;
+        $candidate_id = 953;
+
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 953"] = [
+            'user_id'    => 953,
+            'city'       => 'Amman',
+            'state'      => '',
+            'country'    => 'Jordan',
+            'birth_date' => '1996-07-12',
+        ];
+
+        update_user_meta($candidate_id, 'phone_number', '+962 7 9123 4567');
+        update_user_meta($candidate_id, 'user_social_links', 'Instagram: @candidate_jo');
+
+        $wpdb->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = 952 OR user_two_id = 952) AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired')\n                 ORDER BY COALESCE(approved_at, created_at) DESC, id DESC"] = [
+            [
+                'id'                => 101,
+                'user_one_id'       => 952,
+                'user_two_id'       => 953,
+                'status'            => 'archived',
+                'user_one_response' => 'accepted',
+                'user_two_response' => 'accepted',
+                'approved_at'       => '2026-08-15 10:00:00',
+                'created_at'        => '2026-08-14 10:00:00',
+                'updated_at'        => '2026-08-16 12:00:00',
+            ],
+        ];
+
+        $history = $repo->find_match_history_for_user($user_id);
+        $this->assertCount(1, $history);
+        $this->assertTrue($history[0]['is_mutual']);
+        $this->assertEquals('+962 7 9123 4567', $history[0]['phone_number']);
+        $this->assertEquals('Instagram: @candidate_jo', $history[0]['user_social_links']);
+
+        // Verify HTML rendering in tab-matches
+        $match_history = $history;
+        $matches = [];
+        $is_premium = true;
+        $user_type = 'monthly';
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-matches.php';
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('mm-history-contacts-wrap', $html);
+        $this->assertStringContainsString('Contact Revealed:', $html);
+        $this->assertStringContainsString('+962 7 9123 4567', $html);
+        $this->assertStringContainsString('@candidate_jo', $html);
+    }
 }
 
 

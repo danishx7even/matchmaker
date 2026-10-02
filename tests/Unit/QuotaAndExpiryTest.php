@@ -272,18 +272,21 @@ final class QuotaAndExpiryTest extends TestCase
             'user_type' => 'monthly',
         ];
 
+        $cycle801 = $repo->get_user_subscription_cycle(801);
         $sql801 = $GLOBALS['wpdb']->prepare(
             "SELECT COUNT(*) FROM wp_matches
              WHERE (user_one_id = %d OR user_two_id = %d)
-               AND status IN ('approved', 'matched', 'rejected', 'expired')
+               AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired')
                AND (
-                   (approved_at IS NOT NULL AND DATE_FORMAT(approved_at, '%%Y-%%m') = %s)
-                   OR (approved_at IS NULL AND DATE_FORMAT(created_at, '%%Y-%%m') = %s)
+                   (approved_at IS NOT NULL AND approved_at >= %s AND approved_at < %s)
+                   OR (approved_at IS NULL AND created_at >= %s AND created_at < %s)
                )",
             801,
             801,
-            $cur_month,
-            $cur_month
+            $cycle801['start_date'],
+            $cycle801['end_date'],
+            $cycle801['start_date'],
+            $cycle801['end_date']
         );
         $GLOBALS['wpdb']->mock_vars[$sql801] = 3;
 
@@ -307,18 +310,21 @@ final class QuotaAndExpiryTest extends TestCase
             'user_id'   => 803,
             'user_type' => 'monthly',
         ];
+        $cycle803 = $repo->get_user_subscription_cycle(803);
         $sql803 = $GLOBALS['wpdb']->prepare(
             "SELECT COUNT(*) FROM wp_matches
              WHERE (user_one_id = %d OR user_two_id = %d)
-               AND status IN ('approved', 'matched', 'rejected', 'expired')
+               AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired')
                AND (
-                   (approved_at IS NOT NULL AND DATE_FORMAT(approved_at, '%%Y-%%m') = %s)
-                   OR (approved_at IS NULL AND DATE_FORMAT(created_at, '%%Y-%%m') = %s)
+                   (approved_at IS NOT NULL AND approved_at >= %s AND approved_at < %s)
+                   OR (approved_at IS NULL AND created_at >= %s AND created_at < %s)
                )",
             803,
             803,
-            $cur_month,
-            $cur_month
+            $cycle803['start_date'],
+            $cycle803['end_date'],
+            $cycle803['start_date'],
+            $cycle803['end_date']
         );
         $GLOBALS['wpdb']->mock_vars[$sql803] = 1;
 
