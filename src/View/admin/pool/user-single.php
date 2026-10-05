@@ -44,7 +44,9 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
                 </span>
             <?php endif; ?>
             <?php 
-            $user_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($user_id);
+            $pmpro_sync = \Matchmaker\Core\PMProSync::instance();
+            $user_services = $pmpro_sync->get_user_active_services($user_id);
+            $cancel_info   = $pmpro_sync->get_user_cancellation_info($user_id);
             if (!empty($user_services)) :
                 foreach ($user_services as $usrv) :
             ?>
@@ -54,7 +56,12 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
             <?php 
                 endforeach;
             endif; 
+            if (!empty($cancel_info)) :
             ?>
+                <span class="mm-badge mm-badge-cancelled-active" style="font-size:11px; padding:3px 9px;">
+                    ⚠️ <?php echo esc_html(!empty($cancel_info['expires_at']) ? sprintf(__('Cancelled (Active until %s)', 'matchmaker'), $cancel_info['expires_at']) : __('Subscription Cancelled', 'matchmaker')); ?>
+                </span>
+            <?php endif; ?>
         </h2>
         <p class="description" style="margin:0;">
             <strong><?php esc_html_e('Email:', 'matchmaker'); ?></strong> <?php echo esc_html($user_obj->user_email); ?> &nbsp;|&nbsp; 
@@ -81,26 +88,23 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
     </div>
 </div>
 
-<?php 
-$cancel_reason  = (string) get_user_meta($user_id, 'mm_cancellation_reason', true);
-$cancel_details = (string) get_user_meta($user_id, 'mm_cancellation_details', true);
-$cancel_date    = (string) get_user_meta($user_id, 'mm_cancellation_date', true);
-$cancel_expires = (string) get_user_meta($user_id, 'mm_subscription_expires_at', true);
-?>
-<?php if (!empty($cancel_reason) || !empty($cancel_details)) : ?>
+<?php if (!empty($cancel_info)) : ?>
     <div class="notice notice-warning inline" style="margin-bottom:20px; padding:12px 16px; background:#fffbeb; border-left:4px solid #f59e0b; border-radius:4px;">
         <h4 style="margin:0 0 4px; color:#b45309; font-size:14px; font-weight:700;">
             ⚠️ <?php esc_html_e('Membership Cancellation Notice', 'matchmaker'); ?>
         </h4>
         <p style="margin:0 0 4px; font-size:13px; color:#92400e;">
-            <strong><?php esc_html_e('Reason:', 'matchmaker'); ?></strong> <?php echo esc_html($cancel_reason ?: __('Not specified', 'matchmaker')); ?>
-            <?php if (!empty($cancel_expires)) : ?>
-                &nbsp;|&nbsp; <strong><?php esc_html_e('Access Expires:', 'matchmaker'); ?></strong> <?php echo esc_html(substr($cancel_expires, 0, 10)); ?>
+            <strong><?php esc_html_e('Reason:', 'matchmaker'); ?></strong> <?php echo esc_html($cancel_info['reason']); ?>
+            <?php if (!empty($cancel_info['cancellation_date'])) : ?>
+                &nbsp;|&nbsp; <strong><?php esc_html_e('Cancelled On:', 'matchmaker'); ?></strong> <?php echo esc_html($cancel_info['cancellation_date']); ?>
+            <?php endif; ?>
+            <?php if (!empty($cancel_info['expires_at'])) : ?>
+                &nbsp;|&nbsp; <strong><?php esc_html_e('Access Expires:', 'matchmaker'); ?></strong> <?php echo esc_html($cancel_info['expires_at']); ?>
             <?php endif; ?>
         </p>
-        <?php if (!empty($cancel_details)) : ?>
+        <?php if (!empty($cancel_info['details'])) : ?>
             <p style="margin:0; font-size:13px; color:#78350f; font-style:italic; line-height:1.4;">
-                "<?php echo esc_html($cancel_details); ?>"
+                "<?php echo esc_html($cancel_info['details']); ?>"
             </p>
         <?php endif; ?>
     </div>

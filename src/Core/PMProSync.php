@@ -1006,6 +1006,93 @@ class PMProSync {
     }
 
     /**
+     * Retrieves cancellation information for a user if their membership is cancelled
+     * or if they have deferred active access until their billing cycle end date.
+     *
+     * @param int $user_id
+     * @return array<string, mixed>|null
+     */
+    public function get_user_cancellation_info(int $user_id): ?array
+    {
+        if ($user_id <= 0) {
+            return null;
+        }
+
+        $cancelled_at   = (string) get_user_meta($user_id, 'mm_subscription_cancelled_at', true);
+        $expires_at     = (string) get_user_meta($user_id, 'mm_subscription_expires_at', true);
+        $cancel_reason  = (string) get_user_meta($user_id, 'mm_cancellation_reason', true);
+        $cancel_details = (string) get_user_meta($user_id, 'mm_cancellation_details', true);
+        $cancel_date    = (string) get_user_meta($user_id, 'mm_cancellation_date', true);
+        $cancelled_lvl  = (int) get_user_meta($user_id, 'mm_cancelled_level_id', true);
+
+        $now    = current_time('timestamp');
+        $exp_ts = !empty($expires_at) ? strtotime($expires_at) : 0;
+
+        // Check PMPro levels for user if function exists
+        $user_levels = function_exists('pmpro_getMembershipLevelsForUser') ? pmpro_getMembershipLevelsForUser($user_id) : [];
+        if (empty($user_levels) && function_exists('pmpro_getMembershipLevelForUser')) {
+            $single_lvl = pmpro_getMembershipLevelForUser($user_id);
+            if (!empty($single_lvl)) {
+                $user_levels = [$single_lvl];
+            }
+        }
+
+        $is_cancelled = false;
+        $level_name   = '';
+
+        // 1. Check if user metadata indicates active deferred cancellation
+        if (!empty($cancelled_at) || !empty($expires_at)) {
+            if ($exp_ts === 0 || $exp_ts > $now) {
+                $is_cancelled = true;
+            }
+        }
+
+        // 2. Check PMPro level objects
+        if (!empty($user_levels)) {
+            foreach ($user_levels as $lvl) {
+                if ($this->is_level_subscription_cancelled($user_id, $lvl)) {
+                    $is_cancelled = true;
+                    if (empty($level_name) && is_object($lvl) && !empty($lvl->name)) {
+                        $level_name = (string) $lvl->name;
+                    }
+                    if ($exp_ts <= 0 && is_object($lvl) && !empty($lvl->enddate)) {
+                        $end_ts = is_numeric($lvl->enddate) ? (int) $lvl->enddate : strtotime((string) $lvl->enddate);
+                        if ($end_ts > $now) {
+                            $exp_ts     = $end_ts;
+                            $expires_at = gmdate('Y-m-d H:i:s', $end_ts);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Also check if reason or details were explicitly submitted
+        if (!empty($cancel_reason) || !empty($cancel_details)) {
+            $is_cancelled = true;
+        }
+
+        if (!$is_cancelled && empty($cancel_reason) && empty($cancel_details)) {
+            return null;
+        }
+
+        $date_format           = get_option('date_format', 'F j, Y');
+        $formatted_expires     = $exp_ts > 0 ? (function_exists('date_i18n') ? date_i18n($date_format, $exp_ts) : gmdate($date_format, $exp_ts)) : (!empty($expires_at) ? substr($expires_at, 0, 10) : '');
+        $formatted_cancel_date = !empty($cancel_date) ? (function_exists('date_i18n') ? date_i18n($date_format, strtotime($cancel_date)) : substr($cancel_date, 0, 10)) : (!empty($cancelled_at) ? (function_exists('date_i18n') ? date_i18n($date_format, strtotime($cancelled_at)) : substr($cancelled_at, 0, 10)) : '');
+
+        return [
+            'is_cancelled'          => true,
+            'reason'                => !empty($cancel_reason) ? $cancel_reason : __('Not specified', 'matchmaker'),
+            'details'               => $cancel_details,
+            'cancellation_date'     => $formatted_cancel_date,
+            'cancellation_date_raw' => $cancel_date ?: $cancelled_at,
+            'expires_at'            => $formatted_expires,
+            'expires_at_raw'        => $expires_at,
+            'expires_timestamp'     => $exp_ts,
+            'level_name'            => $level_name,
+        ];
+    }
+
+    /**
      * Strips all cancellation-related actions from PMPro action link arrays.
      *
      * @param array<string, mixed> $links

@@ -182,9 +182,18 @@ window.mmFallbackExportPoolCsv = function(btn, e) {
                                 <?php echo esc_html($repo->format_tier_label($c['user_type'] ?? 'free')); ?>
                             </span>
                             <?php 
-                            $user_services = \Matchmaker\Core\PMProSync::instance()->get_user_active_services($uid);
-                            if (!empty($user_services)) : 
+                            $pmpro_sync    = \Matchmaker\Core\PMProSync::instance();
+                            $user_services = $pmpro_sync->get_user_active_services($uid);
+                            $c_cancel_info = $pmpro_sync->get_user_cancellation_info($uid);
+                            if (!empty($c_cancel_info)) :
                             ?>
+                                <div style="margin-top:3px;">
+                                    <span class="mm-badge mm-badge-cancelled-active" style="font-size:10px; padding:2px 6px;" title="<?php echo esc_attr(!empty($c_cancel_info['expires_at']) ? sprintf(__('Active until %s', 'matchmaker'), $c_cancel_info['expires_at']) : __('Subscription Cancelled', 'matchmaker')); ?>">
+                                        ⚠️ <?php esc_html_e('Cancelled (Active)', 'matchmaker'); ?>
+                                    </span>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($user_services)) : ?>
                                 <div class="mm-service-badges-group">
                                     <?php foreach ($user_services as $usrv) : ?>
                                         <span class="mm-badge mm-badge-service">

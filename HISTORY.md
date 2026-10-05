@@ -6,7 +6,19 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
-### Task 134: Refine PMPro Cancellation Flow Suppression & Cancelled Status Badge Formatting
+### Task 135: Display Cancellation Notice & Badges for Cancelled Active Subscriptions on Admin Profile
+- **Objective**:
+  1. Detect users who have cancelled their membership but still retain active deferred access, and ensure the cancellation reason and details are displayed on the Admin Single User view (`user-single.php`).
+  2. Implement `PMProSync::get_user_cancellation_info(int $user_id): ?array` evaluating `wp_usermeta` cancellation flags (`mm_subscription_cancelled_at`, `mm_subscription_expires_at`, `mm_cancellation_reason`, `mm_cancellation_details`, `mm_cancellation_date`) as well as active PMPro levels with future `enddate`.
+  3. Render the warning cancellation notice block on `user-single.php` even if no custom text was entered (falling back to "Not specified"), showing cancellation date and access expiration date.
+  4. Display `.mm-badge-cancelled-active` in the profile header badge list on `user-single.php` and in the Tier & Services column of `pool-list.php`.
+- **Implemented**:
+  - `src/Core/PMProSync.php`: Implemented `get_user_cancellation_info(int $user_id): ?array`.
+  - `src/View/admin/pool/user-single.php`: Updated header and warning notice block to render whenever `get_user_cancellation_info()` returns cancellation info.
+  - `src/View/admin/pool/pool-list.php`: Added cancelled active badge in the Tier & Services column.
+  - `assets/css/admin-matchmaker.css`: Added `.mm-badge-cancelled-active` badge styles.
+  - `tests/Unit/CancellationAndRejectionReasonTest.php`: Added unit tests for `get_user_cancellation_info`.
+- **Verification**: Ran full test suite with **230/230 tests passing (0 failures, 0 errors)**.
 - **Objective**:
   1. Prevent the cancellation reason modal popup from triggering when clicking the final submit button (`<input type="submit" class="pmpro_btn pmpro_btn-submit" value="Yes, cancel this membership">`) on PMPro's cancellation confirmation page.
   2. Detect cancelled recurring subscriptions retaining access until the end of the billing cycle, displaying their status badge as **"Cancelled (Active until [Date])"** with an amber/warning badge (`.mm-badge-cancelled-active`) instead of active green.

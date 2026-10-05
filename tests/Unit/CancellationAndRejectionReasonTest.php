@@ -256,6 +256,69 @@ final class CancellationAndRejectionReasonTest extends TestCase
         $filtered = $sync->filter_pmpro_member_action_links($links, $level_obj, $user_id);
         $this->assertArrayNotHasKey('cancel', $filtered);
     }
+
+    public function test_get_user_cancellation_info_resolves_all_fields(): void
+    {
+        $user_id = 105;
+        $future_exp = date('Y-m-d H:i:s', time() + (14 * 86400));
+
+        update_user_meta($user_id, 'mm_subscription_cancelled_at', date('Y-m-d H:i:s'));
+        update_user_meta($user_id, 'mm_subscription_expires_at', $future_exp);
+        update_user_meta($user_id, 'mm_cancellation_reason', 'Taking a temporary break');
+        update_user_meta($user_id, 'mm_cancellation_details', 'Busy with studies this semester.');
+        update_user_meta($user_id, 'mm_cancellation_date', '2026-10-05 14:00:00');
+
+        $sync = PMProSync::instance();
+        $info = $sync->get_user_cancellation_info($user_id);
+
+        $this->assertNotNull($info);
+        $this->assertTrue($info['is_cancelled']);
+        $this->assertEquals('Taking a temporary break', $info['reason']);
+        $this->assertEquals('Busy with studies this semester.', $info['details']);
+        $this->assertNotEmpty($info['expires_at']);
+        $this->assertNotEmpty($info['cancellation_date']);
+    }
+
+    public function test_get_user_cancellation_info_with_only_pmpro_enddate_and_no_reason(): void
+    {
+        $user_id = 106;
+        $level_id = 3;
+        $future_exp = date('Y-m-d H:i:s', time() + (10 * 86400));
+
+        $level_obj = (object) [
+            'id'             => $level_id,
+            'name'           => 'Monthly Tier',
+            'user_id'        => $user_id,
+            'enddate'        => $future_exp,
+            'billing_amount' => '30.00',
+        ];
+
+        // Mock pmpro_getMembershipLevelsForUser
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [$level_obj];
+
+        $sync = PMProSync::instance();
+        $info = $sync->get_user_cancellation_info($user_id);
+
+        $this->assertNotNull($info);
+        $this->assertTrue($info['is_cancelled']);
+        $this->assertEquals('Not specified', $info['reason']);
+        $this->assertNotEmpty($info['expires_at']);
+    }
+
+    public function test_get_user_cancellation_info_returns_null_for_active_user(): void
+    {
+        $user_id = 107;
+        // Clean user with no cancellation data
+        delete_user_meta($user_id, 'mm_subscription_cancelled_at');
+        delete_user_meta($user_id, 'mm_subscription_expires_at');
+        delete_user_meta($user_id, 'mm_cancellation_reason');
+        delete_user_meta($user_id, 'mm_cancellation_details');
+
+        $sync = PMProSync::instance();
+        $info = $sync->get_user_cancellation_info($user_id);
+
+        $this->assertNull($info);
+    }
 }
 
 
