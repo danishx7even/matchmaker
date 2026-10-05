@@ -6,6 +6,19 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 131: Fix Email Verification Script Syntax Error & Remove User ID Hidden Input
+- **Objective**:
+  1. Fix `Uncaught SyntaxError: expected expression, got '<'` on the member dashboard when the email verification form is rendered.
+  2. Decouple inline PHP interpolation from JavaScript code by storing parameters (`data-ajax-url`, `data-nonce`, `data-context`, `data-cooldown`) on the `<form>` element as HTML data attributes.
+  3. Remove the redundant `<input type="hidden" id="mm_verify_user_id">` input from `email-verification.php` and the pending email change modal in `EmailVerificationService.php`, ensuring that authenticated requests rely strictly on the active WordPress user session (`get_current_user_id()`) on the backend.
+- **Implemented**:
+  - `src/View/frontend/portal/email-verification.php`:
+    - Removed `mm_verify_user_id` hidden input.
+    - Updated `<form>` with safe HTML data attributes and refactored script to read directly from dataset attributes without inline PHP interpolation.
+  - `src/Service/EmailVerificationService.php`:
+    - Removed redundant hidden `user_id` input from the pending email update modal form.
+- **Verification**: Ran automated test suite with **220/220 tests passing** (0 failures, 0 errors).
+
 ### Task 130: Align PMPro Checkout Date of Birth Field Styling
 - **Objective**:
   1. Remove rigid inline styles (`max-width: 320px;`, manual borders, padding) from the Date of Birth (`user_dob`) input and label on the PMPro checkout form.

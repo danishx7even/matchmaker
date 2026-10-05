@@ -33,10 +33,11 @@ $ajax_url = admin_url('admin-ajax.php');
 
         <div id="mm-verify-alert" class="mm-verify-alert" style="display:none;" role="alert"></div>
 
-        <form id="mm-email-verify-form" class="mm-email-verify-form" onsubmit="return false;">
-            <input type="hidden" id="mm_verify_user_id" value="<?php echo (int) $user_id; ?>">
-            <input type="hidden" id="mm_verify_nonce" value="<?php echo esc_attr($nonce); ?>">
-            <input type="hidden" id="mm_verify_context" value="<?php echo esc_attr($context); ?>">
+        <form id="mm-email-verify-form" class="mm-email-verify-form" onsubmit="return false;"
+              data-ajax-url="<?php echo esc_url($ajax_url); ?>"
+              data-nonce="<?php echo esc_attr($nonce); ?>"
+              data-context="<?php echo esc_attr($context); ?>"
+              data-cooldown="<?php echo (int) $cooldown_remaining; ?>">
 
             <div class="mm-otp-group">
                 <label for="mm-otp-input" class="mm-otp-label"><?php esc_html_e('Enter 6-Digit Code', 'matchmaker'); ?></label>
@@ -247,18 +248,19 @@ $ajax_url = admin_url('admin-ajax.php');
 
 <script>
 (function() {
-    var ajaxUrl = "<?php echo esc_js($ajax_url); ?>";
     var form = document.getElementById('mm-email-verify-form');
+    if (!form) return;
+
+    var ajaxUrl = form.getAttribute('data-ajax-url') || '/wp-admin/admin-ajax.php';
+    var nonce = form.getAttribute('data-nonce') || '';
+    var cooldownSeconds = parseInt(form.getAttribute('data-cooldown') || '0', 10);
+
     var input = document.getElementById('mm-otp-input');
     var submitBtn = document.getElementById('mm-verify-submit-btn');
     var resendBtn = document.getElementById('mm-resend-code-btn');
     var timerBox = document.getElementById('mm-resend-timer-box');
     var countdownEl = document.getElementById('mm-resend-countdown');
     var alertBox = document.getElementById('mm-verify-alert');
-    var nonce = document.getElementById('mm_verify_nonce') ? document.getElementById('mm_verify_nonce').value : '';
-    var userId = document.getElementById('mm_verify_user_id') ? document.getElementById('mm_verify_user_id').value : '<?php echo (int) $user_id; ?>';
-
-    var cooldownSeconds = <?php echo (int) $cooldown_remaining; ?>;
     var timerInterval = null;
 
     function showAlert(msg, type) {
@@ -333,7 +335,6 @@ $ajax_url = admin_url('admin-ajax.php');
         var bodyData = new URLSearchParams();
         bodyData.append('action', 'mm_verify_email_code');
         bodyData.append('nonce', nonce);
-        bodyData.append('user_id', userId);
         bodyData.append('code', code);
 
         fetch(ajaxUrl, {
@@ -379,7 +380,6 @@ $ajax_url = admin_url('admin-ajax.php');
             var bodyData = new URLSearchParams();
             bodyData.append('action', 'mm_resend_verification_code');
             bodyData.append('nonce', nonce);
-            bodyData.append('user_id', userId);
 
             fetch(ajaxUrl, {
                 method: 'POST',

@@ -1798,7 +1798,6 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
                     <form id="mm-pending-verify-form" style="margin:0 0 16px;">
                         <input type="hidden" name="action" value="mm_verify_pending_email_code">
                         <input type="hidden" name="nonce" value="<?php echo esc_attr($nonce); ?>">
-                        <input type="hidden" name="user_id" value="<?php echo (int) $user_id; ?>">
 
                         <div style="margin-bottom:18px;">
                             <input type="text" id="mm-pending-otp-input" name="code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" placeholder="· · · · · ·" style="font-family:'Courier New', monospace; font-size:30px; font-weight:700; letter-spacing:10px; text-align:center; width:220px; padding:12px 8px; border:2px solid #E5E7EB; border-radius:10px; outline:none; transition:border-color 0.2s, box-shadow 0.2s; background:#FAFAFA;" autocomplete="one-time-code" required>
