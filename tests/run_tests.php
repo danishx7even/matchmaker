@@ -96,10 +96,20 @@ foreach ($test_classes as $class_name) {
                 'trace'   => $e->getTraceAsString(),
             ];
             echo "  ✖ {$method->getName()}: {$e->getMessage()}\n";
+        } finally {
+            if ($reflection->hasMethod('tearDown')) {
+                $tearDownMethod = $reflection->getMethod('tearDown');
+                $tearDownMethod->setAccessible(true);
+                $tearDownMethod->invoke($instance);
+            }
+            unset($GLOBALS['__mm_current_user_id'], $GLOBALS['__mm_pool_users']);
+            $_POST = [];
+            $_GET  = [];
         }
     }
     echo "\n";
 }
+
 
 echo "========================================================\n";
 echo " Test Results Summary\n";

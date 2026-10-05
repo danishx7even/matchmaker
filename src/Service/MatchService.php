@@ -60,6 +60,263 @@ class MatchService {
     }
 
     /**
+     * Computes comprehensive field-by-field criteria comparison between two pool users.
+     * Evaluates hard gates and 6-point flexible scoring rules.
+     *
+     * @param array<string, mixed> $user
+     * @param array<string, mixed> $candidate
+     * @return array<string, mixed>
+     */
+    public function get_criteria_comparison_breakdown(array $user, array $candidate): array
+    {
+        $repo = MatchRepository::instance();
+
+        // Helper: split comma-delimited string
+        $split = static function (?string $val): array {
+            if (empty($val)) {
+                return [];
+            }
+            return array_filter(array_map('trim', explode(',', $val)));
+        };
+
+        // Helper: in list or Any
+        $in_list = static function (?string $needle, ?string $haystack) use ($split): bool {
+            if (empty($haystack)) {
+                return true;
+            }
+            $items = $split($haystack);
+            foreach ($items as $item) {
+                if (in_array(strtolower(trim($item)), ['any', 'any origin', 'no preference', 'any country', 'any citizenship', 'any religion', 'any modesty'], true)) {
+                    return true;
+                }
+                if (!empty($needle) && strcasecmp(trim($needle), $item) === 0) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        $criteria = [];
+
+        // 1. Gender Compatibility
+        $u_pref_g = strtolower((string) ($user['pref_gender'] ?? ''));
+        $c_gender = strtolower((string) ($candidate['gender'] ?? ''));
+        $c_pref_g = strtolower((string) ($candidate['pref_gender'] ?? ''));
+        $u_gender = strtolower((string) ($user['gender'] ?? ''));
+
+        $gender_match = ($u_pref_g === 'any' || empty($u_pref_g) || $u_pref_g === $c_gender) &&
+                         ($c_pref_g === 'any' || empty($c_pref_g) || $c_pref_g === $u_gender);
+
+        $criteria[] = [
+            'id'            => 'gender',
+            'label'         => __('Gender Compatibility', 'matchmaker'),
+            'category'      => 'gate',
+            'target_val'    => sprintf(__('Prefers %s (is %s)', 'matchmaker'), ucfirst($u_pref_g ?: 'Any'), ucfirst($u_gender)),
+            'candidate_val' => sprintf(__('Prefers %s (is %s)', 'matchmaker'), ucfirst($c_pref_g ?: 'Any'), ucfirst($c_gender)),
+            'is_match'      => $gender_match,
+            'note'          => $gender_match ? __('Mutual gender preference matched', 'matchmaker') : __('Gender preference mismatch', 'matchmaker'),
+        ];
+
+        // 2. Age Range
+        $u_age = $repo->calc_age((string) ($user['birth_date'] ?? ''));
+        $c_age = $repo->calc_age((string) ($candidate['birth_date'] ?? ''));
+        $u_min_age = (int) ($user['preferred_age_min'] ?? 18);
+        $u_max_age = (int) ($user['preferred_age_max'] ?? 80);
+        $c_min_age = (int) ($candidate['preferred_age_min'] ?? 18);
+        $c_max_age = (int) ($candidate['preferred_age_max'] ?? 80);
+
+        $u_accepts_c_age = ($c_age >= $u_min_age && $c_age <= $u_max_age);
+        $c_accepts_u_age = ($u_age >= $c_min_age && $u_age <= $c_max_age);
+        $age_match       = ($u_accepts_c_age && $c_accepts_u_age);
+
+        $criteria[] = [
+            'id'            => 'age',
+            'label'         => __('Age Range', 'matchmaker'),
+            'category'      => 'gate',
+            'target_val'    => sprintf(__('%d yrs (Prefers %d–%d)', 'matchmaker'), $u_age, $u_min_age, $u_max_age),
+            'candidate_val' => sprintf(__('%d yrs (Prefers %d–%d)', 'matchmaker'), $c_age, $c_min_age, $c_max_age),
+            'is_match'      => $age_match,
+            'note'          => $age_match ? __('Both within mutual age ranges', 'matchmaker') : ($u_accepts_c_age ? __('Target user is outside candidate age range', 'matchmaker') : __('Candidate is outside target age range', 'matchmaker')),
+        ];
+
+        // 3. Location / Country
+        $u_loc_parts = array_filter([$user['city'] ?? '', $user['state'] ?? '', $user['country'] ?? '']);
+        $u_loc = !empty($u_loc_parts) ? implode(', ', $u_loc_parts) : ($user['location'] ?? '—');
+        $c_loc_parts = array_filter([$candidate['city'] ?? '', $candidate['state'] ?? '', $candidate['country'] ?? '']);
+        $c_loc = !empty($c_loc_parts) ? implode(', ', $c_loc_parts) : ($candidate['location'] ?? '—');
+
+        $u_pref_c = $user['pref_country'] ?? '';
+        $c_pref_c = $candidate['pref_country'] ?? '';
+        $u_country = $user['country'] ?? '';
+        $c_country = $candidate['country'] ?? '';
+
+        $loc_match = $in_list($c_country, $u_pref_c) && $in_list($u_country, $c_pref_c);
+
+        $criteria[] = [
+            'id'            => 'location',
+            'label'         => __('Location / Country', 'matchmaker'),
+            'category'      => 'gate',
+            'target_val'    => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $u_loc, $u_pref_c ?: __('Any', 'matchmaker')),
+            'candidate_val' => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $c_loc, $c_pref_c ?: __('Any', 'matchmaker')),
+            'is_match'      => $loc_match,
+            'note'          => $loc_match ? __('Location preferences aligned', 'matchmaker') : __('Country/location preferences differ', 'matchmaker'),
+        ];
+
+        // 4. Religion
+        $u_rel = $user['religion'] ?? '—';
+        $c_rel = $candidate['religion'] ?? '—';
+        $u_pref_rel = $user['pref_religion'] ?? '';
+        $c_pref_rel = $candidate['pref_religion'] ?? '';
+
+        $rel_match = $in_list($c_rel, $u_pref_rel) && $in_list($u_rel, $c_pref_rel);
+
+        $criteria[] = [
+            'id'            => 'religion',
+            'label'         => __('Religion / Sect', 'matchmaker'),
+            'category'      => 'gate',
+            'target_val'    => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $u_rel, $u_pref_rel ?: __('Any', 'matchmaker')),
+            'candidate_val' => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $c_rel, $c_pref_rel ?: __('Any', 'matchmaker')),
+            'is_match'      => $rel_match,
+            'note'          => $rel_match ? __('Religious preferences compatible', 'matchmaker') : __('Religious preferences differ', 'matchmaker'),
+        ];
+
+        // 5. Modesty Level
+        $u_mod = $user['modesty'] ?? '—';
+        $c_mod = $candidate['modesty'] ?? '—';
+        $u_pref_mod = $user['pref_modesty'] ?? '';
+        $c_pref_mod = $candidate['pref_modesty'] ?? '';
+
+        $mod_match = $in_list($c_mod, $u_pref_mod) && $in_list($u_mod, $c_pref_mod);
+
+        $criteria[] = [
+            'id'            => 'modesty',
+            'label'         => __('Modesty Level', 'matchmaker'),
+            'category'      => 'gate',
+            'target_val'    => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $u_mod, $u_pref_mod ?: __('Any', 'matchmaker')),
+            'candidate_val' => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $c_mod, $c_pref_mod ?: __('Any', 'matchmaker')),
+            'is_match'      => $mod_match,
+            'note'          => $mod_match ? __('Modesty levels align', 'matchmaker') : __('Modesty expectations differ', 'matchmaker'),
+        ];
+
+        // 6. Origin / Ethnicity (Flexible Point #1)
+        $u_orig = $user['origin'] ?? '—';
+        $c_orig = $candidate['origin'] ?? '—';
+        $u_pref_orig = $user['pref_origin'] ?? '';
+        $c_pref_orig = $candidate['pref_origin'] ?? '';
+
+        $orig_match = $in_list($c_orig, $u_pref_orig) && $in_list($u_orig, $c_pref_orig);
+
+        $criteria[] = [
+            'id'            => 'origin',
+            'label'         => __('Origin / Ethnicity', 'matchmaker'),
+            'category'      => 'score',
+            'target_val'    => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $u_orig, $u_pref_orig ?: __('Any', 'matchmaker')),
+            'candidate_val' => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $c_orig, $c_pref_orig ?: __('Any', 'matchmaker')),
+            'is_match'      => $orig_match,
+            'note'          => $orig_match ? __('+1 pt: Origin preferences match', 'matchmaker') : __('Origin preferences differ', 'matchmaker'),
+        ];
+
+        // 7. Citizenship
+        $u_cit = $user['citizenship'] ?? '—';
+        $c_cit = $candidate['citizenship'] ?? '—';
+        $u_pref_cit = $user['pref_citizenship'] ?? '';
+        $c_pref_cit = $candidate['pref_citizenship'] ?? '';
+
+        $cit_match = $in_list($c_cit, $u_pref_cit) && $in_list($u_cit, $c_pref_cit);
+
+        $criteria[] = [
+            'id'            => 'citizenship',
+            'label'         => __('Citizenship', 'matchmaker'),
+            'category'      => 'gate',
+            'target_val'    => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $u_cit, $u_pref_cit ?: __('Any', 'matchmaker')),
+            'candidate_val' => sprintf(__('%s (Prefers: %s)', 'matchmaker'), $c_cit, $c_pref_cit ?: __('Any', 'matchmaker')),
+            'is_match'      => $cit_match,
+            'note'          => $cit_match ? __('Citizenship preferences align', 'matchmaker') : __('Citizenship preferences differ', 'matchmaker'),
+        ];
+
+        // 8. Languages (Flexible Point #2)
+        $u_langs = $split($user['languages'] ?? null);
+        $c_langs = $split($candidate['languages'] ?? null);
+        $shared_langs = array_intersect($u_langs, $c_langs);
+        $lang_match = !empty($shared_langs);
+
+        $criteria[] = [
+            'id'            => 'languages',
+            'label'         => __('Spoken Languages', 'matchmaker'),
+            'category'      => 'score',
+            'target_val'    => !empty($u_langs) ? implode(', ', $u_langs) : '—',
+            'candidate_val' => !empty($c_langs) ? implode(', ', $c_langs) : '—',
+            'is_match'      => $lang_match,
+            'note'          => $lang_match ? sprintf(__('+1 pt: Shared: %s', 'matchmaker'), implode(', ', $shared_langs)) : __('No common languages listed', 'matchmaker'),
+        ];
+
+        // 9. Height Range (Flexible Point #3)
+        $c_h = !empty($candidate['height_cm']) ? (int) $candidate['height_cm'] : null;
+        $u_h = !empty($user['height_cm']) ? (int) $user['height_cm'] : null;
+        $u_h_min = !empty($user['preferred_height_min']) ? (int) $user['preferred_height_min'] : null;
+        $u_h_max = !empty($user['preferred_height_max']) ? (int) $user['preferred_height_max'] : null;
+        $c_h_min = !empty($candidate['preferred_height_min']) ? (int) $candidate['preferred_height_min'] : null;
+        $c_h_max = !empty($candidate['preferred_height_max']) ? (int) $candidate['preferred_height_max'] : null;
+
+        $a_in_b = ($c_h !== null && $u_h_min !== null && $u_h_max !== null && $c_h >= $u_h_min && $c_h <= $u_h_max);
+        $b_in_a = ($u_h !== null && $c_h_min !== null && $c_h_max !== null && $u_h >= $c_h_min && $u_h <= $c_h_max);
+        $height_match = ($a_in_b && $b_in_a);
+
+        $criteria[] = [
+            'id'            => 'height',
+            'label'         => __('Height & Height Range', 'matchmaker'),
+            'category'      => 'score',
+            'target_val'    => ($u_h ? $repo->cm_to_feet($u_h) : '—') . ($u_h_min && $u_h_max ? sprintf(' (Prefers %s–%s)', $repo->cm_to_feet($u_h_min), $repo->cm_to_feet($u_h_max)) : ''),
+            'candidate_val' => ($c_h ? $repo->cm_to_feet($c_h) : '—') . ($c_h_min && $c_h_max ? sprintf(' (Prefers %s–%s)', $repo->cm_to_feet($c_h_min), $repo->cm_to_feet($c_h_max)) : ''),
+            'is_match'      => $height_match,
+            'note'          => $height_match ? __('+1 pt: Heights mutually within ranges', 'matchmaker') : __('Heights outside mutual ranges', 'matchmaker'),
+        ];
+
+        // 10. Profession / Job (Flexible Point #4)
+        $has_job = !empty(trim((string) ($candidate['job'] ?? '')));
+        $criteria[] = [
+            'id'            => 'job',
+            'label'         => __('Profession / Employment', 'matchmaker'),
+            'category'      => 'score',
+            'target_val'    => $user['job'] ?? '—',
+            'candidate_val' => $candidate['job'] ?? '—',
+            'is_match'      => $has_job,
+            'note'          => $has_job ? __('+1 pt: Candidate profile specifies profession', 'matchmaker') : __('No profession specified', 'matchmaker'),
+        ];
+
+        // 11. Lifestyle (Smoking & Drinking) (Flexible Points #5 & #6)
+        $smoke_match = $in_list($candidate['smoking'] ?? null, $user['pref_smoking'] ?? null);
+        $drink_match = $in_list($candidate['drinking'] ?? null, $user['pref_drinking'] ?? null);
+        $lifestyle_match = ($smoke_match && $drink_match);
+
+        $criteria[] = [
+            'id'            => 'lifestyle',
+            'label'         => __('Lifestyle (Smoking / Drinking)', 'matchmaker'),
+            'category'      => 'score',
+            'target_val'    => sprintf('Smoke: %s, Drink: %s', $user['smoking'] ?? '—', $user['drinking'] ?? '—'),
+            'candidate_val' => sprintf('Smoke: %s, Drink: %s', $candidate['smoking'] ?? '—', $candidate['drinking'] ?? '—'),
+            'is_match'      => $lifestyle_match,
+            'note'          => ($smoke_match && $drink_match) ? __('+2 pts: Lifestyle preferences align', 'matchmaker') : ($smoke_match || $drink_match ? __('+1 pt: Partial lifestyle alignment', 'matchmaker') : __('Lifestyle preferences differ', 'matchmaker')),
+        ];
+
+        $flex_score = $this->compute_flexible_score($user, $candidate);
+        $match_count = 0;
+        foreach ($criteria as $c) {
+            if (!empty($c['is_match'])) {
+                $match_count++;
+            }
+        }
+
+        return [
+            'flexible_score'          => $flex_score,
+            'max_flexible_score'      => 6,
+            'total_criteria_count'    => count($criteria),
+            'matching_criteria_count' => $match_count,
+            'criteria'                => $criteria,
+        ];
+    }
+
+    /**
      * Get quota used for the cycle.
      *
      * @param int $user_id The user ID.

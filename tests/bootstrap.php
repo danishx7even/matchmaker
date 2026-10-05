@@ -1190,13 +1190,45 @@ class Fakewpdb {
 
     public function get_results(string $query, $output = OBJECT): array {
         $this->queries[] = $query;
-        return $this->mock_results[$query] ?? [];
+        if (isset($this->mock_results[$query])) {
+            return $this->mock_results[$query];
+        }
+        foreach ($this->mock_results as $k => $v) {
+            if (is_string($k) && $k !== '' && str_contains($query, $k)) {
+                return $v;
+            }
+        }
+        if (str_contains($query, 'wp_matchmaking_pool') && !empty($GLOBALS['__mm_pool_users'])) {
+            $list = [];
+            foreach ($GLOBALS['__mm_pool_users'] as $uid => $row) {
+                $user = $GLOBALS['__mm_users'][$uid] ?? new FakeWP_User($uid, 'user' . $uid, 'user' . $uid . '@example.com');
+                $row['display_name'] = $user->display_name ?? ('User #' . $uid);
+                $row['user_email']   = $user->user_email ?? '';
+                $row['user_login']   = $user->user_login ?? ('user' . $uid);
+                $list[] = $row;
+            }
+            return $list;
+        }
+        return [];
     }
 
     public function get_row(string $query, $output = OBJECT): ?array {
         $this->queries[] = $query;
-        return $this->mock_rows[$query] ?? null;
+        if (isset($this->mock_rows[$query])) {
+            return $this->mock_rows[$query];
+        }
+        foreach ($this->mock_rows as $k => $v) {
+            if (is_string($k) && $k !== '' && str_contains($query, $k)) {
+                return $v;
+            }
+        }
+        if (str_contains($query, 'wp_matchmaking_pool') && preg_match('/user_id = (\d+)/', $query, $m)) {
+            $uid = (int) $m[1];
+            return $GLOBALS['__mm_pool_users'][$uid] ?? null;
+        }
+        return null;
     }
+
 
     public function get_col(string $query): array {
         $this->queries[] = $query;

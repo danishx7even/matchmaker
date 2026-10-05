@@ -6,7 +6,29 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 137: Add Direct Member Search Tab with Informational Compatibility Breakdown in Manual Matchmaker
+- **Objective**:
+  1. Add a 2-tab navigation system to the Admin Manual Matchmaker tool (`manual-match.php`):
+     - **Tab 1: Compatibility Filter Search**: Preserves 100% of existing filter queries, location cascade dropdowns, and ranked compatibility results without any regression.
+     - **Tab 2: Direct Member Search**: Provides instant live debounced autocomplete searching for any candidate registered in the matchmaking pool by Name, Email, Username, or User ID.
+  2. Implement an informational side-by-side compatibility breakdown matrix displaying 11 criteria (Gender, Age, Location, Religion, Modesty, Origin, Citizenship, Languages, Height, Profession, Lifestyle) with total flexible compatibility score ($X/6$ pts) and criteria status pills (`✓ Match` / `✕ Differs`), purely for admin review.
+  3. Allow the admin to click **"Create Direct Match Pair"** to immediately create the match record (`status = 'pending_review'`, `source = 'manual'`) regardless of whether 0 or all fields match, preventing duplicate active pairs.
+  4. Ensure existing automatic background matching engine and standard manual filter matching remain 100% untouched and operative.
+- **Implemented**:
+  - `src/Service/MatchService.php`:
+    - Implemented `get_criteria_comparison_breakdown(array $user, array $candidate): array` computing detailed criteria comparisons and flexible score calculation.
+  - `src/Admin/AdminPortal.php`:
+    - Added AJAX endpoints: `mm_admin_search_candidates`, `mm_admin_get_candidate_breakdown`, and `mm_admin_create_direct_match`.
+  - `src/View/admin/pool/manual-match.php`:
+    - Added 2-tab navigation (`#tab-filter` & `#tab-direct`), debounced candidate search input with clear button, interactive suggestions dropdown, side-by-side comparison matrix, existing match warning banner, and AJAX match pair creation action.
+  - `assets/css/admin-matchmaker.css`:
+    - Added styles for `.mm-manual-nav-tabs`, `.mm-direct-search-box`, `.mm-direct-results-dropdown`, `.mm-search-result-item`, `.mm-breakdown-table`, `.mm-pill-match`, and `.mm-pill-differ`.
+  - `tests/Unit/ManualMatchmakerTest.php`:
+    - Added automated tests for criteria matrix evaluation, candidate live search, breakdown calculation, and direct match pair creation.
+- **Verification**: Ran full automated test suite with **235/235 tests passing (0 failures, 0 errors)**.
+
 ### Task 136: Support PMPro 3.0 Cancellation Pipeline & Verify Match Rejection Persistence
+
 - **Objective**:
   1. Fix issue where PMPro 3.0 subscription cancellations (which call `pmpro_set_expiration_date` and bypass `pmpro_cancelMembershipLevel`) failed to trigger metadata saving for cancellation reason and details.
   2. Implement hooks for `pmpro_cancel_before_submit`, `pmpro_cancel_processed`, `pmpro_cancel_should_process`, and `pmpro_cancel_on_next_payment_date` in `PMProSync.php` to guarantee cancellation metadata (`mm_cancellation_reason`, `mm_cancellation_details`, `mm_subscription_cancelled_at`, `mm_subscription_expires_at`, `mm_cancellation_date`) is captured and persisted in `wp_usermeta`.

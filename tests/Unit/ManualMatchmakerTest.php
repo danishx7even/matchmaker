@@ -20,6 +20,13 @@ class ManualMatchmakerTest
         $this->repo = MatchRepository::instance();
     }
 
+    public function tearDown(): void
+    {
+        unset($GLOBALS['__mm_current_user_id'], $GLOBALS['__mm_pool_users']);
+        $_POST = [];
+    }
+
+
     public function test_get_manual_match_candidates_filters_and_scores(): void
     {
         global $wpdb;
@@ -143,4 +150,220 @@ class ManualMatchmakerTest
             throw new \RuntimeException("Expected INSERT into wp_matches, executed:\n{$queries_str}");
         }
     }
+
+    public function test_get_criteria_comparison_breakdown_matrix(): void
+    {
+        $match_service = \Matchmaker\Service\MatchService::instance();
+
+        $user = [
+            'user_id'            => 10,
+            'gender'             => 'male',
+            'birth_date'         => '1990-01-01',
+            'country'            => 'Saudi Arabia',
+            'city'               => 'Riyadh',
+            'location'           => 'Riyadh',
+            'origin'             => 'Arab',
+            'religion'           => 'Muslim',
+            'modesty'            => 'Hijab',
+            'pref_gender'        => 'female',
+            'preferred_age_min'  => 20,
+            'preferred_age_max'  => 35,
+            'pref_country'       => 'Saudi Arabia',
+            'pref_location'      => 'Riyadh',
+            'pref_origin'        => 'Arab',
+            'pref_religion'      => 'Muslim',
+            'pref_modesty'       => 'Hijab',
+            'height_cm'          => 180,
+            'preferred_height_min' => 155,
+            'preferred_height_max' => 175,
+            'languages'          => 'Arabic, English',
+            'pref_languages'     => 'Arabic',
+            'education'          => 'Master',
+            'job'                => 'Engineer',
+            'smoking'            => 'no',
+            'drinking'           => 'no',
+            'pref_smoking'       => 'no',
+            'pref_drinking'      => 'no',
+            'marital_status'     => 'single',
+        ];
+
+        $candidate_match = [
+            'user_id'            => 20,
+            'gender'             => 'female',
+            'birth_date'         => '1995-05-15',
+            'country'            => 'Saudi Arabia',
+            'city'               => 'Riyadh',
+            'location'           => 'Riyadh',
+            'origin'             => 'Arab',
+            'religion'           => 'Muslim',
+            'modesty'            => 'Hijab',
+            'pref_gender'        => 'male',
+            'preferred_age_min'  => 28,
+            'preferred_age_max'  => 40,
+            'pref_country'       => 'Saudi Arabia',
+            'pref_location'      => 'Riyadh',
+            'pref_origin'        => 'Arab',
+            'pref_religion'      => 'Muslim',
+            'pref_modesty'       => 'Hijab',
+            'height_cm'          => 165,
+            'preferred_height_min' => 170,
+            'preferred_height_max' => 190,
+            'languages'          => 'Arabic',
+            'pref_languages'     => 'Arabic',
+            'education'          => 'Bachelor',
+            'job'                => 'Doctor',
+            'smoking'            => 'no',
+            'drinking'           => 'no',
+            'pref_smoking'       => 'no',
+            'pref_drinking'      => 'no',
+            'marital_status'     => 'single',
+        ];
+
+        $breakdown = $match_service->get_criteria_comparison_breakdown($user, $candidate_match);
+
+        if ($breakdown['flexible_score'] < 5) {
+            throw new \RuntimeException("Expected high flexible score for matched candidate, got: {$breakdown['flexible_score']}");
+        }
+
+        if ($breakdown['total_criteria_count'] !== 11) {
+            throw new \RuntimeException("Expected 11 criteria evaluated, got: {$breakdown['total_criteria_count']}");
+        }
+
+        if ($breakdown['matching_criteria_count'] < 10) {
+            throw new \RuntimeException("Expected at least 10 criteria matches, got: {$breakdown['matching_criteria_count']}");
+        }
+
+
+        // Test mismatched candidate
+        $candidate_mismatch = [
+            'user_id'            => 30,
+            'gender'             => 'male', // Gender mismatch
+            'birth_date'         => '1950-01-01', // Age mismatch (76 yrs)
+            'country'            => 'Canada',
+            'city'               => 'Toronto',
+            'location'           => 'Toronto',
+            'origin'             => 'European',
+            'religion'           => 'Christian',
+            'modesty'            => 'Western',
+            'pref_gender'        => 'male',
+            'preferred_age_min'  => 60,
+            'preferred_age_max'  => 80,
+            'pref_country'       => 'Canada',
+            'pref_location'      => 'Toronto',
+            'pref_origin'        => 'European',
+            'pref_religion'      => 'Christian',
+            'pref_modesty'       => 'Western',
+        ];
+
+        $breakdown_mismatch = $match_service->get_criteria_comparison_breakdown($user, $candidate_mismatch);
+        if ($breakdown_mismatch['flexible_score'] > 2) {
+            throw new \RuntimeException("Expected low flexible score for mismatched candidate, got: {$breakdown_mismatch['flexible_score']}");
+        }
+
+        $gender_crit = array_values(array_filter($breakdown_mismatch['criteria'], fn($c) => $c['id'] === 'gender'))[0] ?? null;
+        if (!$gender_crit || $gender_crit['is_match'] !== false) {
+            throw new \RuntimeException("Expected gender mismatch criterion to be false");
+        }
+    }
+
+    public function test_ajax_candidate_search_and_direct_match_flow(): void
+    {
+        global $wpdb;
+
+        $admin = \Matchmaker\Admin\AdminPortal::instance();
+        
+        // Setup admin user
+        $admin_user = new \FakeWP_User(1, 'admin', 'admin@example.com');
+        $admin_user->roles = ['administrator'];
+        $GLOBALS['__mm_users'][1] = $admin_user;
+        $GLOBALS['__mm_current_user_id'] = 1;
+
+        $GLOBALS['__mm_pool_users'] = [
+            10 => [
+                'user_id'      => 10,
+                'gender'       => 'male',
+                'birth_date'   => '1990-01-01',
+                'country'      => 'Saudi Arabia',
+                'city'         => 'Riyadh',
+                'location'     => 'Riyadh',
+                'origin'       => 'Arab',
+                'religion'     => 'Muslim',
+                'modesty'      => 'Hijab',
+                'user_type'    => 'monthly',
+                'pref_gender'  => 'female',
+            ],
+            50 => [
+                'user_id'      => 50,
+                'gender'       => 'female',
+                'birth_date'   => '1994-06-20',
+                'country'      => 'Saudi Arabia',
+                'city'         => 'Jeddah',
+                'location'     => 'Jeddah',
+                'origin'       => 'Arab',
+                'religion'     => 'Muslim',
+                'modesty'      => 'Hijab',
+                'user_type'    => 'free',
+                'pref_gender'  => 'male',
+            ],
+        ];
+
+        // 1. Test search handler
+        $_POST = [
+            'nonce'          => wp_create_nonce('mm_admin_nonce'),
+            'target_user_id' => 10,
+            'query'          => '50',
+        ];
+
+        ob_start();
+        try {
+            $admin->ajax_search_candidates();
+        } catch (\Throwable $e) {
+            // expected from wp_send_json_success / wp_send_json_error
+        }
+        $res = json_decode(ob_get_clean(), true);
+
+        if (!isset($res['success']) || !$res['success']) {
+            throw new \RuntimeException("Expected ajax_search_candidates to succeed: " . json_encode($res));
+        }
+
+        // 2. Test candidate breakdown handler
+        $_POST = [
+            'nonce'          => wp_create_nonce('mm_admin_nonce'),
+            'target_user_id' => 10,
+            'candidate_id'   => 50,
+        ];
+
+        ob_start();
+        try {
+            $admin->ajax_get_candidate_breakdown();
+        } catch (\Throwable $e) {
+            // expected
+        }
+        $res_bd = json_decode(ob_get_clean(), true);
+
+        if (!isset($res_bd['success']) || !$res_bd['success'] || !isset($res_bd['data']['score'])) {
+            throw new \RuntimeException("Expected ajax_get_candidate_breakdown to return breakdown data: " . json_encode($res_bd));
+        }
+
+        // 3. Test direct match creation handler
+        $_POST = [
+            'nonce'          => wp_create_nonce('mm_admin_nonce'),
+            'target_user_id' => 10,
+            'candidate_id'   => 50,
+        ];
+
+        ob_start();
+        try {
+            $admin->ajax_create_direct_match();
+        } catch (\Throwable $e) {
+            // expected
+        }
+        $res_create = json_decode(ob_get_clean(), true);
+
+        if (!isset($res_create['success']) || !$res_create['success'] || empty($res_create['data']['match_id'])) {
+            throw new \RuntimeException("Expected ajax_create_direct_match to succeed: " . json_encode($res_create));
+        }
+    }
 }
+
+

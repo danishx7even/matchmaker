@@ -4,11 +4,10 @@
 **Active Task**: None
 **Current Phase**: Idle
 
-## Objectives
-*No active tasks. Ready for next instruction.*
+---
 
-## Checklist
-*No pending checklist items.*
+*Set task details here when starting a new task, and clear back to IDLE upon completion.*
+
 
 
 

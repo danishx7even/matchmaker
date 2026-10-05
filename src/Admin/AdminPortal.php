@@ -68,6 +68,9 @@ class AdminPortal
         add_action('wp_ajax_mm_clear_file_log',           [$this, 'ajax_clear_file_log']);
         add_action('wp_ajax_mm_get_admin_notes',          [$this, 'ajax_get_admin_notes']);
         add_action('wp_ajax_mm_save_admin_notes',         [$this, 'ajax_save_admin_notes']);
+        add_action('wp_ajax_mm_admin_search_candidates',       [$this, 'ajax_search_candidates']);
+        add_action('wp_ajax_mm_admin_get_candidate_breakdown', [$this, 'ajax_get_candidate_breakdown']);
+        add_action('wp_ajax_mm_admin_create_direct_match',     [$this, 'ajax_create_direct_match']);
 
         // Admin bar restrictions for restricted roles
         add_action('admin_bar_menu',                      [$this, 'restrict_admin_bar_for_restricted_roles'], 999);
@@ -1812,5 +1815,227 @@ class AdminPortal
             'user_id' => $user_id,
             'message' => __('Admin notes saved successfully.', 'matchmaker'),
         ]);
+    }
+
+    /**
+     * AJAX handler: Search candidate pool members by name, email, username, or ID.
+     *
+     * @return void
+     */
+    public function ajax_search_candidates(): void
+    {
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized permission.', 'matchmaker')], 403);
+        }
+
+        $term = isset($_POST['term']) ? sanitize_text_field(wp_unslash((string) $_POST['term'])) : '';
+        $exclude_id = isset($_POST['exclude_id']) ? (int) $_POST['exclude_id'] : 0;
+
+        if (mb_strlen(trim($term)) < 1) {
+            wp_send_json_success(['candidates' => []]);
+        }
+
+        global $wpdb;
+        $repo = MatchRepository::instance();
+        $pool_table  = $wpdb->prefix . 'matchmaking_pool';
+        $users_table = $wpdb->users;
+
+        $like_term = '%' . $wpdb->esc_like(trim($term)) . '%';
+        $sql = "SELECT p.*, u.display_name, u.user_email, u.user_login 
+                FROM {$pool_table} p 
+                INNER JOIN {$users_table} u ON p.user_id = u.ID 
+                WHERE (p.user_id = %d OR u.display_name LIKE %s OR u.user_email LIKE %s OR u.user_login LIKE %s)";
+
+        $params = [
+            is_numeric($term) ? (int) $term : 0,
+            $like_term,
+            $like_term,
+            $like_term,
+        ];
+
+        if ($exclude_id > 0) {
+            $sql .= " AND p.user_id != %d";
+            $params[] = $exclude_id;
+        }
+
+        $sql .= " ORDER BY u.display_name ASC LIMIT 20";
+
+        $prepared = $wpdb->prepare($sql, $params);
+        $rows     = $wpdb->get_results($prepared, ARRAY_A) ?: [];
+
+        $results = [];
+        foreach ($rows as $r) {
+            $uid   = (int) $r['user_id'];
+            $meta  = $repo->get_meta_block($uid);
+            $photo = !empty($meta['user_photo1']) ? $meta['user_photo1'] : (!empty($r['user_photo1']) ? $r['user_photo1'] : '');
+            $age   = $repo->calc_age((string) ($r['birth_date'] ?? ''));
+
+            $loc_parts = array_filter([$r['city'] ?? '', $r['state'] ?? '', $r['country'] ?? '']);
+            $loc = !empty($loc_parts) ? implode(', ', $loc_parts) : ($r['location'] ?? '—');
+
+            $results[] = [
+                'id'           => $uid,
+                'display_name' => $r['display_name'],
+                'user_email'   => $r['user_email'],
+                'user_type'    => $r['user_type'] ?? 'free',
+                'tier_label'   => $repo->format_tier_label($r['user_type'] ?? 'free'),
+                'gender'       => ucfirst((string) ($r['gender'] ?? '')),
+                'age'          => $age,
+                'location'     => $loc,
+                'photo'        => $photo,
+            ];
+        }
+
+        wp_send_json_success(['candidates' => $results]);
+    }
+
+    /**
+     * AJAX handler: Get comprehensive criteria comparison between target user and selected candidate.
+     *
+     * @return void
+     */
+    public function ajax_get_candidate_breakdown(): void
+    {
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized permission.', 'matchmaker')], 403);
+        }
+
+        $target_id    = isset($_POST['target_user_id']) ? (int) $_POST['target_user_id'] : 0;
+        $candidate_id = isset($_POST['candidate_id']) ? (int) $_POST['candidate_id'] : 0;
+
+        if ($target_id <= 0 || $candidate_id <= 0 || $target_id === $candidate_id) {
+            wp_send_json_error(['message' => __('Invalid user selection.', 'matchmaker')]);
+        }
+
+        $repo = MatchRepository::instance();
+        $target_pool    = $repo->get_user_pool($target_id);
+        $candidate_pool = $repo->get_user_pool($candidate_id);
+
+        if (!$target_pool || !$candidate_pool) {
+            wp_send_json_error(['message' => __('One or both candidate profiles could not be found in the matchmaking pool.', 'matchmaker')]);
+        }
+
+        $target_user    = get_userdata($target_id);
+        $candidate_user = get_userdata($candidate_id);
+        $target_meta    = $repo->get_meta_block($target_id);
+        $candidate_meta = $repo->get_meta_block($candidate_id);
+
+        $target_photo    = !empty($target_meta['user_photo1']) ? $target_meta['user_photo1'] : (!empty($target_pool['user_photo1']) ? $target_pool['user_photo1'] : '');
+        $candidate_photo = !empty($candidate_meta['user_photo1']) ? $candidate_meta['user_photo1'] : (!empty($candidate_pool['user_photo1']) ? $candidate_pool['user_photo1'] : '');
+
+        // Check existing match
+        global $wpdb;
+        $matches_table = $wpdb->prefix . 'matches';
+        $u1 = min($target_id, $candidate_id);
+        $u2 = max($target_id, $candidate_id);
+        $existing = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM {$matches_table} WHERE user_one_id = %d AND user_two_id = %d ORDER BY id DESC LIMIT 1", $u1, $u2),
+            ARRAY_A
+        );
+
+        $breakdown_data = MatchService::instance()->get_criteria_comparison_breakdown($target_pool, $candidate_pool);
+
+        wp_send_json_success([
+            'target' => [
+                'id'           => $target_id,
+                'name'         => $target_user ? $target_user->display_name : ('User #' . $target_id),
+                'email'        => $target_user ? $target_user->user_email : '',
+                'photo'        => $target_photo,
+                'user_type'    => $target_pool['user_type'] ?? 'free',
+                'tier_label'   => $repo->format_tier_label($target_pool['user_type'] ?? 'free'),
+                'gender'       => ucfirst((string) ($target_pool['gender'] ?? '')),
+                'age'          => $repo->calc_age((string) ($target_pool['birth_date'] ?? '')),
+            ],
+            'candidate' => [
+                'id'           => $candidate_id,
+                'name'         => $candidate_user ? $candidate_user->display_name : ('User #' . $candidate_id),
+                'email'        => $candidate_user ? $candidate_user->user_email : '',
+                'photo'        => $candidate_photo,
+                'user_type'    => $candidate_pool['user_type'] ?? 'free',
+                'tier_label'   => $repo->format_tier_label($candidate_pool['user_type'] ?? 'free'),
+                'gender'       => ucfirst((string) ($candidate_pool['gender'] ?? '')),
+                'age'          => $repo->calc_age((string) ($candidate_pool['birth_date'] ?? '')),
+            ],
+            'score'                   => $breakdown_data['flexible_score'],
+            'max_score'               => $breakdown_data['max_flexible_score'],
+            'total_criteria_count'    => $breakdown_data['total_criteria_count'],
+            'matching_criteria_count' => $breakdown_data['matching_criteria_count'],
+            'criteria'                => $breakdown_data['criteria'],
+            'match_exists'            => !empty($existing),
+            'existing_status'         => $existing ? ($existing['status'] ?? '') : '',
+            'existing_match_id'       => $existing ? (int) $existing['id'] : 0,
+        ]);
+    }
+
+    /**
+     * AJAX handler: Create direct manual match between target user and selected candidate.
+     *
+     * @return void
+     */
+    public function ajax_create_direct_match(): void
+    {
+        check_ajax_referer('mm_admin_nonce', 'nonce');
+
+        if (!current_user_can('manage_matchmaker')) {
+            wp_send_json_error(['message' => __('Unauthorized permission.', 'matchmaker')], 403);
+        }
+
+        $target_id    = isset($_POST['target_user_id']) ? (int) $_POST['target_user_id'] : 0;
+        $candidate_id = isset($_POST['candidate_id']) ? (int) $_POST['candidate_id'] : 0;
+
+        if ($target_id <= 0 || $candidate_id <= 0 || $target_id === $candidate_id) {
+            wp_send_json_error(['message' => __('Invalid user pair for match creation.', 'matchmaker')]);
+        }
+
+        $repo = MatchRepository::instance();
+        $target_pool    = $repo->get_user_pool($target_id);
+        $candidate_pool = $repo->get_user_pool($candidate_id);
+
+        if (!$target_pool || !$candidate_pool) {
+            wp_send_json_error(['message' => __('Both candidates must be present in the matchmaking pool.', 'matchmaker')]);
+        }
+
+        if ($repo->has_mutual_match_this_month($target_id) || $repo->has_mutual_match_this_month($candidate_id)) {
+            wp_send_json_error(['message' => __('Cannot create match: one or both users already have a mutually accepted match this month.', 'matchmaker')]);
+        }
+
+        $score    = MatchService::instance()->compute_flexible_score($target_pool, $candidate_pool);
+        $admin_id = get_current_user_id();
+        $inserted = $repo->create_match($target_id, $candidate_id, $admin_id, 'pending_review', 'manual', $score);
+
+        if ($inserted) {
+            if (class_exists(\Matchmaker\Service\FileLoggerService::class)) {
+                \Matchmaker\Service\FileLoggerService::info(
+                    'Admin #' . $admin_id . ' created direct manual match #' . $inserted . ' for users #' . $target_id . ' & #' . $candidate_id . ' (score ' . $score . '/6).',
+                    ['admin_id' => $admin_id, 'match_id' => $inserted, 'u1' => $target_id, 'u2' => $candidate_id, 'score' => $score],
+                    'admin'
+                );
+            }
+
+            $repo->log_event(
+                'match_lifecycle',
+                'manual_match_created',
+                sprintf(__('Direct Match Created: User #%d & Candidate #%d', 'matchmaker'), $target_id, $candidate_id),
+                sprintf(__('Admin #%d created direct match pair (Match ID #%d, Score: %d/6).', 'matchmaker'), $admin_id, $inserted, $score),
+                ['u1' => $target_id, 'u2' => $candidate_id, 'score' => $score, 'admin_id' => $admin_id],
+                $inserted,
+                $admin_id,
+                null,
+                'info'
+            );
+
+            wp_send_json_success([
+                'match_id' => $inserted,
+                'score'    => $score,
+                'message'  => sprintf(__('Direct manual match #%d created successfully and queued for review.', 'matchmaker'), $inserted),
+                'queue_url'=> admin_url('admin.php?page=matchmaking-matches'),
+            ]);
+        } else {
+            wp_send_json_error(['message' => __('A match record already exists for this pair in the database.', 'matchmaker')]);
+        }
     }
 }

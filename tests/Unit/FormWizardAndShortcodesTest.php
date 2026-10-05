@@ -20,10 +20,17 @@ class FormWizardAndShortcodesTest
         $GLOBALS['wpdb']->mock_rows = [];
         $GLOBALS['wpdb']->mock_vars = [];
 
+        $GLOBALS['__mm_current_user_id'] = 100;
         $GLOBALS['__mm_users'][100] = new FakeWP_User(100, 'member100', 'member100@example.com');
 
         $this->form_controller = FormController::instance();
         $this->field_generator = FieldGenerator::instance();
+    }
+
+    public function tearDown(): void
+    {
+        unset($GLOBALS['__mm_current_user_id']);
+        $_POST = [];
     }
 
     public function test_field_generator_renders_inputs(): void
@@ -60,18 +67,19 @@ class FormWizardAndShortcodesTest
     public function test_render_form_shortcode_markup(): void
     {
         // 1. Unverified member renders email verification screen
-        update_user_meta(1, 'mm_email_verified', 0);
+        update_user_meta(100, 'mm_email_verified', 0);
         $verify_out = $this->form_controller->render_form();
         if (empty($verify_out) || !str_contains($verify_out, 'mm-email-verify-card')) {
             throw new \RuntimeException("Expected unverified user to see email verification screen: " . $verify_out);
         }
 
         // 2. Verified member renders matchmaking form
-        update_user_meta(1, 'mm_email_verified', 1);
+        update_user_meta(100, 'mm_email_verified', 1);
         $out = $this->form_controller->render_form();
         if (empty($out) || (!str_contains($out, 'mmf-form') && !str_contains($out, 'matchmaking_form'))) {
             throw new \RuntimeException("Expected verified user to see matchmaking_form container: " . $out);
         }
+
 
         if (!str_contains($out, 'is_parent_applying') || !str_contains($out, 'I am a parent applying on behalf of my child')) {
             throw new \RuntimeException("Expected form wizard markup to contain is_parent_applying field: " . $out);

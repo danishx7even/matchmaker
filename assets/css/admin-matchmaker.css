@@ -947,6 +947,180 @@ body.mm-lightbox-open {
     outline: none !important;
 }
 
+/* =============================================================
+   Manual Matchmaker — Direct Search & Criteria Breakdown
+   ============================================================= */
+
+.mm-manual-nav-tabs {
+    border-bottom: 1px solid #cbd5e1;
+    margin-bottom: 20px;
+}
+
+.mm-manual-nav-tabs .nav-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+    color: #475569;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    transition: all 0.15s ease-in-out;
+}
+
+.mm-manual-nav-tabs .nav-tab:hover {
+    color: #CC723F;
+    background: #f8fafc;
+}
+
+.mm-manual-nav-tabs .nav-tab-active,
+.mm-manual-nav-tabs .nav-tab-active:hover {
+    color: #CC723F;
+    background: #ffffff;
+    border-color: #cbd5e1 #cbd5e1 #ffffff;
+    border-bottom: 1px solid #ffffff;
+    margin-bottom: -1px;
+}
+
+.mm-direct-search-box input:focus {
+    border-color: #CC723F !important;
+    box-shadow: 0 0 0 3px rgba(204, 114, 63, 0.15) !important;
+}
+
+.mm-direct-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    margin-top: 6px;
+    max-height: 380px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.mm-search-results-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px 0;
+}
+
+.mm-search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: background 0.15s ease-in-out;
+}
+
+.mm-search-result-item:last-child {
+    border-bottom: none;
+}
+
+.mm-search-result-item:hover {
+    background: #f8fafc;
+}
+
+.mm-search-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.mm-search-avatar-placeholder {
+    background: #e2e8f0;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.mm-search-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.mm-search-item-title {
+    font-size: 13px;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mm-search-item-meta {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-search-no-results {
+    padding: 24px;
+    text-align: center;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.mm-breakdown-table th {
+    background: #f8fafc;
+    color: #334155;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mm-breakdown-table td {
+    vertical-align: middle;
+    font-size: 13px;
+}
+
+.mm-pill-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+    font-size: 11px;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    padding: 3px 8px;
+    border-radius: 12px;
+}
+
+.mm-pill-differ {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    font-size: 11px;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+    padding: 3px 8px;
+    border-radius: 12px;
+}
+
+@media (max-width: 782px) {
+    .mm-compare-members-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+
 
 
 
