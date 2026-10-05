@@ -319,6 +319,79 @@ final class CancellationAndRejectionReasonTest extends TestCase
 
         $this->assertNull($info);
     }
+
+    public function test_pmpro_cancel_processed_and_cancel_on_next_payment_date_handlers_save_metadata(): void
+    {
+        $user_id = 120;
+        $level_id = 3;
+        $future_exp = date('Y-m-d H:i:s', time() + (25 * 86400));
+
+        $level_obj = (object) [
+            'id'      => $level_id,
+            'name'    => 'Monthly Gold',
+            'user_id' => $user_id,
+            'enddate' => $future_exp,
+        ];
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [$level_obj];
+
+        $_REQUEST['mm_cancellation_reason']  = 'Too expensive / financial reasons';
+        $_REQUEST['mm_cancellation_details'] = 'Subscription fee is higher than expected.';
+
+        $sync = PMProSync::instance();
+        $sync->handle_pmpro_cancel_on_next_payment_date(true, $level_id, $user_id);
+
+        $this->assertEquals('Too expensive / financial reasons', get_user_meta($user_id, 'mm_cancellation_reason', true));
+        $this->assertEquals('Subscription fee is higher than expected.', get_user_meta($user_id, 'mm_cancellation_details', true));
+        $this->assertEquals($future_exp, get_user_meta($user_id, 'mm_subscription_expires_at', true));
+        $this->assertEquals($level_id, (int) get_user_meta($user_id, 'mm_cancelled_level_id', true));
+    }
+
+    public function test_render_cancel_before_submit_fields_outputs_hidden_inputs(): void
+    {
+        $_REQUEST['mm_cancellation_reason']  = 'Taking a temporary break';
+        $_REQUEST['mm_cancellation_details'] = 'Traveling for work.';
+
+        $sync = PMProSync::instance();
+        ob_start();
+        $sync->render_cancel_before_submit_fields(null, [3]);
+        $html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('name="mm_cancellation_reason" value="Taking a temporary break"', $html);
+        $this->assertStringContainsString('name="mm_cancellation_details" value="Traveling for work."', $html);
+    }
+
+    public function test_match_rejection_stores_in_wp_matches_table_columns(): void
+    {
+        $wpdb = $GLOBALS['wpdb'];
+        $repo = MatchRepository::instance();
+
+        // Mock find_match_by_id
+        $match_row = [
+            'id'                        => 500,
+            'user_one_id'               => 15,
+            'user_two_id'               => 25,
+            'initiator_user_id'         => 15,
+            'status'                    => 'approved',
+            'user_one_response'         => 'pending',
+            'user_two_response'         => 'pending',
+            'user_one_rejection_reason' => null,
+            'user_two_rejection_reason' => null,
+        ];
+        $wpdb->mock_rows["SELECT * FROM wp_matches WHERE id = 500"] = $match_row;
+
+        $res = $repo->update_match_response(500, 15, 'decline', 'Lifestyle incompatibility and location distance.');
+
+        $this->assertTrue($res['success']);
+        $this->assertEquals(1, $res['next_step']);
+
+        // Verify update was issued with user_one_rejection_reason
+        $last_update = end($wpdb->updates);
+        $this->assertNotEmpty($last_update);
+        $this->assertEquals('wp_matches', $last_update['table']);
+        $this->assertEquals('rejected', $last_update['data']['status']);
+        $this->assertEquals('rejected', $last_update['data']['user_one_response']);
+        $this->assertEquals('Lifestyle incompatibility and location distance.', $last_update['data']['user_one_rejection_reason']);
+    }
 }
 
 

@@ -72,6 +72,10 @@ class PMProSync {
         add_filter('pmpro_can_cancel_membership_level', [$this, 'filter_pmpro_can_cancel_membership_level'], 10, 3);
         add_filter('pmpro_cancel_membership_level', [$this, 'block_base_membership_cancellation_with_active_services'], 10, 3);
         add_filter('pmpro_cancel_membership_level', [$this, 'defer_cancellation_to_end_of_period'], 20, 3);
+        add_action('pmpro_cancel_before_submit', [$this, 'render_cancel_before_submit_fields'], 10, 2);
+        add_action('pmpro_cancel_processed', [$this, 'handle_pmpro_cancel_processed'], 10, 1);
+        add_filter('pmpro_cancel_should_process', [$this, 'handle_pmpro_cancel_should_process'], 10, 2);
+        add_filter('pmpro_cancel_on_next_payment_date', [$this, 'handle_pmpro_cancel_on_next_payment_date'], 10, 3);
         add_filter('pmpro_member_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_filter('pmpro_account_membership_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_filter('pmpro_account_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
@@ -796,6 +800,186 @@ class PMProSync {
 
         // Returning false prevents PMPro from immediately dropping the level to 0
         return false;
+    }
+
+    /**
+     * Extracts and persists cancellation reason, feedback, and timestamp metadata for a user.
+     *
+     * @param int         $user_id
+     * @param int         $level_id
+     * @param string|null $enddate_mysql
+     * @return void
+     */
+    public function save_cancellation_metadata(int $user_id, int $level_id = 0, ?string $enddate_mysql = null): void
+    {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        $reason  = isset($_REQUEST['mm_cancellation_reason']) ? sanitize_text_field(wp_unslash((string) $_REQUEST['mm_cancellation_reason'])) : '';
+        $details = isset($_REQUEST['mm_cancellation_details']) ? sanitize_textarea_field(wp_unslash((string) $_REQUEST['mm_cancellation_details'])) : '';
+
+        // Check referer if empty in $_REQUEST
+        if (empty($reason) && !empty($_SERVER['HTTP_REFERER'])) {
+            $referer_query = wp_parse_url((string) $_SERVER['HTTP_REFERER'], PHP_URL_QUERY);
+            if (!empty($referer_query)) {
+                parse_str($referer_query, $ref_args);
+                if (!empty($ref_args['mm_cancellation_reason'])) {
+                    $reason = sanitize_text_field((string) $ref_args['mm_cancellation_reason']);
+                }
+                if (!empty($ref_args['mm_cancellation_details'])) {
+                    $details = sanitize_textarea_field((string) $ref_args['mm_cancellation_details']);
+                }
+            }
+        }
+
+        // If level_id not passed, try to detect from $_REQUEST or user levels
+        if ($level_id <= 0 && !empty($_REQUEST['levelstocancel']) && is_numeric($_REQUEST['levelstocancel'])) {
+            $level_id = (int) $_REQUEST['levelstocancel'];
+        }
+
+        if (empty($enddate_mysql)) {
+            $user_levels = function_exists('pmpro_getMembershipLevelsForUser') ? pmpro_getMembershipLevelsForUser($user_id) : [];
+            if (!empty($user_levels)) {
+                foreach ($user_levels as $lvl) {
+                    if (is_object($lvl) && !empty($lvl->enddate)) {
+                        $enddate_mysql = is_numeric($lvl->enddate) ? date('Y-m-d H:i:s', (int) $lvl->enddate) : (string) $lvl->enddate;
+                        if ($level_id <= 0) {
+                            $level_id = (int) ($lvl->id ?? $lvl->ID ?? 0);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        update_user_meta($user_id, 'mm_subscription_cancelled_at', current_time('mysql'));
+        update_user_meta($user_id, 'mm_cancellation_date', current_time('mysql'));
+        if (!empty($enddate_mysql)) {
+            update_user_meta($user_id, 'mm_subscription_expires_at', $enddate_mysql);
+        }
+        if ($level_id > 0) {
+            update_user_meta($user_id, 'mm_cancelled_level_id', $level_id);
+        }
+        if (!empty($reason)) {
+            update_user_meta($user_id, 'mm_cancellation_reason', $reason);
+        }
+        if (!empty($details)) {
+            update_user_meta($user_id, 'mm_cancellation_details', $details);
+        }
+
+        // Log cancellation event
+        $log_desc = sprintf(__('PMPro membership cancellation recorded for user #%d (level %d).', 'matchmaker'), $user_id, $level_id);
+        if (!empty($reason)) {
+            $log_desc .= ' ' . sprintf(__('Reason: %s.', 'matchmaker'), $reason);
+        }
+        if (!empty($details)) {
+            $log_desc .= ' ' . sprintf(__('Details: %s', 'matchmaker'), $details);
+        }
+
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info(
+                $log_desc,
+                [
+                    'user_id'              => $user_id,
+                    'level_id'             => $level_id,
+                    'expires_at'           => $enddate_mysql,
+                    'cancellation_reason'  => $reason,
+                    'cancellation_details' => $details,
+                ],
+                'pmpro'
+            );
+        }
+
+        \Matchmaker\Repository\MatchRepository::instance()->log_event(
+            'pmpro_sync',
+            'subscription_cancelled',
+            sprintf(__('Membership Cancelled (PMPro): User #%d', 'matchmaker'), $user_id),
+            $log_desc,
+            [
+                'user_id'              => $user_id,
+                'level_id'             => $level_id,
+                'expires_at'           => $enddate_mysql,
+                'cancellation_reason'  => $reason,
+                'cancellation_details' => $details,
+            ],
+            $user_id,
+            null,
+            'warning'
+        );
+    }
+
+    /**
+     * Hooked to pmpro_cancel_processed action.
+     *
+     * @param mixed $user
+     * @return void
+     */
+    public function handle_pmpro_cancel_processed(mixed $user): void
+    {
+        $user_id = is_object($user) ? (int) ($user->ID ?? 0) : (int) $user;
+        if ($user_id <= 0) {
+            $user_id = get_current_user_id();
+        }
+        $this->save_cancellation_metadata($user_id);
+    }
+
+    /**
+     * Hooked to pmpro_cancel_should_process filter.
+     *
+     * @param bool  $should_process
+     * @param mixed $user
+     * @return bool
+     */
+    public function handle_pmpro_cancel_should_process(bool $should_process, mixed $user): bool
+    {
+        if ($should_process) {
+            $user_id = is_object($user) ? (int) ($user->ID ?? 0) : (int) $user;
+            if ($user_id <= 0) {
+                $user_id = get_current_user_id();
+            }
+            $this->save_cancellation_metadata($user_id);
+        }
+        return $should_process;
+    }
+
+    /**
+     * Hooked to pmpro_cancel_on_next_payment_date filter.
+     *
+     * @param bool  $cancel_on_next
+     * @param mixed $level_id
+     * @param mixed $user_id
+     * @return bool
+     */
+    public function handle_pmpro_cancel_on_next_payment_date(bool $cancel_on_next, mixed $level_id, mixed $user_id): bool
+    {
+        $uid = (int) $user_id;
+        $lid = (int) $level_id;
+        if ($uid > 0) {
+            $this->save_cancellation_metadata($uid, $lid);
+        }
+        return $cancel_on_next;
+    }
+
+    /**
+     * Renders hidden cancellation reason and details fields inside the PMPro cancellation form.
+     * Hooked to pmpro_cancel_before_submit action.
+     *
+     * @param mixed $user
+     * @param mixed $old_level_ids
+     * @return void
+     */
+    public function render_cancel_before_submit_fields(mixed $user, mixed $old_level_ids): void
+    {
+        $reason  = isset($_REQUEST['mm_cancellation_reason']) ? sanitize_text_field(wp_unslash((string) $_REQUEST['mm_cancellation_reason'])) : '';
+        $details = isset($_REQUEST['mm_cancellation_details']) ? sanitize_textarea_field(wp_unslash((string) $_REQUEST['mm_cancellation_details'])) : '';
+
+        if (!empty($reason)) {
+            echo '<input type="hidden" name="mm_cancellation_reason" value="' . esc_attr($reason) . '">';
+        }
+        if (!empty($details)) {
+            echo '<input type="hidden" name="mm_cancellation_details" value="' . esc_attr($details) . '">';
+        }
     }
 
     /**

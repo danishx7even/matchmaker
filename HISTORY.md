@@ -6,7 +6,17 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
-### Task 135: Display Cancellation Notice & Badges for Cancelled Active Subscriptions on Admin Profile
+### Task 136: Support PMPro 3.0 Cancellation Pipeline & Verify Match Rejection Persistence
+- **Objective**:
+  1. Fix issue where PMPro 3.0 subscription cancellations (which call `pmpro_set_expiration_date` and bypass `pmpro_cancelMembershipLevel`) failed to trigger metadata saving for cancellation reason and details.
+  2. Implement hooks for `pmpro_cancel_before_submit`, `pmpro_cancel_processed`, `pmpro_cancel_should_process`, and `pmpro_cancel_on_next_payment_date` in `PMProSync.php` to guarantee cancellation metadata (`mm_cancellation_reason`, `mm_cancellation_details`, `mm_subscription_cancelled_at`, `mm_subscription_expires_at`, `mm_cancellation_date`) is captured and persisted in `wp_usermeta`.
+  3. Ensure hidden fields are injected directly into PMPro's server-rendered cancellation form and validated on client submit in `cancellation-modal.js`.
+  4. Verify and test match rejection feedback persistence directly in `wp_matches` columns (`user_one_rejection_reason` / `user_two_rejection_reason`).
+- **Implemented**:
+  - `src/Core/PMProSync.php`: Added `save_cancellation_metadata()`, `handle_pmpro_cancel_processed()`, `handle_pmpro_cancel_should_process()`, `handle_pmpro_cancel_on_next_payment_date()`, and `render_cancel_before_submit_fields()`.
+  - `assets/js/cancellation-modal.js`: Enhanced confirmation page field injection to ensure inputs exist on submit.
+  - `tests/Unit/CancellationAndRejectionReasonTest.php`: Added tests for PMPro 3.0 cancellation handlers, form fields rendering, and match rejection DB persistence.
+- **Verification**: All **233/233 automated tests passing (0 failures, 0 errors)**.
 - **Objective**:
   1. Detect users who have cancelled their membership but still retain active deferred access, and ensure the cancellation reason and details are displayed on the Admin Single User view (`user-single.php`).
   2. Implement `PMProSync::get_user_cancellation_info(int $user_id): ?array` evaluating `wp_usermeta` cancellation flags (`mm_subscription_cancelled_at`, `mm_subscription_expires_at`, `mm_cancellation_reason`, `mm_cancellation_details`, `mm_cancellation_date`) as well as active PMPro levels with future `enddate`.

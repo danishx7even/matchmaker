@@ -31,42 +31,55 @@
             }
 
             var allForms = document.querySelectorAll('form');
+            var urlParams = new URLSearchParams(window.location.search);
+            var reason = urlParams.get('mm_cancellation_reason') || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_reason') : '') || '';
+            var details = urlParams.get('mm_cancellation_details') || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_details') : '') || '';
+
+            function injectCancelFields(cf) {
+                var curReason = reason || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_reason') : '') || '';
+                var curDetails = details || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_details') : '') || '';
+
+                if (curReason) {
+                    var rField = cf.querySelector('input[name="mm_cancellation_reason"]');
+                    if (!rField) {
+                        rField = document.createElement('input');
+                        rField.type = 'hidden';
+                        rField.name = 'mm_cancellation_reason';
+                        cf.appendChild(rField);
+                    }
+                    rField.value = curReason;
+                }
+
+                if (curDetails) {
+                    var dField = cf.querySelector('input[name="mm_cancellation_details"]');
+                    if (!dField) {
+                        dField = document.createElement('input');
+                        dField.type = 'hidden';
+                        dField.name = 'mm_cancellation_details';
+                        cf.appendChild(dField);
+                    }
+                    dField.value = curDetails;
+                }
+            }
+
             if (allForms.length > 0) {
-                var urlParams = new URLSearchParams(window.location.search);
-                var reason = urlParams.get('mm_cancellation_reason') || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_reason') : '') || '';
-                var details = urlParams.get('mm_cancellation_details') || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_details') : '') || '';
-
                 allForms.forEach(function (cf) {
-                    if (reason) {
-                        var rField = cf.querySelector('input[name="mm_cancellation_reason"]');
-                        if (!rField) {
-                            rField = document.createElement('input');
-                            rField.type = 'hidden';
-                            rField.name = 'mm_cancellation_reason';
-                            cf.appendChild(rField);
-                        }
-                        rField.value = reason;
-                    }
-
-                    if (details) {
-                        var dField = cf.querySelector('input[name="mm_cancellation_details"]');
-                        if (!dField) {
-                            dField = document.createElement('input');
-                            dField.type = 'hidden';
-                            dField.name = 'mm_cancellation_details';
-                            cf.appendChild(dField);
-                        }
-                        dField.value = details;
-                    }
-
+                    injectCancelFields(cf);
                     cf.addEventListener('submit', function () {
-                        if (window.sessionStorage) {
-                            sessionStorage.removeItem('mm_cancellation_reason');
-                            sessionStorage.removeItem('mm_cancellation_details');
-                        }
+                        injectCancelFields(cf);
                     });
                 });
             }
+
+            // Also re-check when submit buttons are clicked
+            document.querySelectorAll('input[type="submit"], button[type="submit"], .pmpro_btn-submit').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var parentForm = btn.closest('form');
+                    if (parentForm) {
+                        injectCancelFields(parentForm);
+                    }
+                });
+            });
 
             // On confirmation page, do not attach modal interceptors to prevent double popup
             return;

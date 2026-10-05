@@ -1162,6 +1162,7 @@ class Fakewpdb {
     public array $mock_rows = [];
     public array $mock_cols = [];
     public array $mock_vars = [];
+    public array $updates = [];
 
     public function esc_like(string $text): string {
         return addcslashes($text, '_%\\');
@@ -1209,6 +1210,7 @@ class Fakewpdb {
 
     public function update($table, $data, $where, $format = null, $where_format = null): int {
         $this->queries[] = "UPDATE {$table}";
+        $this->updates[] = ['table' => $table, 'data' => $data, 'where' => $where];
         if ($table === $this->users && isset($where['ID']) && isset($GLOBALS['__mm_users'][$where['ID']])) {
             $u = $GLOBALS['__mm_users'][$where['ID']];
             if (isset($data['user_login'])) {
