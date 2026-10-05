@@ -783,11 +783,60 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
         $time_diff          = time() - $last_sent;
         $cooldown_remaining = ($time_diff < $cooldown_limit) ? ($cooldown_limit - $time_diff) : 0;
 
+        $this->enqueue_verification_assets();
+
         $view_path = (defined('MM_SRC_PATH') ? MM_SRC_PATH : dirname(__DIR__) . '/') . 'View/frontend/portal/email-verification.php';
 
         ob_start();
         include $view_path;
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Enqueue or schedule verification CSS and JS assets safely outside wpautop.
+     *
+     * @return void
+     */
+    public function enqueue_verification_assets(): void
+    {
+        $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__DIR__, 2));
+        $version    = defined('MM_VERSION') ? MM_VERSION : '2.11.0';
+
+        if (function_exists('wp_enqueue_style') && !wp_style_is('mm-email-verification-styles', 'enqueued')) {
+            wp_enqueue_style('mm-email-verification-styles', $plugin_url . 'assets/css/email-verification.css', [], $version);
+        }
+
+        if (function_exists('wp_enqueue_script') && !wp_script_is('mm-email-verification-script', 'enqueued')) {
+            wp_enqueue_script('mm-email-verification-script', $plugin_url . 'assets/js/email-verification.js', [], $version, true);
+        }
+
+        // Register footer fallback in case scripts were enqueued after wp_enqueue_scripts fired
+        add_action('wp_footer', [$this, 'print_verification_footer_assets'], 99);
+    }
+
+    /**
+     * Fallback footer printer ensuring styles and scripts load if wp_enqueue_scripts had already fired.
+     *
+     * @return void
+     */
+    public function print_verification_footer_assets(): void
+    {
+        static $printed = false;
+        if ($printed) {
+            return;
+        }
+        $printed = true;
+
+        $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__DIR__, 2));
+        $version    = defined('MM_VERSION') ? MM_VERSION : '2.11.0';
+
+        if (function_exists('wp_style_is') && !wp_style_is('mm-email-verification-styles', 'done') && !wp_style_is('mm-email-verification-styles', 'enqueued')) {
+            echo '<link rel="stylesheet" id="mm-email-verification-styles-css" href="' . esc_url($plugin_url . 'assets/css/email-verification.css?ver=' . $version) . '" type="text/css" media="all" />' . "\n";
+        }
+
+        if (function_exists('wp_script_is') && !wp_script_is('mm-email-verification-script', 'done') && !wp_script_is('mm-email-verification-script', 'enqueued')) {
+            echo '<script src="' . esc_url($plugin_url . 'assets/js/email-verification.js?ver=' . $version) . '"></script>' . "\n";
+        }
     }
 
     /**

@@ -23,6 +23,13 @@ if (!defined('OBJECT')) {
 if (!defined('MM_UNIT_TESTS')) {
     define('MM_UNIT_TESTS', true);
 }
+if (!defined('MM_URL')) {
+    define('MM_URL', 'https://example.com/wp-content/plugins/matchmaker/');
+}
+
+function plugin_dir_url($file) {
+    return 'https://example.com/wp-content/plugins/matchmaker/';
+}
 
 
 $GLOBALS['__mm_dbdelta_sql']     = null;

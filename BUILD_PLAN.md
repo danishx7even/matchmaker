@@ -5,7 +5,8 @@
 **Current Phase**: Idle
 
 ## Objectives
-*No active tasks.*
+*No active tasks. Ready for next instruction.*
 
 ## Checklist
-*No active checklist.*
+*No pending checklist items.*
+

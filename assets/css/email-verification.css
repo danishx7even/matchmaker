@@ -1,0 +1,176 @@
+/**
+ * Matchmaker Email Verification Styles
+ */
+.mm-email-verify-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 50vh;
+    padding: 40px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    box-sizing: border-box;
+}
+.mm-email-verify-card {
+    background: #ffffff;
+    max-width: 480px;
+    width: 100%;
+    border-radius: 20px;
+    padding: 40px 32px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(29, 30, 32, 0.08);
+    border: 1px solid rgba(204, 114, 63, 0.18);
+    box-sizing: border-box;
+}
+.mm-email-verify-icon-wrap {
+    width: 68px;
+    height: 68px;
+    margin: 0 auto 20px;
+    background: #F8F2ED;
+    border: 2px solid #CC723F;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #CC723F;
+}
+.mm-email-verify-icon {
+    width: 32px;
+    height: 32px;
+}
+.mm-email-verify-title {
+    font-family: "Cormorant SC", Georgia, serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1D1E20;
+    margin: 0 0 10px;
+    letter-spacing: 0.02em;
+}
+.mm-email-verify-desc {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #64748b;
+    margin: 0 0 24px;
+}
+.mm-email-highlight {
+    color: #1D1E20;
+    font-weight: 600;
+}
+.mm-verify-alert {
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 20px;
+    text-align: center;
+    box-sizing: border-box;
+}
+.mm-verify-alert.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+.mm-verify-alert.success {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
+.mm-otp-group {
+    margin-bottom: 24px;
+}
+.mm-otp-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+.mm-otp-input {
+    width: 100%;
+    max-width: 280px;
+    height: 54px;
+    margin: 0 auto;
+    text-align: center;
+    font-family: "Courier New", Courier, monospace, monospace;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.35em;
+    padding-left: 0.35em;
+    color: #1D1E20;
+    background: #F8F2ED;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+.mm-otp-input:focus {
+    border-color: #CC723F;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(204, 114, 63, 0.15);
+}
+.mm-verify-btn {
+    width: 100%;
+    height: 48px;
+    background: #1D1E20;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+}
+.mm-verify-btn:hover {
+    background: #CC723F;
+}
+.mm-verify-btn:active {
+    transform: scale(0.99);
+}
+.mm-verify-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.mm-resend-wrap {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #f1f5f9;
+}
+.mm-resend-text {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+}
+.mm-resend-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 6px;
+    color: #CC723F;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.mm-resend-btn:disabled {
+    color: #94a3b8;
+    text-decoration: none;
+    cursor: not-allowed;
+}
+.mm-verify-btn-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: mm-spin 0.6s linear infinite;
+    display: inline-block;
+}
+@keyframes mm-spin {
+    to { transform: rotate(360deg); }
+}

@@ -6,6 +6,20 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 132: Extract Email Verification CSS/JS to Prevent wpautop Paragraph Tag Injection
+- **Objective**:
+  1. Resolve WordPress core `wpautop` filter injecting `<p>` and `</p>` tags into `<script>` and `<style>` blocks when `[matchmaker_member_portal]` renders the email verification screen on member pages.
+  2. Extract email verification styling to `assets/css/email-verification.css` and client-side OTP logic (6-digit paste, auto-advance, submission, resend countdown cooldown) to `assets/js/email-verification.js`.
+  3. Register and enqueue both assets in `EmailVerificationService::enqueue_verification_assets()` and register a late `wp_footer` printer (`print_verification_footer_assets()`) as a fallback to ensure assets always load even if the verification view is invoked late during shortcode rendering.
+  4. Refactor `src/View/frontend/portal/email-verification.php` to clean, semantic HTML storing configuration purely in HTML `data-*` attributes (`data-ajax-url`, `data-nonce`, `data-context`, `data-cooldown`), eliminating all inline `<script>` blocks from shortcode return values.
+- **Implemented**:
+  - `assets/css/email-verification.css`: Created dedicated stylesheet containing all modal, card, OTP input, badge, and timer styles.
+  - `assets/js/email-verification.js`: Created dedicated standalone script managing OTP focus, paste handling, alert messages, AJAX submission, and resend countdown timer.
+  - `src/View/frontend/portal/email-verification.php`: Converted template to pure semantic HTML without inline scripts.
+  - `src/Service/EmailVerificationService.php`: Enqueued scripts and styles properly via WordPress enqueue API and `wp_footer` fallback hook.
+- **Verification**: Ran automated test suite with **220/220 tests passing** (0 failures, 0 errors).
+
+
 ### Task 131: Fix Email Verification Script Syntax Error & Remove User ID Hidden Input
 - **Objective**:
   1. Fix `Uncaught SyntaxError: expected expression, got '<'` on the member dashboard when the email verification form is rendered.
