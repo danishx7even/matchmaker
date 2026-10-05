@@ -2778,15 +2778,30 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — **all 210 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+---
 
-
-
-
-
-
-
-
-
-
-
+### Task 124: Membership Cancellation Single-Trigger Modal & Cancelled Subscription Status Fix
+- **Objective**:
+  1. Fix the Reason for Membership Cancellation modal so it triggers only once on the initial Cancel CTA click on the PMPro Membership Account page.
+  2. Prevent the cancellation popup from re-triggering on PMPro's default confirmation page (`form#pmpro_cancel_form`) when confirming the cancellation.
+  3. Ensure cancellation reasons and details are seamlessly carried over and submitted with the PMPro confirmation form via query parameters and `sessionStorage`.
+  4. Ensure that when a user has cancelled their subscription but retains active access for the current billing cycle:
+     - The Cancel button/link is completely hidden and disabled on the membership account page.
+     - The membership card status displays clearly as `Cancelled (Active until [Expiration Date])` with an amber warning badge (`mm-badge-cancelled-active`).
+     - `PMProSync::filter_pmpro_can_cancel_membership_level` returns `false` to block re-cancellation attempts.
+- **Implemented**:
+  - `assets/js/cancellation-modal.js`:
+    - Added detection of the PMPro cancel confirmation page (`form#pmpro_cancel_form`). If on confirmation page, automatically populates hidden fields `mm_cancellation_reason` and `mm_cancellation_details` from URL parameters or `sessionStorage` and returns early without attaching modal interceptors.
+    - Scoped link click interceptors strictly to active account page Cancel CTA links, ignoring disabled, hidden, or already cancelled subscriptions.
+  - `src/Core/PMProSync.php`:
+    - In `filter_pmpro_can_cancel_membership_level()`: Returns `false` if `mm_subscription_cancelled_at` is set and `mm_subscription_expires_at` is in the future.
+    - In `filter_pmpro_member_action_links()`: Unconditionally unsets `cancel` and `pmpro_cancel` action links for cancelled subscriptions.
+    - In `get_membership_level_card_details()`: When subscription is cancelled with access remaining, formats `status` as `Cancelled (Active until [Date])` and sets `status_badge_class` to `mm-badge-cancelled-active`.
+    - In `render_membership_account_card_details()`: Renders amber warning badge for cancelled memberships.
+    - In `render_account_cancel_blockade_script()`: Injects script to hide cancel links and render `Cancelled` indicator tag for cancelled memberships.
+  - `tests/Unit/CancellationAndRejectionReasonTest.php`:
+    - Added `test_cancelled_membership_card_details_shows_cancelled_active_status()` verifying status formatting, badge class, and cancellation notice.
+    - Added `test_cancelled_membership_action_links_and_can_cancel_suppression()` verifying action links and cancellation permission suppression.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 226 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 

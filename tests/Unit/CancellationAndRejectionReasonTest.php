@@ -161,4 +161,64 @@ final class CancellationAndRejectionReasonTest extends TestCase
         $this->assertEquals('Distance is too far.', $history[0]['my_rejection_reason']);
         $this->assertEquals('Distance is too far.', $history[0]['user_one_rejection_reason']);
     }
+
+    public function test_cancelled_membership_card_details_shows_cancelled_active_status(): void
+    {
+        $user_id = 77;
+        $level_id = 3;
+        $future_exp = date('Y-m-d H:i:s', time() + (20 * 86400));
+
+        update_user_meta($user_id, 'mm_subscription_cancelled_at', date('Y-m-d H:i:s'));
+        update_user_meta($user_id, 'mm_subscription_expires_at', $future_exp);
+        update_user_meta($user_id, 'mm_cancelled_level_id', $level_id);
+
+        $level_obj = (object) [
+            'id'             => $level_id,
+            'name'           => 'Monthly Gold',
+            'user_id'        => $user_id,
+            'startdate'      => date('Y-m-d H:i:s', time() - (10 * 86400)),
+            'enddate'        => $future_exp,
+            'billing_amount' => '49.00',
+        ];
+
+        $sync = PMProSync::instance();
+        $details = $sync->get_membership_level_card_details($level_obj, $user_id);
+
+        $this->assertTrue($details['is_subscription_cancelled']);
+        $this->assertStringContainsString('Cancelled (Active until', $details['status']);
+        $this->assertEquals('mm-badge-cancelled-active', $details['status_badge_class']);
+        $this->assertStringContainsString('Subscription cancelled. Access remains active until', $details['cancelled_notice']);
+    }
+
+    public function test_cancelled_membership_action_links_and_can_cancel_suppression(): void
+    {
+        $user_id = 88;
+        $level_id = 3;
+        $future_exp = date('Y-m-d H:i:s', time() + (15 * 86400));
+
+        update_user_meta($user_id, 'mm_subscription_cancelled_at', date('Y-m-d H:i:s'));
+        update_user_meta($user_id, 'mm_subscription_expires_at', $future_exp);
+        update_user_meta($user_id, 'mm_cancelled_level_id', $level_id);
+
+        $sync = PMProSync::instance();
+
+        // 1. Action links should have cancel removed
+        $links = [
+            'change' => '<a href="/change">Change</a>',
+            'cancel' => '<a href="/cancel">Cancel</a>',
+            'pmpro_cancel' => '<a href="/cancel">Cancel</a>',
+        ];
+
+        $level_obj = (object) ['id' => $level_id, 'enddate' => $future_exp];
+        $filtered = $sync->filter_pmpro_member_action_links($links, $level_obj, $user_id);
+
+        $this->assertArrayNotHasKey('cancel', $filtered);
+        $this->assertArrayNotHasKey('pmpro_cancel', $filtered);
+        $this->assertArrayHasKey('change', $filtered);
+
+        // 2. Can cancel filter should return false
+        $can_cancel = $sync->filter_pmpro_can_cancel_membership_level(true, $user_id, $level_obj);
+        $this->assertFalse($can_cancel);
+    }
 }
+
