@@ -539,8 +539,11 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
                 action: 'mm_admin_search_candidates',
                 nonce: nonce,
                 target_user_id: targetUserId,
-                query: query
+                exclude_id: targetUserId,
+                query: query,
+                term: query
             },
+
             success: function(res) {
                 if (searchSpinner) searchSpinner.style.display = 'none';
                 if (res && res.success && res.data && res.data.candidates) {

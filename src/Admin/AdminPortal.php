@@ -1830,8 +1830,8 @@ class AdminPortal
             wp_send_json_error(['message' => __('Unauthorized permission.', 'matchmaker')], 403);
         }
 
-        $term = isset($_POST['term']) ? sanitize_text_field(wp_unslash((string) $_POST['term'])) : '';
-        $exclude_id = isset($_POST['exclude_id']) ? (int) $_POST['exclude_id'] : 0;
+        $term = isset($_POST['query']) ? sanitize_text_field(wp_unslash((string) $_POST['query'])) : (isset($_POST['term']) ? sanitize_text_field(wp_unslash((string) $_POST['term'])) : '');
+        $exclude_id = isset($_POST['target_user_id']) ? (int) $_POST['target_user_id'] : (isset($_POST['exclude_id']) ? (int) $_POST['exclude_id'] : 0);
 
         if (mb_strlen(trim($term)) < 1) {
             wp_send_json_success(['candidates' => []]);
@@ -1841,15 +1841,30 @@ class AdminPortal
         $repo = MatchRepository::instance();
         $pool_table  = $wpdb->prefix . 'matchmaking_pool';
         $users_table = $wpdb->users;
+        $meta_table  = $wpdb->usermeta;
 
         $like_term = '%' . $wpdb->esc_like(trim($term)) . '%';
         $sql = "SELECT p.*, u.display_name, u.user_email, u.user_login 
                 FROM {$pool_table} p 
                 INNER JOIN {$users_table} u ON p.user_id = u.ID 
-                WHERE (p.user_id = %d OR u.display_name LIKE %s OR u.user_email LIKE %s OR u.user_login LIKE %s)";
+                WHERE (
+                    p.user_id = %d 
+                    OR u.display_name LIKE %s 
+                    OR u.user_email LIKE %s 
+                    OR u.user_login LIKE %s 
+                    OR u.user_nicename LIKE %s
+                    OR EXISTS (
+                        SELECT 1 FROM {$meta_table} um 
+                        WHERE um.user_id = p.user_id 
+                        AND um.meta_key IN ('first_name', 'last_name', 'full_name', 'user_full_name', 'nickname') 
+                        AND um.meta_value LIKE %s
+                    )
+                )";
 
         $params = [
             is_numeric($term) ? (int) $term : 0,
+            $like_term,
+            $like_term,
             $like_term,
             $like_term,
             $like_term,
@@ -1872,12 +1887,26 @@ class AdminPortal
             $photo = !empty($meta['user_photo1']) ? $meta['user_photo1'] : (!empty($r['user_photo1']) ? $r['user_photo1'] : '');
             $age   = $repo->calc_age((string) ($r['birth_date'] ?? ''));
 
+            $u_obj = get_userdata($uid);
+            $full_name = '';
+            if ($u_obj) {
+                $fname = get_user_meta($uid, 'first_name', true);
+                $lname = get_user_meta($uid, 'last_name', true);
+                $full_name = trim($fname . ' ' . $lname);
+                if (empty($full_name)) {
+                    $full_name = !empty($meta['full_name']) ? (string)$meta['full_name'] : $u_obj->display_name;
+                }
+            }
+            if (empty($full_name)) {
+                $full_name = $r['display_name'] ?: ('User #' . $uid);
+            }
+
             $loc_parts = array_filter([$r['city'] ?? '', $r['state'] ?? '', $r['country'] ?? '']);
             $loc = !empty($loc_parts) ? implode(', ', $loc_parts) : ($r['location'] ?? '—');
 
             $results[] = [
                 'id'           => $uid,
-                'display_name' => $r['display_name'],
+                'display_name' => $full_name,
                 'user_email'   => $r['user_email'],
                 'user_type'    => $r['user_type'] ?? 'free',
                 'tier_label'   => $repo->format_tier_label($r['user_type'] ?? 'free'),
@@ -1890,6 +1919,7 @@ class AdminPortal
 
         wp_send_json_success(['candidates' => $results]);
     }
+
 
     /**
      * AJAX handler: Get comprehensive criteria comparison between target user and selected candidate.
