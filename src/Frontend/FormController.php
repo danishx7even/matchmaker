@@ -128,13 +128,18 @@ class FormController {
             $values['email']     = $current_user->user_email;
         }
 
+        $saved_dob = (string) (get_user_meta($user_id, 'user_dob', true) ?: get_user_meta($user_id, 'birth_date', true));
+        if ($saved_dob !== '') {
+            $values['birth_date'] = $saved_dob;
+        }
+
         $pool = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
 
         if ($pool) {
             $values['is_parent_applying']   = !empty($pool['is_parent_applying']) ? 1 : 0;
             $values['user_gender']          = !empty($pool['gender'])      ? ucfirst($pool['gender'])      : '';
             $values['pref_gender']          = !empty($pool['pref_gender']) ? ucfirst($pool['pref_gender']) : '';
-            $values['birth_date']           = $pool['birth_date']          ?? '';
+            $values['birth_date']           = !empty($pool['birth_date']) ? $pool['birth_date'] : ($values['birth_date'] ?? '');
             $values['preferred_age_min']    = $pool['preferred_age_min']   ?? '';
             $values['preferred_age_max']    = $pool['preferred_age_max']   ?? '';
             $values['user_location']        = $pool['location']            ?? '';
@@ -669,6 +674,8 @@ class FormController {
 
         // 10. Save usermeta fields (remove pref_social_links)
         $meta_map = [
+            'user_dob'            => $birth_date,
+            'birth_date'          => $birth_date,
             'is_parent_applying'  => $is_parent_applying,
             'phone_number'        => sanitize_text_field((string) ($f['phone_number'] ?? '')),
             'user_citizenship'    => sanitize_text_field((string) ($f['user_citizenship'] ?? '')),

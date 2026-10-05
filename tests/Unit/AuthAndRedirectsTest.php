@@ -248,36 +248,51 @@ class AuthAndRedirectsTest
 
     public function test_privacy_policy_checkbox_rendering_markup(): void
     {
-        // 1. Logged-out user should render the privacy policy checkbox
+        // 1. Logged-out user should render the full compliance fields (DOB, Age Confirm, Privacy Policy, AUP)
         $GLOBALS['__mm_current_user_id'] = 0;
         ob_start();
         $this->auth->render_checkout_privacy_policy_checkbox();
         $html = (string) ob_get_clean();
 
         if (!str_contains($html, 'id="pmpro_privacy_policy_wrapper"')) {
-            throw new \RuntimeException("Expected privacy policy wrapper in HTML for logged-out user: " . $html);
+            throw new \RuntimeException("Expected compliance wrapper in HTML for logged-out user: " . $html);
         }
 
-        if (!str_contains($html, 'name="privacy_policy_consent"')) {
-            throw new \RuntimeException("Expected privacy_policy_consent input name in HTML: " . $html);
+        // DOB field
+        if (!str_contains($html, 'name="user_dob"') || !str_contains($html, 'Date of Birth')) {
+            throw new \RuntimeException("Expected user_dob date field in HTML: " . $html);
         }
 
-        if (!str_contains($html, 'https://arabzawaj.org/privacy-policy/')) {
-            throw new \RuntimeException("Expected privacy policy URL 'https://arabzawaj.org/privacy-policy/' in HTML: " . $html);
+        // Confirm your age card
+        if (!str_contains($html, 'Confirm your age') || !str_contains($html, 'name="mm_age_confirmed"')) {
+            throw new \RuntimeException("Expected Confirm your age section and checkbox in HTML: " . $html);
+        }
+        if (!str_contains($html, 'You must be at least 18 years old and have reached the age of legal majority')) {
+            throw new \RuntimeException("Expected age confirmation descriptive text in HTML: " . $html);
+        }
+
+        // Privacy Policy checkbox
+        if (!str_contains($html, 'name="privacy_policy_consent"') || !str_contains($html, 'privacy-policy/')) {
+            throw new \RuntimeException("Expected privacy_policy_consent input name and URL in HTML: " . $html);
+        }
+
+        // AUP checkbox
+        if (!str_contains($html, 'name="mm_aup_consent"') || !str_contains($html, 'law-enforcement-requests-member-safety-policy/')) {
+            throw new \RuntimeException("Expected AUP checkbox and link in HTML: " . $html);
         }
 
         if (!str_contains($html, 'pmpro_asterisk') || !str_contains($html, '*')) {
-            throw new \RuntimeException("Expected required asterisk in privacy policy checkbox: " . $html);
+            throw new \RuntimeException("Expected required asterisk in compliance fields: " . $html);
         }
 
-        // 2. Logged-in user should NOT render the privacy policy checkbox
+        // 2. Logged-in user should NOT render the compliance fields
         $GLOBALS['__mm_current_user_id'] = 109;
         ob_start();
         $this->auth->render_checkout_privacy_policy_checkbox();
         $logged_in_html = (string) ob_get_clean();
 
         if (!empty($logged_in_html)) {
-            throw new \RuntimeException("Expected no privacy policy checkbox for logged-in user, got: " . $logged_in_html);
+            throw new \RuntimeException("Expected no compliance fields for logged-in user, got: " . $logged_in_html);
         }
 
         $GLOBALS['__mm_current_user_id'] = 0;
@@ -288,46 +303,105 @@ class AuthAndRedirectsTest
         // 1. For logged-out user:
         $GLOBALS['__mm_current_user_id'] = 0;
         $_POST['submit-checkout'] = '1';
-        unset($_POST['privacy_policy_consent'], $_REQUEST['privacy_policy_consent']);
 
-        // Check without consent - must fail
+        // Case A: Missing DOB
+        unset($_POST['user_dob'], $_POST['mm_age_confirmed'], $_POST['privacy_policy_consent'], $_POST['mm_aup_consent']);
         $valid = $this->auth->check_privacy_policy_consent(true);
         if ($valid !== false) {
-            throw new \RuntimeException("Expected logged-out checkout without privacy policy consent to fail validation.");
+            throw new \RuntimeException("Expected logged-out checkout without DOB to fail validation.");
         }
 
-        // Check with consent - must pass
+        // Case B: Underage (< 18)
+        $underage_year = (int) date('Y') - 16;
+        $_POST['user_dob'] = "{$underage_year}-05-15";
+        $_POST['mm_age_confirmed'] = '1';
         $_POST['privacy_policy_consent'] = '1';
-        $valid_with_consent = $this->auth->check_privacy_policy_consent(true);
-        if ($valid_with_consent !== true) {
-            throw new \RuntimeException("Expected logged-out checkout with privacy policy consent to pass validation.");
+        $_POST['mm_aup_consent'] = '1';
+        $valid_underage = $this->auth->check_privacy_policy_consent(true);
+        if ($valid_underage !== false) {
+            throw new \RuntimeException("Expected underage user (<18) to fail registration validation.");
+        }
+        global $pmpro_msg;
+        if ($pmpro_msg !== 'You do not meet the minimum age requirement to use Arab Zawaj.') {
+            throw new \RuntimeException("Expected exact underage error message, got: " . $pmpro_msg);
+        }
+
+        // Case C: Valid DOB (25 yrs), but missing age confirm checkbox
+        $valid_year = (int) date('Y') - 25;
+        $_POST['user_dob'] = "{$valid_year}-01-01";
+        unset($_POST['mm_age_confirmed']);
+        $valid_no_age_chk = $this->auth->check_privacy_policy_consent(true);
+        if ($valid_no_age_chk !== false || $pmpro_msg !== 'You must confirm that you meet the age requirements.') {
+            throw new \RuntimeException("Expected missing age confirmation error, got: " . $pmpro_msg);
+        }
+
+        // Case D: Valid DOB & age confirm, but missing Privacy Policy
+        $_POST['mm_age_confirmed'] = '1';
+        unset($_POST['privacy_policy_consent']);
+        $valid_no_privacy = $this->auth->check_privacy_policy_consent(true);
+        if ($valid_no_privacy !== false || $pmpro_msg !== 'You must agree to the Privacy Policy to complete your registration.') {
+            throw new \RuntimeException("Expected missing privacy policy error, got: " . $pmpro_msg);
+        }
+
+        // Case E: Valid DOB, age confirm, privacy policy, but missing AUP
+        $_POST['privacy_policy_consent'] = '1';
+        unset($_POST['mm_aup_consent']);
+        $valid_no_aup = $this->auth->check_privacy_policy_consent(true);
+        if ($valid_no_aup !== false || $pmpro_msg !== 'You must agree to the Acceptable Use Policy (AUP) to complete your registration.') {
+            throw new \RuntimeException("Expected missing AUP error, got: " . $pmpro_msg);
+        }
+
+        // Case F: All valid (DOB 25yo, age confirmed, privacy consent, AUP consent) - MUST PASS
+        $_POST['mm_aup_consent'] = '1';
+        $valid_all = $this->auth->check_privacy_policy_consent(true);
+        if ($valid_all !== true) {
+            throw new \RuntimeException("Expected valid checkout submission to pass validation.");
         }
 
         // 2. For logged-in user (already agreed previously):
         $GLOBALS['__mm_current_user_id'] = 109;
-        unset($_POST['privacy_policy_consent'], $_REQUEST['privacy_policy_consent']);
+        unset($_POST['user_dob'], $_POST['mm_age_confirmed'], $_POST['privacy_policy_consent'], $_POST['mm_aup_consent']);
         $valid_logged_in = $this->auth->check_privacy_policy_consent(true);
         if ($valid_logged_in !== true) {
-            throw new \RuntimeException("Expected logged-in checkout to pass validation without needing consent checkbox.");
+            throw new \RuntimeException("Expected logged-in checkout to pass validation without re-prompting.");
         }
 
-        unset($_POST['submit-checkout'], $_POST['privacy_policy_consent']);
+        unset($_POST['submit-checkout'], $_POST['user_dob'], $_POST['mm_age_confirmed'], $_POST['privacy_policy_consent'], $_POST['mm_aup_consent']);
         $GLOBALS['__mm_current_user_id'] = 0;
     }
 
     public function test_privacy_policy_consent_saved_on_checkout(): void
     {
         $user_id = 110;
+        $_POST['user_dob'] = '1996-08-14';
+        $_POST['mm_age_confirmed'] = '1';
         $_POST['privacy_policy_consent'] = '1';
+        $_POST['mm_aup_consent'] = '1';
 
         $this->auth->save_privacy_policy_consent_on_checkout($user_id);
-        $consent_meta = get_user_meta($user_id, 'mm_privacy_policy_consent', true);
 
-        if (empty($consent_meta)) {
-            throw new \RuntimeException("Expected mm_privacy_policy_consent meta to be saved for user #{$user_id}.");
+        $saved_dob       = get_user_meta($user_id, 'user_dob', true);
+        $saved_age_conf  = get_user_meta($user_id, 'mm_age_confirmed', true);
+        $saved_privacy   = get_user_meta($user_id, 'mm_privacy_policy_consent', true);
+        $saved_aup       = get_user_meta($user_id, 'mm_aup_consent', true);
+
+        if ($saved_dob !== '1996-08-14') {
+            throw new \RuntimeException("Expected user_dob '1996-08-14' saved for user #{$user_id}, got: " . var_export($saved_dob, true));
         }
 
-        unset($_POST['privacy_policy_consent']);
+        if (empty($saved_age_conf)) {
+            throw new \RuntimeException("Expected mm_age_confirmed meta saved for user #{$user_id}.");
+        }
+
+        if (empty($saved_privacy)) {
+            throw new \RuntimeException("Expected mm_privacy_policy_consent meta saved for user #{$user_id}.");
+        }
+
+        if (empty($saved_aup)) {
+            throw new \RuntimeException("Expected mm_aup_consent meta saved for user #{$user_id}.");
+        }
+
+        unset($_POST['user_dob'], $_POST['mm_age_confirmed'], $_POST['privacy_policy_consent'], $_POST['mm_aup_consent']);
     }
 
     public function test_pmpro_login_page_design_does_not_contain_username_edit_validation(): void
@@ -368,6 +442,48 @@ class AuthAndRedirectsTest
         if (str_contains($html, ', input#user_login\');') || str_contains($html, ', input#user_login"')) {
             throw new \RuntimeException("Profile edit script must not match generic input#user_login on login pages.");
         }
+    }
+
+    public function test_exact_age_boundaries_and_profile_dob_sync(): void
+    {
+        $GLOBALS['__mm_current_user_id'] = 0;
+        $_POST['submit-checkout']        = '1';
+        $_POST['mm_age_confirmed']       = '1';
+        $_POST['privacy_policy_consent'] = '1';
+        $_POST['mm_aup_consent']         = '1';
+
+        // 1. Exactly 18 years old today -> MUST PASS
+        $exact_18 = (new \DateTime('today'))->sub(new \DateInterval('P18Y'))->format('Y-m-d');
+        $_POST['user_dob'] = $exact_18;
+        $pass_18 = $this->auth->check_privacy_policy_consent(true);
+        if ($pass_18 !== true) {
+            throw new \RuntimeException("Expected exactly 18-year-old user to pass age check.");
+        }
+
+        // 2. 17 years and 364 days old (born 18 years ago tomorrow) -> MUST FAIL
+        $almost_18 = (new \DateTime('tomorrow'))->sub(new \DateInterval('P18Y'))->format('Y-m-d');
+        $_POST['user_dob'] = $almost_18;
+        $fail_17 = $this->auth->check_privacy_policy_consent(true);
+        if ($fail_17 !== false) {
+            throw new \RuntimeException("Expected 17-year-old user to fail age check.");
+        }
+
+        // 3. User Register hook saves DOB & compliance metas
+        $user_id = 115;
+        $_POST['user_dob'] = '1998-11-20';
+        $this->auth->save_privacy_policy_consent_on_user_register($user_id);
+
+        if (get_user_meta($user_id, 'user_dob', true) !== '1998-11-20') {
+            throw new \RuntimeException("Expected user_dob to be saved on user_register.");
+        }
+        if (empty(get_user_meta($user_id, 'mm_age_confirmed', true))) {
+            throw new \RuntimeException("Expected mm_age_confirmed to be saved on user_register.");
+        }
+        if (empty(get_user_meta($user_id, 'mm_aup_consent', true))) {
+            throw new \RuntimeException("Expected mm_aup_consent to be saved on user_register.");
+        }
+
+        unset($_POST['submit-checkout'], $_POST['user_dob'], $_POST['mm_age_confirmed'], $_POST['privacy_policy_consent'], $_POST['mm_aup_consent']);
     }
 }
 

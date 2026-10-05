@@ -6,6 +6,38 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 129: PMPro Signup DOB & Age Confirmation, AUP Checkbox, Age-Gate Validation, and LONGTEXT Schema Migration
+- **Objective**:
+  1. Add required Date of Birth (`user_dob`) input on the PMPro registration/checkout form positioned directly after the email confirmation field (`#bconfirmemail`).
+  2. Add **Confirm your age** section with heading, description ("You must be at least 18 years old and have reached the age of legal majority where you live, whichever is higher, to use Arab Zawaj."), and required checkbox ("I confirm that I meet these age requirements. *").
+  3. Add required **Acceptable Use Policy (AUP)** checkbox ("I have read and agree to the AUP *") positioned after the Privacy Policy checkbox with link to `/law-enforcement-requests-member-safety-policy/`.
+  4. Implement strict checkout validation in `AuthController::check_privacy_policy_consent()` (`pmpro_registration_checks`):
+     - If DOB is missing: `Please enter your date of birth.`
+     - If user is under 18: `You do not meet the minimum age requirement to use Arab Zawaj.`
+     - If age confirmation checkbox is unchecked: `You must confirm that you meet the age requirements.`
+     - If Privacy Policy checkbox is unchecked: `You must agree to the Privacy Policy to complete your registration.`
+     - If AUP checkbox is unchecked: `You must agree to the Acceptable Use Policy (AUP) to complete your registration.`
+  5. Save `user_dob`, `birth_date`, `mm_age_confirmed`, `mm_privacy_policy_consent`, and `mm_aup_consent` in `wp_usermeta` on checkout and registration.
+  6. Enable two-way hydration in `FormController.php` so the profile questionnaire pre-populates `birth_date` from `user_dob` if present, and updates `user_dob` usermeta upon profile submission.
+  7. Convert all multi-select and preference list columns in `wp_matchmaking_pool` (`pref_country`, `pref_state`, `pref_city`, `pref_religion`, `pref_modesty`, `pref_origin`, `languages`, `pref_languages`, `pref_smoking`, `pref_drinking`) to `LONGTEXT` in `DBMigrator.php` (v2.11.0) to prevent truncation of extensive selections.
+- **Implemented**:
+  - `src/Frontend/AuthController.php`:
+    - Updated `render_checkout_privacy_policy_checkbox()` with DOB field, Age Confirmation card, Privacy Policy checkbox, and AUP checkbox.
+    - Updated `check_privacy_policy_consent()` with age calculation ($\ge 18$) and individual validation error messages.
+    - Updated `save_privacy_policy_consent_on_checkout()` and `save_privacy_policy_consent_on_user_register()` to save `user_dob`, `mm_age_confirmed`, `mm_privacy_policy_consent`, and `mm_aup_consent`.
+  - `src/Frontend/FormController.php`:
+    - Updated `get_user_form_values()` to pre-fill `birth_date` from `user_dob` if pool record does not exist.
+    - Added `user_dob` and `birth_date` to `$meta_map` on questionnaire submission.
+  - `src/Core/DBMigrator.php`:
+    - Bumped schema version to `2.11.0`.
+    - Defined multi-select columns as `LONGTEXT` in `CREATE TABLE {$pool_table}` and added `ALTER TABLE ... MODIFY COLUMN ... LONGTEXT` migrations.
+  - `tests/Unit/AuthAndRedirectsTest.php`:
+    - Updated markup and consent validation tests.
+    - Added `test_exact_age_boundaries_and_profile_dob_sync()` testing 18+ boundary checks and registration meta saves.
+  - `tests/DBMigratorTest.php`:
+    - Updated version check to `2.11.0` and verified `longtext` definitions.
+- **Verification**: Ran automated test suite with **220/220 tests passing** (0 failures, 0 errors).
+
 ### Task 128: Relocate Admin Notes to the Bottom of Match History
 - **Objective**:
   1. Move the Admin Notes card on the single candidate profile view (`user-single.php`) from the right-hand sidebar to the bottom of the page, directly beneath the Match History & Approval Queue table.

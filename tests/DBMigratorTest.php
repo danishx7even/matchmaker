@@ -31,12 +31,14 @@ final class DBMigratorTest extends TestCase
         $this->assertStringContainsString($GLOBALS['wpdb']->prefix . 'matchmaker_event_clicks', $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString('has_one_on_one', $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString('is_parent_applying', $GLOBALS['__mm_dbdelta_sql']);
-        $this->assertEquals('2.10.0', $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version']);
+        $this->assertStringContainsString('pref_country longtext', $GLOBALS['__mm_dbdelta_sql']);
+        $this->assertStringContainsString('pref_city longtext', $GLOBALS['__mm_dbdelta_sql']);
+        $this->assertEquals('2.11.0', $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version']);
     }
 
     public function test_maybe_migrate_skips_when_already_installed(): void
     {
-        $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version'] = '2.10.0';
+        $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version'] = '2.11.0';
         $migrator = DBMigrator::instance();
         $migrator->maybe_migrate();
 

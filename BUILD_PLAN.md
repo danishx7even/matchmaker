@@ -9,5 +9,3 @@
 
 ## Checklist
 *No active checklist.*
-
-

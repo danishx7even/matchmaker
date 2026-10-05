@@ -673,7 +673,7 @@ class AuthController
     }
 
     /**
-     * Render the Privacy Policy consent checkbox on the PMPro checkout page.
+     * Render the DOB input, Age Confirmation, Privacy Policy, and AUP consent checkboxes on the PMPro checkout page.
      * Only shown for logged-out users (new registrations / guest checkouts).
      *
      * @return void
@@ -690,27 +690,77 @@ class AuthController
         }
         $rendered = true;
 
-        $checked = (!empty($_REQUEST['privacy_policy_consent']) || !empty($_POST['privacy_policy_consent'])) ? ' checked="checked"' : '';
-        $privacy_url = 'https://arabzawaj.org/privacy-policy/';
+        $dob_val         = sanitize_text_field((string) ($_REQUEST['user_dob'] ?? $_POST['user_dob'] ?? ''));
+        $age_checked     = (!empty($_REQUEST['mm_age_confirmed']) || !empty($_POST['mm_age_confirmed']) || !empty($_REQUEST['age_confirmed']) || !empty($_POST['age_confirmed'])) ? ' checked="checked"' : '';
+        $privacy_checked = (!empty($_REQUEST['privacy_policy_consent']) || !empty($_POST['privacy_policy_consent']) || !empty($_REQUEST['mm_privacy_policy_consent']) || !empty($_POST['mm_privacy_policy_consent'])) ? ' checked="checked"' : '';
+        $aup_checked     = (!empty($_REQUEST['mm_aup_consent']) || !empty($_POST['mm_aup_consent']) || !empty($_REQUEST['aup_consent']) || !empty($_POST['aup_consent'])) ? ' checked="checked"' : '';
+
+        $privacy_url = function_exists('home_url') ? home_url('/privacy-policy/') : 'https://arabzawaj.org/privacy-policy/';
+        $aup_url     = function_exists('home_url') ? home_url('/law-enforcement-requests-member-safety-policy/') : 'https://arabzawaj.org/law-enforcement-requests-member-safety-policy/';
 
         ?>
-        <div id="pmpro_privacy_policy_wrapper" class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-privacy-policy" style="margin: 16px 0 20px 0; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
-            <div class="pmpro_checkout-field-inner" style="display: flex; align-items: flex-start; gap: 10px;">
-                <input type="checkbox" id="privacy_policy_consent" name="privacy_policy_consent" value="1" <?php echo $checked; ?> required="required" style="margin-top: 3px; accent-color: #CC723F; width: 18px; height: 18px; cursor: pointer;" />
-                <label for="privacy_policy_consent" class="pmpro_label" style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0; cursor: pointer; display: inline;">
-                    <?php
-                    printf(
-                        /* translators: %s: Privacy Policy link */
-                        __('I have read and agree to the %s <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span>', 'matchmaker'),
-                        '<a href="' . esc_url($privacy_url) . '" target="_blank" rel="noopener noreferrer" style="color: #CC723F; font-weight: 600; text-decoration: underline;">' . esc_html__('Privacy Policy', 'matchmaker') . '</a>'
-                    );
-                    ?>
+        <div id="pmpro_privacy_policy_wrapper" class="pmpro_checkout-fields-compliance" style="margin: 16px 0 20px 0; box-sizing: border-box;">
+            
+            <!-- 1. Date of Birth Field -->
+            <div class="pmpro_checkout-field pmpro_checkout-field-date pmpro_checkout-field-user-dob" style="margin-bottom: 18px;">
+                <label for="user_dob" class="pmpro_label" style="display: block; font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 6px;">
+                    <?php esc_html_e('Date of Birth', 'matchmaker'); ?> <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span>
                 </label>
+                <input type="date" id="user_dob" name="user_dob" value="<?php echo esc_attr($dob_val); ?>" required="required" max="<?php echo esc_attr(date('Y-m-d')); ?>" class="input pmpro_input pmpro_input-date" style="width: 100%; max-width: 320px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; color: #1e293b; box-sizing: border-box; background: #fff;" />
             </div>
+
+            <!-- 2. Age Confirmation Card -->
+            <div class="pmpro_checkout-field pmpro_checkout-field-age-confirm" style="margin-bottom: 16px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
+                <div style="font-weight: 700; font-size: 14px; color: #1e293b; margin-bottom: 6px;">
+                    <?php esc_html_e('Confirm your age', 'matchmaker'); ?>
+                </div>
+                <div style="font-size: 13px; line-height: 1.5; color: #475569; margin-bottom: 10px;">
+                    <?php esc_html_e('You must be at least 18 years old and have reached the age of legal majority where you live, whichever is higher, to use Arab Zawaj.', 'matchmaker'); ?>
+                </div>
+                <div class="pmpro_checkout-field-inner" style="display: flex; align-items: flex-start; gap: 10px;">
+                    <input type="checkbox" id="mm_age_confirmed" name="mm_age_confirmed" value="1" <?php echo $age_checked; ?> required="required" style="margin-top: 3px; accent-color: #CC723F; width: 18px; height: 18px; cursor: pointer;" />
+                    <label for="mm_age_confirmed" class="pmpro_label" style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0; cursor: pointer; display: inline;">
+                        <?php esc_html_e('I confirm that I meet these age requirements.', 'matchmaker'); ?> <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 3. Privacy Policy Checkbox Card -->
+            <div class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-privacy-policy" style="margin-bottom: 12px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
+                <div class="pmpro_checkout-field-inner" style="display: flex; align-items: flex-start; gap: 10px;">
+                    <input type="checkbox" id="privacy_policy_consent" name="privacy_policy_consent" value="1" <?php echo $privacy_checked; ?> required="required" style="margin-top: 3px; accent-color: #CC723F; width: 18px; height: 18px; cursor: pointer;" />
+                    <label for="privacy_policy_consent" class="pmpro_label" style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0; cursor: pointer; display: inline;">
+                        <?php
+                        printf(
+                            /* translators: %s: Privacy Policy link */
+                            __('I have read and agree to the %s <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span>', 'matchmaker'),
+                            '<a href="' . esc_url($privacy_url) . '" target="_blank" rel="noopener noreferrer" style="color: #CC723F; font-weight: 600; text-decoration: underline;">' . esc_html__('Privacy Policy', 'matchmaker') . '</a>'
+                        );
+                        ?>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 4. AUP Checkbox Card -->
+            <div class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-aup" style="margin-bottom: 16px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
+                <div class="pmpro_checkout-field-inner" style="display: flex; align-items: flex-start; gap: 10px;">
+                    <input type="checkbox" id="mm_aup_consent" name="mm_aup_consent" value="1" <?php echo $aup_checked; ?> required="required" style="margin-top: 3px; accent-color: #CC723F; width: 18px; height: 18px; cursor: pointer;" />
+                    <label for="mm_aup_consent" class="pmpro_label" style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0; cursor: pointer; display: inline;">
+                        <?php
+                        printf(
+                            /* translators: %s: AUP link */
+                            __('I have read and agree to the %s <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span>', 'matchmaker'),
+                            '<a href="' . esc_url($aup_url) . '" target="_blank" rel="noopener noreferrer" style="color: #CC723F; font-weight: 600; text-decoration: underline;">' . esc_html__('AUP', 'matchmaker') . '</a>'
+                        );
+                        ?>
+                    </label>
+                </div>
+            </div>
+
         </div>
         <script>
         (function() {
-            function placePrivacyCheckbox() {
+            function placeComplianceFields() {
                 var wrapper = document.getElementById('pmpro_privacy_policy_wrapper');
                 if (!wrapper) return;
                 
@@ -733,18 +783,18 @@ class AuthController
                 }
             }
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', placePrivacyCheckbox);
+                document.addEventListener('DOMContentLoaded', placeComplianceFields);
             } else {
-                placePrivacyCheckbox();
+                placeComplianceFields();
             }
-            setTimeout(placePrivacyCheckbox, 300);
+            setTimeout(placeComplianceFields, 300);
         })();
         </script>
         <?php
     }
 
     /**
-     * Validates Privacy Policy consent during PMPro checkout registration.
+     * Validates DOB, age requirement (18+), Age Confirmation, Privacy Policy, and AUP consent during PMPro checkout.
      * Only enforced for logged-out users creating a new account.
      *
      * @param bool $okay
@@ -756,7 +806,7 @@ class AuthController
             return false;
         }
 
-        // Already logged in users have already agreed to the Privacy Policy upon registration
+        // Already logged in users have already agreed upon initial registration
         if (is_user_logged_in()) {
             return true;
         }
@@ -771,14 +821,70 @@ class AuthController
             return $okay;
         }
 
-        $consent = !empty($_REQUEST['privacy_policy_consent']) 
+        global $pmpro_msg, $pmpro_msgt;
+
+        // 1. Validate Date of Birth & Minimum Age (18+)
+        $raw_dob = sanitize_text_field((string) ($_REQUEST['user_dob'] ?? $_POST['user_dob'] ?? ''));
+        if ($raw_dob === '') {
+            $pmpro_msg  = __('Please enter your date of birth.', 'matchmaker');
+            $pmpro_msgt = 'pmpro_error';
+            return false;
+        }
+
+        $dob_timestamp = strtotime($raw_dob);
+        if ($dob_timestamp === false) {
+            $pmpro_msg  = __('Please enter a valid date of birth.', 'matchmaker');
+            $pmpro_msgt = 'pmpro_error';
+            return false;
+        }
+
+        try {
+            $birth_dt = new \DateTime($raw_dob);
+            $today    = new \DateTime('today');
+            $age      = (int) $birth_dt->diff($today)->y;
+            if ($birth_dt > $today || $age < 18) {
+                $pmpro_msg  = __('You do not meet the minimum age requirement to use Arab Zawaj.', 'matchmaker');
+                $pmpro_msgt = 'pmpro_error';
+                return false;
+            }
+        } catch (\Exception $e) {
+            $pmpro_msg  = __('Please enter a valid date of birth.', 'matchmaker');
+            $pmpro_msgt = 'pmpro_error';
+            return false;
+        }
+
+        // 2. Validate Age Confirmation Checkbox
+        $age_confirmed = !empty($_REQUEST['mm_age_confirmed']) 
+            || !empty($_POST['mm_age_confirmed'])
+            || !empty($_REQUEST['age_confirmed']) 
+            || !empty($_POST['age_confirmed']);
+
+        if (!$age_confirmed) {
+            $pmpro_msg  = __('You must confirm that you meet the age requirements.', 'matchmaker');
+            $pmpro_msgt = 'pmpro_error';
+            return false;
+        }
+
+        // 3. Validate Privacy Policy Consent Checkbox
+        $privacy_consent = !empty($_REQUEST['privacy_policy_consent']) 
             || !empty($_POST['privacy_policy_consent']) 
             || !empty($_REQUEST['mm_privacy_policy_consent']) 
             || !empty($_POST['mm_privacy_policy_consent']);
 
-        if (!$consent) {
-            global $pmpro_msg, $pmpro_msgt;
+        if (!$privacy_consent) {
             $pmpro_msg  = __('You must agree to the Privacy Policy to complete your registration.', 'matchmaker');
+            $pmpro_msgt = 'pmpro_error';
+            return false;
+        }
+
+        // 4. Validate AUP Consent Checkbox
+        $aup_consent = !empty($_REQUEST['mm_aup_consent']) 
+            || !empty($_POST['mm_aup_consent'])
+            || !empty($_REQUEST['aup_consent']) 
+            || !empty($_POST['aup_consent']);
+
+        if (!$aup_consent) {
+            $pmpro_msg  = __('You must agree to the Acceptable Use Policy (AUP) to complete your registration.', 'matchmaker');
             $pmpro_msgt = 'pmpro_error';
             return false;
         }
@@ -787,7 +893,7 @@ class AuthController
     }
 
     /**
-     * Save Privacy Policy consent timestamp on successful checkout.
+     * Save DOB and compliance consent timestamps on successful checkout.
      *
      * @param int   $user_id
      * @param mixed $morder
@@ -799,18 +905,52 @@ class AuthController
             return;
         }
 
-        $consent = !empty($_REQUEST['privacy_policy_consent']) 
+        // 1. Save Date of Birth
+        $raw_dob = sanitize_text_field((string) ($_REQUEST['user_dob'] ?? $_POST['user_dob'] ?? ''));
+        if (!empty($raw_dob) && strtotime($raw_dob) !== false) {
+            $formatted_dob = gmdate('Y-m-d', (int) strtotime($raw_dob));
+            update_user_meta($user_id, 'user_dob', $formatted_dob);
+            update_user_meta($user_id, 'birth_date', $formatted_dob);
+
+            // Sync with pool if a record exists
+            $existing_pool = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);
+            if (!empty($existing_pool)) {
+                global $wpdb;
+                $pool_table = $wpdb->prefix . 'matchmaking_pool';
+                $wpdb->update($pool_table, ['birth_date' => $formatted_dob], ['user_id' => $user_id]);
+            }
+        }
+
+        // 2. Save Age Confirmation Timestamp
+        $age_confirmed = !empty($_REQUEST['mm_age_confirmed']) 
+            || !empty($_POST['mm_age_confirmed'])
+            || !empty($_REQUEST['age_confirmed']) 
+            || !empty($_POST['age_confirmed']);
+        if ($age_confirmed) {
+            update_user_meta($user_id, 'mm_age_confirmed', current_time('mysql'));
+        }
+
+        // 3. Save Privacy Policy Consent Timestamp
+        $privacy_consent = !empty($_REQUEST['privacy_policy_consent']) 
             || !empty($_POST['privacy_policy_consent']) 
             || !empty($_REQUEST['mm_privacy_policy_consent']) 
             || !empty($_POST['mm_privacy_policy_consent']);
-
-        if ($consent) {
+        if ($privacy_consent) {
             update_user_meta($user_id, 'mm_privacy_policy_consent', current_time('mysql'));
+        }
+
+        // 4. Save AUP Consent Timestamp
+        $aup_consent = !empty($_REQUEST['mm_aup_consent']) 
+            || !empty($_POST['mm_aup_consent'])
+            || !empty($_REQUEST['aup_consent']) 
+            || !empty($_POST['aup_consent']);
+        if ($aup_consent) {
+            update_user_meta($user_id, 'mm_aup_consent', current_time('mysql'));
         }
     }
 
     /**
-     * Save Privacy Policy consent timestamp on standard user registration.
+     * Save DOB and compliance consent timestamps on standard user registration.
      *
      * @param int $user_id
      * @return void
@@ -821,13 +961,39 @@ class AuthController
             return;
         }
 
-        $consent = !empty($_REQUEST['privacy_policy_consent']) 
+        // 1. Save Date of Birth
+        $raw_dob = sanitize_text_field((string) ($_REQUEST['user_dob'] ?? $_POST['user_dob'] ?? ''));
+        if (!empty($raw_dob) && strtotime($raw_dob) !== false) {
+            $formatted_dob = gmdate('Y-m-d', (int) strtotime($raw_dob));
+            update_user_meta($user_id, 'user_dob', $formatted_dob);
+            update_user_meta($user_id, 'birth_date', $formatted_dob);
+        }
+
+        // 2. Save Age Confirmation Timestamp
+        $age_confirmed = !empty($_REQUEST['mm_age_confirmed']) 
+            || !empty($_POST['mm_age_confirmed'])
+            || !empty($_REQUEST['age_confirmed']) 
+            || !empty($_POST['age_confirmed']);
+        if ($age_confirmed) {
+            update_user_meta($user_id, 'mm_age_confirmed', current_time('mysql'));
+        }
+
+        // 3. Save Privacy Policy Consent Timestamp
+        $privacy_consent = !empty($_REQUEST['privacy_policy_consent']) 
             || !empty($_POST['privacy_policy_consent']) 
             || !empty($_REQUEST['mm_privacy_policy_consent']) 
             || !empty($_POST['mm_privacy_policy_consent']);
-
-        if ($consent) {
+        if ($privacy_consent) {
             update_user_meta($user_id, 'mm_privacy_policy_consent', current_time('mysql'));
+        }
+
+        // 4. Save AUP Consent Timestamp
+        $aup_consent = !empty($_REQUEST['mm_aup_consent']) 
+            || !empty($_POST['mm_aup_consent'])
+            || !empty($_REQUEST['aup_consent']) 
+            || !empty($_POST['aup_consent']);
+        if ($aup_consent) {
+            update_user_meta($user_id, 'mm_aup_consent', current_time('mysql'));
         }
     }
 }
