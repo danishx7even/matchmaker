@@ -6,7 +6,23 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
-### Task 133: Membership Cancellation Reason Popup & Match Rejection Reason Modal
+### Task 134: Refine PMPro Cancellation Flow Suppression & Cancelled Status Badge Formatting
+- **Objective**:
+  1. Prevent the cancellation reason modal popup from triggering when clicking the final submit button (`<input type="submit" class="pmpro_btn pmpro_btn-submit" value="Yes, cancel this membership">`) on PMPro's cancellation confirmation page.
+  2. Detect cancelled recurring subscriptions retaining access until the end of the billing cycle, displaying their status badge as **"Cancelled (Active until [Date])"** with an amber/warning badge (`.mm-badge-cancelled-active`) instead of active green.
+  3. Strip and suppress the "Cancel" action link on the PMPro Account page once a subscription is already marked as cancelled, preventing re-triggering of cancellation dialogs.
+- **Implemented**:
+  - `assets/js/cancellation-modal.js`:
+    - Updated `isCancelConfirmationPage` detection to comprehensively match PMPro 3.0 confirmation markup (`input[name="levelstocancel"]`, `input[name="confirm"]`, `#pmpro_cancel-nonce`, etc.).
+    - When on the confirmation screen, automatically transfers `mm_cancellation_reason` and `mm_cancellation_details` into the confirmation form's hidden inputs and suppresses modal binding.
+    - Scoped `attachLinkInterceptors()` strictly to the account page cancel links, explicitly skipping `.pmpro_btn-cancel` and cancelled card elements.
+  - `src/Core/PMProSync.php`:
+    - Implemented `is_level_subscription_cancelled(int $user_id, mixed $level): bool` checking usermeta timestamps and recurring tiers with future end dates.
+    - Updated `filter_pmpro_member_action_links()` and `filter_pmpro_can_cancel_membership_level()` to strip and disable cancel actions for already cancelled levels.
+    - Updated `get_membership_level_card_details()` to format the status as `Cancelled (Active until [Date])` with CSS class `mm-badge-cancelled-active`.
+  - `tests/Unit/CancellationAndRejectionReasonTest.php`:
+    - Added unit tests covering `is_level_subscription_cancelled`, status badge formatting, and action link suppression.
+- **Verification**: Full test suite executed with **227/227 tests passing (0 failures, 0 errors)**.
 - **Objective**:
   1. Add a mandatory Reason & Feedback modal popup for PMPro Membership Cancellation when users cancel on the account or cancel confirmation pages.
   2. Add a mandatory Rejection Feedback prompt and textarea in Step 4 of the Member Portal when a member declines a match.

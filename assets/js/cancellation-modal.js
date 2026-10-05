@@ -16,44 +16,55 @@
         var detailsInput = document.getElementById('mm-cancellation-details-input');
 
         // Check if we are on PMPro's cancel confirmation page
-        var isCancelConfirmationPage = !!document.querySelector('form#pmpro_cancel_form, form[name="pmpro_cancel_form"], .pmpro_cancel, .pmpro_membership_cancel');
+        var isCancelConfirmationPage = (
+            window.location.pathname.indexOf('membership-cancel') !== -1 ||
+            window.location.pathname.indexOf('/cancel') !== -1 ||
+            window.location.search.indexOf('levelstocancel') !== -1 ||
+            window.location.search.indexOf('membership-cancel') !== -1 ||
+            !!document.querySelector('input[name="levelstocancel"], input[name="confirm"], #pmpro_cancel-nonce, form#pmpro_cancel_form, form[name="pmpro_cancel_form"], .pmpro_membership_cancel, .pmpro_cancel, body.pmpro-membership-cancel, body.page-membership-cancel')
+        );
 
         // If on the confirmation page, populate stored or URL cancellation reasons into the PMPro confirmation form
         if (isCancelConfirmationPage) {
-            var confirmForm = document.querySelector('form#pmpro_cancel_form, form[name="pmpro_cancel_form"], form.pmpro_form');
-            if (confirmForm) {
+            if (modal) {
+                modal.style.display = 'none';
+            }
+
+            var allForms = document.querySelectorAll('form');
+            if (allForms.length > 0) {
                 var urlParams = new URLSearchParams(window.location.search);
                 var reason = urlParams.get('mm_cancellation_reason') || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_reason') : '') || '';
                 var details = urlParams.get('mm_cancellation_details') || (window.sessionStorage ? sessionStorage.getItem('mm_cancellation_details') : '') || '';
 
-                if (reason) {
-                    var rField = confirmForm.querySelector('input[name="mm_cancellation_reason"]');
-                    if (!rField) {
-                        rField = document.createElement('input');
-                        rField.type = 'hidden';
-                        rField.name = 'mm_cancellation_reason';
-                        confirmForm.appendChild(rField);
+                allForms.forEach(function (cf) {
+                    if (reason) {
+                        var rField = cf.querySelector('input[name="mm_cancellation_reason"]');
+                        if (!rField) {
+                            rField = document.createElement('input');
+                            rField.type = 'hidden';
+                            rField.name = 'mm_cancellation_reason';
+                            cf.appendChild(rField);
+                        }
+                        rField.value = reason;
                     }
-                    rField.value = reason;
-                }
 
-                if (details) {
-                    var dField = confirmForm.querySelector('input[name="mm_cancellation_details"]');
-                    if (!dField) {
-                        dField = document.createElement('input');
-                        dField.type = 'hidden';
-                        dField.name = 'mm_cancellation_details';
-                        confirmForm.appendChild(dField);
+                    if (details) {
+                        var dField = cf.querySelector('input[name="mm_cancellation_details"]');
+                        if (!dField) {
+                            dField = document.createElement('input');
+                            dField.type = 'hidden';
+                            dField.name = 'mm_cancellation_details';
+                            cf.appendChild(dField);
+                        }
+                        dField.value = details;
                     }
-                    dField.value = details;
-                }
 
-                // Clear sessionStorage after binding to the confirmation form
-                confirmForm.addEventListener('submit', function () {
-                    if (window.sessionStorage) {
-                        sessionStorage.removeItem('mm_cancellation_reason');
-                        sessionStorage.removeItem('mm_cancellation_details');
-                    }
+                    cf.addEventListener('submit', function () {
+                        if (window.sessionStorage) {
+                            sessionStorage.removeItem('mm_cancellation_reason');
+                            sessionStorage.removeItem('mm_cancellation_details');
+                        }
+                    });
                 });
             }
 
@@ -191,29 +202,32 @@
 
         // Intercept cancel links strictly on the Account page CTA
         function attachLinkInterceptors() {
-            var cancelLinks = document.querySelectorAll('.pmpro_actionlink-cancel, a[href*="membership-cancel"], a[href*="membership_cancel"], a[href*="cancel"]');
+            var cancelLinks = document.querySelectorAll('.pmpro_actionlink-cancel, a[href*="membership-cancel"], a[href*="membership_cancel"], a[href*="levelstocancel"]');
             cancelLinks.forEach(function (link) {
                 if (link.getAttribute('data-mm-cancel-bound') === 'true') return;
 
-                // Skip if disabled, hidden, or already cancelled
+                // Skip if disabled, hidden, already cancelled, or the "No, keep this membership" button
                 var isAlreadyCancelled = link.style.display === 'none' ||
                     link.classList.contains('pmpro-base-cancel-disabled') ||
                     link.classList.contains('pmpro-sub-cancelled') ||
+                    link.classList.contains('pmpro_btn-cancel') ||
                     link.getAttribute('data-mm-cancelled') === 'true' ||
                     !!document.querySelector('.mm-badge-cancelled-active, .pmpro-sub-cancelled-note');
 
                 if (isAlreadyCancelled) {
-                    link.style.display = 'none';
-                    link.setAttribute('data-mm-cancelled', 'true');
+                    if (!link.classList.contains('pmpro_btn-cancel')) {
+                        link.style.display = 'none';
+                        link.setAttribute('data-mm-cancelled', 'true');
+                    }
                     return;
                 }
 
                 // Only intercept cancel links inside account wrappers or with cancel actions
                 var href = link.getAttribute('href') || '';
                 var isAccountCancel = link.classList.contains('pmpro_actionlink-cancel') ||
-                    href.indexOf('cancel') !== -1 ||
                     href.indexOf('membership-cancel') !== -1 ||
-                    href.indexOf('membership_cancel') !== -1;
+                    href.indexOf('membership_cancel') !== -1 ||
+                    href.indexOf('levelstocancel') !== -1;
 
                 if (!isAccountCancel) return;
 
@@ -239,8 +253,9 @@
         }
 
         attachLinkInterceptors();
-        setTimeout(attachLinkInterceptors, 500);
-        setTimeout(attachLinkInterceptors, 1500);
+        setTimeout(attachLinkInterceptors, 300);
+        setTimeout(attachLinkInterceptors, 1000);
+        setTimeout(attachLinkInterceptors, 2500);
     }
 
     if (document.readyState === 'loading') {
@@ -249,3 +264,4 @@
         initCancellationModal();
     }
 })();
+
