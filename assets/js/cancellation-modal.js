@@ -196,10 +196,15 @@
                 if (link.getAttribute('data-mm-cancel-bound') === 'true') return;
 
                 // Skip if disabled, hidden, or already cancelled
-                if (link.style.display === 'none' ||
+                var isAlreadyCancelled = link.style.display === 'none' ||
                     link.classList.contains('pmpro-base-cancel-disabled') ||
                     link.classList.contains('pmpro-sub-cancelled') ||
-                    link.getAttribute('data-mm-cancelled') === 'true') {
+                    link.getAttribute('data-mm-cancelled') === 'true' ||
+                    !!document.querySelector('.mm-badge-cancelled-active, .pmpro-sub-cancelled-note');
+
+                if (isAlreadyCancelled) {
+                    link.style.display = 'none';
+                    link.setAttribute('data-mm-cancelled', 'true');
                     return;
                 }
 
@@ -217,9 +222,12 @@
                     var currentHref = link.getAttribute('href') || '';
                     if (!currentHref || currentHref === '#' || currentHref.indexOf('javascript:') === 0) return;
 
-                    // Double check if subscription was marked cancelled
-                    if (link.style.display === 'none' || link.getAttribute('data-mm-cancelled') === 'true') {
+                    // Double check if subscription was marked cancelled or page has cancelled badge
+                    if (link.style.display === 'none' ||
+                        link.getAttribute('data-mm-cancelled') === 'true' ||
+                        document.querySelector('.mm-badge-cancelled-active, .pmpro-sub-cancelled-note')) {
                         e.preventDefault();
+                        e.stopPropagation();
                         return;
                     }
 

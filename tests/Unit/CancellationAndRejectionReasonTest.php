@@ -220,5 +220,42 @@ final class CancellationAndRejectionReasonTest extends TestCase
         $can_cancel = $sync->filter_pmpro_can_cancel_membership_level(true, $user_id, $level_obj);
         $this->assertFalse($can_cancel);
     }
+
+    public function test_monthly_recurring_level_with_future_enddate_detected_as_cancelled_without_usermeta(): void
+    {
+        $user_id = 99;
+        $level_id = 3;
+        $future_exp = date('Y-m-d H:i:s', time() + (30 * 86400));
+
+        // No mm_subscription_cancelled_at in usermeta
+        $level_obj = (object) [
+            'id'             => $level_id,
+            'name'           => 'Monthly Membership',
+            'user_id'        => $user_id,
+            'startdate'      => date('Y-m-d H:i:s', time() - (5 * 86400)),
+            'enddate'        => $future_exp,
+            'billing_amount' => '50.00',
+        ];
+
+        $sync = PMProSync::instance();
+
+        // 1. is_level_subscription_cancelled should return true
+        $this->assertTrue($sync->is_level_subscription_cancelled($user_id, $level_obj));
+
+        // 2. Card details should show cancelled status
+        $details = $sync->get_membership_level_card_details($level_obj, $user_id);
+        $this->assertTrue($details['is_subscription_cancelled']);
+        $this->assertStringContainsString('Cancelled (Active until', $details['status']);
+        $this->assertEquals('mm-badge-cancelled-active', $details['status_badge_class']);
+
+        // 3. Action links should strip cancel link
+        $links = [
+            'change' => '<a href="/change">Change</a>',
+            'cancel' => '<a href="/cancel">Cancel</a>',
+        ];
+        $filtered = $sync->filter_pmpro_member_action_links($links, $level_obj, $user_id);
+        $this->assertArrayNotHasKey('cancel', $filtered);
+    }
 }
+
 

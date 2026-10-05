@@ -952,6 +952,85 @@ class PMProSync {
     }
 
     /**
+     * Checks if a membership level has been cancelled with deferred active access remaining.
+     * Evaluates user metadata, future expiration dates, and PMPro recurring level enddates.
+     *
+     * @param int   $user_id
+     * @param mixed $level
+     * @return bool
+     */
+    public function is_level_subscription_cancelled(int $user_id, mixed $level): bool
+    {
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        $level_id = is_object($level) ? (int) ($level->id ?? $level->ID ?? 0) : (int) $level;
+        $now = current_time('timestamp');
+
+        // 1. User metadata flags
+        $cancelled_at  = get_user_meta($user_id, 'mm_subscription_cancelled_at', true);
+        $cancelled_lvl = (int) get_user_meta($user_id, 'mm_cancelled_level_id', true);
+        $expires_at    = get_user_meta($user_id, 'mm_subscription_expires_at', true);
+        $exp_ts        = !empty($expires_at) ? strtotime((string) $expires_at) : 0;
+
+        if (!empty($cancelled_at)) {
+            if (($exp_ts === 0 || $exp_ts > $now) && ($cancelled_lvl === 0 || $cancelled_lvl === $level_id || $level_id === 0)) {
+                return true;
+            }
+        }
+
+        if (!empty($expires_at) && $exp_ts > $now) {
+            if ($cancelled_lvl === 0 || $cancelled_lvl === $level_id || $level_id === 0) {
+                return true;
+            }
+        }
+
+        // 2. Object enddate check for recurring tiers (Monthly / One-on-One)
+        $end_date_ts = 0;
+        if (is_object($level) && !empty($level->enddate)) {
+            $end_date_ts = is_numeric($level->enddate) ? (int) $level->enddate : strtotime((string) $level->enddate);
+        }
+
+        if ($end_date_ts > $now && $level_id > 0) {
+            $tier = $this->get_user_type_by_level_id($level_id);
+            if ($tier === 'monthly' || $tier === 'one_on_one') {
+                return true;
+            }
+            if (is_object($level) && (!empty($level->billing_amount) || !empty($level->cycle_number))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Strips all cancellation-related actions from PMPro action link arrays.
+     *
+     * @param array<string, mixed> $links
+     * @return void
+     */
+    private function strip_cancel_links(array &$links): void
+    {
+        foreach ($links as $k => $v) {
+            $k_str = strtolower((string) $k);
+            $v_str = strtolower((string) $v);
+            if (
+                $k_str === 'cancel' ||
+                $k_str === 'pmpro_cancel' ||
+                str_contains($k_str, 'cancel') ||
+                str_contains($v_str, 'membership-cancel') ||
+                str_contains($v_str, 'membership_cancel') ||
+                str_contains($v_str, 'action=cancel') ||
+                str_contains($v_str, 'cancel')
+            ) {
+                unset($links[$k]);
+            }
+        }
+    }
+
+    /**
      * Filter pmpro_can_cancel_membership_level in PMPro 3.0+
      *
      * @param bool       $can_cancel
@@ -973,21 +1052,12 @@ class PMProSync {
             return $can_cancel;
         }
 
-        $lid = is_object($level) ? (int) ($level->id ?? 0) : (int) $level;
-
         // If subscription is already cancelled and in deferred access period, prevent cancellation
-        $cancelled_at  = get_user_meta($user_id, 'mm_subscription_cancelled_at', true);
-        $cancelled_lvl = (int) get_user_meta($user_id, 'mm_cancelled_level_id', true);
-        $expires_at    = get_user_meta($user_id, 'mm_subscription_expires_at', true);
-        $now           = current_time('timestamp');
-        $exp_ts        = !empty($expires_at) ? strtotime((string) $expires_at) : 0;
-
-        if (!empty($cancelled_at) && ($exp_ts === 0 || $exp_ts > $now)) {
-            if ($lid === 0 || $cancelled_lvl === 0 || $cancelled_lvl === $lid) {
-                return false;
-            }
+        if ($this->is_level_subscription_cancelled($user_id, $level)) {
+            return false;
         }
 
+        $lid = is_object($level) ? (int) ($level->id ?? 0) : (int) $level;
         if ($this->has_active_one_on_one_service($user_id)) {
             if ($lid > 0 && $this->is_service_level($lid)) {
                 return $can_cancel;
@@ -1022,24 +1092,13 @@ class PMProSync {
         // 1. If user has active services, block cancelling base level
         if ($this->has_active_one_on_one_service($user_id)) {
             if ($lid > 0 && !$this->is_service_level($lid)) {
-                unset($links['cancel'], $links['pmpro_cancel']);
+                $this->strip_cancel_links($links);
             }
         }
 
         // 2. If subscription has already been cancelled with a future enddate or meta, remove cancel link
-        $cancelled_at  = get_user_meta($user_id, 'mm_subscription_cancelled_at', true);
-        $cancelled_lvl = (int) get_user_meta($user_id, 'mm_cancelled_level_id', true);
-        $expires_at    = get_user_meta($user_id, 'mm_subscription_expires_at', true);
-        $now           = current_time('timestamp');
-        $exp_ts        = !empty($expires_at) ? strtotime((string) $expires_at) : 0;
-        if ($exp_ts === 0 && is_object($level) && !empty($level->enddate)) {
-            $exp_ts = is_numeric($level->enddate) ? (int) $level->enddate : strtotime((string) $level->enddate);
-        }
-
-        if (!empty($cancelled_at) && ($exp_ts === 0 || $exp_ts > $now)) {
-            if ($lid === 0 || $cancelled_lvl === 0 || $cancelled_lvl === $lid) {
-                unset($links['cancel'], $links['pmpro_cancel']);
-            }
+        if ($this->is_level_subscription_cancelled($user_id, $level)) {
+            $this->strip_cancel_links($links);
         }
 
         return $links;
@@ -1147,12 +1206,23 @@ class PMProSync {
         </div>
         <?php
 
-        $cancelled_at  = get_user_meta($user_id, 'mm_subscription_cancelled_at', true);
+        $is_cancelled  = false;
         $cancelled_lvl = (int) get_user_meta($user_id, 'mm_cancelled_level_id', true);
-        $expires_at    = get_user_meta($user_id, 'mm_subscription_expires_at', true);
-        $now           = current_time('timestamp');
-        $exp_ts        = !empty($expires_at) ? strtotime((string) $expires_at) : 0;
-        $is_cancelled  = (!empty($cancelled_at) && ($exp_ts === 0 || $exp_ts > $now));
+
+        if ($this->is_level_subscription_cancelled($user_id, $cancelled_lvl)) {
+            $is_cancelled = true;
+        } elseif (function_exists('pmpro_getMembershipLevelsForUser')) {
+            $user_levels = pmpro_getMembershipLevelsForUser($user_id);
+            if (!empty($user_levels)) {
+                foreach ($user_levels as $ul) {
+                    if ($this->is_level_subscription_cancelled($user_id, $ul)) {
+                        $is_cancelled = true;
+                        $cancelled_lvl = is_object($ul) ? (int) ($ul->id ?? 0) : 0;
+                        break;
+                    }
+                }
+            }
+        }
 
         $has_active_services = $this->has_active_one_on_one_service($user_id);
         $services = $has_active_services ? $this->get_user_active_services($user_id) : [];
@@ -1174,11 +1244,18 @@ class PMProSync {
                     var match = href.match(/[?&]level=(\d+)/);
                     var levelId = match ? parseInt(match[1], 10) : 0;
                     
-                    // 1. If subscription is already cancelled, hide cancel link and show Cancelled indicator
+                    // 1. If subscription is cancelled, hide cancel link and show Cancelled indicator
                     if (isCancelled && (cancelledLvl === 0 || levelId === 0 || cancelledLvl === levelId)) {
                         link.style.display = 'none';
                         link.setAttribute('data-mm-cancelled', 'true');
                         link.classList.add('pmpro-sub-cancelled');
+
+                        // Clean up preceding pipe separator if exists
+                        var prev = link.previousSibling;
+                        if (prev && prev.nodeType === 3 && prev.textContent.indexOf('|') !== -1) {
+                            prev.textContent = prev.textContent.replace(/\|\s*$/, '');
+                        }
+
                         if (!link.nextElementSibling || !link.nextElementSibling.classList.contains('pmpro-sub-cancelled-note')) {
                             var cancelNote = document.createElement('span');
                             cancelNote.className = 'pmpro-sub-cancelled-note';
@@ -1189,6 +1266,7 @@ class PMProSync {
                             cancelNote.style.padding = '2px 8px';
                             cancelNote.style.borderRadius = '10px';
                             cancelNote.style.fontWeight = '600';
+                            cancelNote.style.marginLeft = '6px';
                             cancelNote.textContent = 'Cancelled';
                             if (link.parentNode) {
                                 link.parentNode.insertBefore(cancelNote, link.nextSibling);
@@ -1220,8 +1298,9 @@ class PMProSync {
             } else {
                 enforceCancelBlockade();
             }
-            setTimeout(enforceCancelBlockade, 500);
-            setTimeout(enforceCancelBlockade, 1500);
+            setTimeout(enforceCancelBlockade, 300);
+            setTimeout(enforceCancelBlockade, 1000);
+            setTimeout(enforceCancelBlockade, 2500);
         })();
         </script>
         <?php
@@ -1238,6 +1317,10 @@ class PMProSync {
         if (!empty($_GET['msg']) && $_GET['msg'] === 'cannot_cancel_base_with_services') {
             echo '<div class="pmpro_message pmpro_error" style="margin-bottom:20px;padding:12px 16px;background:#fef2f2;border-left:4px solid #ef4444;color:#991b1b;border-radius:6px;font-weight:500;">'
                 . esc_html__('You cannot cancel your base membership while you have active add-on services. Please contact support.', 'matchmaker')
+                . '</div>';
+        } elseif (!empty($_GET['msg']) && $_GET['msg'] === 'subscription_already_cancelled') {
+            echo '<div class="pmpro_message pmpro_alert" style="margin-bottom:20px;padding:12px 16px;background:#fffbeb;border-left:4px solid #f59e0b;color:#92400e;border-radius:6px;font-weight:500;">'
+                . esc_html__('Your subscription has already been cancelled and will not renew. You retain access until the end of your billing cycle.', 'matchmaker')
                 . '</div>';
         } elseif (!empty($_GET['msg']) && $_GET['msg'] === 'subscription_cancelled') {
             $user_id = get_current_user_id();
@@ -1399,14 +1482,14 @@ class PMProSync {
         $cancelled_lvl = $user_id > 0 ? (int) get_user_meta($user_id, 'mm_cancelled_level_id', true) : 0;
         $expires_at    = $user_id > 0 ? get_user_meta($user_id, 'mm_subscription_expires_at', true) : '';
         $now           = current_time('timestamp');
-        $exp_ts        = !empty($expires_at) ? strtotime((string) $expires_at) : $end_date_ts;
+        $exp_ts        = $end_date_ts > 0 ? $end_date_ts : (!empty($expires_at) ? strtotime((string) $expires_at) : 0);
 
-        $is_subscription_cancelled = false;
-        $cancelled_notice          = '';
-        $status_label              = __('Active', 'matchmaker');
-        $status_badge_class        = 'mm-badge-active';
+        $cancelled_notice   = '';
+        $status_label       = __('Active', 'matchmaker');
+        $status_badge_class = 'mm-badge-active';
 
-        if (!empty($cancelled_at) && ($exp_ts === 0 || $exp_ts > $now) && ($cancelled_lvl === 0 || $cancelled_lvl === $level_id)) {
+        $is_subscription_cancelled = $this->is_level_subscription_cancelled($user_id, $level);
+        if ($is_subscription_cancelled) {
             $is_subscription_cancelled = true;
             $exp_formatted             = $exp_ts > 0 ? (function_exists('date_i18n') ? date_i18n($date_format, $exp_ts) : gmdate($date_format, $exp_ts)) : $expiration_val;
             $status_label              = sprintf(__('Cancelled (Active until %s)', 'matchmaker'), $exp_formatted);
