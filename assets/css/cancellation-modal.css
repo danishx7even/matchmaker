@@ -1,0 +1,189 @@
+/**
+ * Cancellation Modal Styles
+ * Package: Matchmaker
+ */
+
+.mm-cancel-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+    animation: mmFadeIn 0.2s ease-out;
+}
+
+@keyframes mmFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.mm-cancel-modal-container {
+    background: #ffffff;
+    border-radius: 16px;
+    max-width: 520px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    padding: 32px 28px;
+    box-sizing: border-box;
+    font-family: inherit;
+    text-align: left;
+}
+
+.mm-cancel-modal-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.mm-cancel-modal-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #fee2e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px auto;
+}
+
+.mm-cancel-modal-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 8px 0;
+}
+
+.mm-cancel-modal-desc {
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.mm-cancel-radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mm-cancel-radio-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #334155;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.mm-cancel-radio-option:hover {
+    border-color: #cbd5e1;
+    background-color: #f8fafc;
+}
+
+.mm-cancel-radio-option input[type="radio"] {
+    margin: 0;
+    accent-color: #CC723F;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.mm-cancel-radio-option.selected {
+    border-color: #CC723F;
+    background-color: #fff7ed;
+    color: #9a3412;
+    font-weight: 500;
+}
+
+.mm-cancel-details-box {
+    margin-bottom: 24px;
+}
+
+.mm-cancel-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 6px;
+}
+
+.mm-cancel-textarea {
+    width: 100%;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    box-sizing: border-box;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.mm-cancel-textarea:focus {
+    border-color: #CC723F;
+}
+
+.mm-cancel-error {
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 6px;
+}
+
+.mm-cancel-modal-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.mm-btn-secondary {
+    flex: 1;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: center;
+}
+
+.mm-btn-secondary:hover {
+    background: #e2e8f0;
+}
+
+.mm-btn-danger {
+    flex: 1;
+    background: #dc2626;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-align: center;
+}
+
+.mm-btn-danger:hover {
+    background: #b91c1c;
+}

@@ -81,6 +81,31 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
     </div>
 </div>
 
+<?php 
+$cancel_reason  = (string) get_user_meta($user_id, 'mm_cancellation_reason', true);
+$cancel_details = (string) get_user_meta($user_id, 'mm_cancellation_details', true);
+$cancel_date    = (string) get_user_meta($user_id, 'mm_cancellation_date', true);
+$cancel_expires = (string) get_user_meta($user_id, 'mm_subscription_expires_at', true);
+?>
+<?php if (!empty($cancel_reason) || !empty($cancel_details)) : ?>
+    <div class="notice notice-warning inline" style="margin-bottom:20px; padding:12px 16px; background:#fffbeb; border-left:4px solid #f59e0b; border-radius:4px;">
+        <h4 style="margin:0 0 4px; color:#b45309; font-size:14px; font-weight:700;">
+            ⚠️ <?php esc_html_e('Membership Cancellation Notice', 'matchmaker'); ?>
+        </h4>
+        <p style="margin:0 0 4px; font-size:13px; color:#92400e;">
+            <strong><?php esc_html_e('Reason:', 'matchmaker'); ?></strong> <?php echo esc_html($cancel_reason ?: __('Not specified', 'matchmaker')); ?>
+            <?php if (!empty($cancel_expires)) : ?>
+                &nbsp;|&nbsp; <strong><?php esc_html_e('Access Expires:', 'matchmaker'); ?></strong> <?php echo esc_html(substr($cancel_expires, 0, 10)); ?>
+            <?php endif; ?>
+        </p>
+        <?php if (!empty($cancel_details)) : ?>
+            <p style="margin:0; font-size:13px; color:#78350f; font-style:italic; line-height:1.4;">
+                "<?php echo esc_html($cancel_details); ?>"
+            </p>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+
 <?php if ($has_mutual) : ?>
     <div class="notice notice-info inline" style="margin-bottom:20px;">
         <p><strong>★ <?php esc_html_e('Notice:', 'matchmaker'); ?></strong> <?php esc_html_e('This candidate has a mutually accepted match for the current calendar month. Additional automated and manual matching runs are paused.', 'matchmaker'); ?></p>
@@ -249,12 +274,21 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
                             </td>
                             <td style="text-align:center;"><small><?php echo esc_html(ucfirst($m['match_source'] ?? 'auto')); ?></small></td>
                             <td>
-                                <small style="line-height:1.4; display:block; white-space:nowrap;">
+                                <?php
+                                $self_reason = (string) ($is_u1 ? ($m['user_one_rejection_reason'] ?? '') : ($m['user_two_rejection_reason'] ?? ''));
+                                $cand_reason = (string) ($is_u1 ? ($m['user_two_rejection_reason'] ?? '') : ($m['user_one_rejection_reason'] ?? ''));
+                                ?>
+                                <small style="line-height:1.4; display:block;">
                                     <strong>Self:</strong> 
                                     <?php if (($is_u1 ? $u1_resp : $u2_resp) === 'accepted') : ?>
                                         <span style="color:#16a34a; font-weight:600;">✓ Accepted</span>
                                     <?php elseif (($is_u1 ? $u1_resp : $u2_resp) === 'rejected') : ?>
                                         <span style="color:#dc2626; font-weight:600;">✕ Declined</span>
+                                        <?php if (!empty($self_reason)) : ?>
+                                            <div style="font-size:11px; color:#991b1b; background:#fee2e2; padding:3px 6px; border-radius:4px; margin:2px 0 4px; max-width:200px; white-space:normal; line-height:1.3;" title="<?php echo esc_attr($self_reason); ?>">
+                                                💬 "<?php echo esc_html(mb_strimwidth($self_reason, 0, 50, '...')); ?>"
+                                            </div>
+                                        <?php endif; ?>
                                     <?php else : ?>
                                         <span style="color:#d97706;">⏳ Pending</span>
                                     <?php endif; ?>
@@ -264,6 +298,11 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
                                         <span style="color:#16a34a; font-weight:600;">✓ Accepted</span>
                                     <?php elseif (($is_u1 ? $u2_resp : $u1_resp) === 'rejected') : ?>
                                         <span style="color:#dc2626; font-weight:600;">✕ Declined</span>
+                                        <?php if (!empty($cand_reason)) : ?>
+                                            <div style="font-size:11px; color:#991b1b; background:#fee2e2; padding:3px 6px; border-radius:4px; margin:2px 0 0; max-width:200px; white-space:normal; line-height:1.3;" title="<?php echo esc_attr($cand_reason); ?>">
+                                                💬 "<?php echo esc_html(mb_strimwidth($cand_reason, 0, 50, '...')); ?>"
+                                            </div>
+                                        <?php endif; ?>
                                     <?php else : ?>
                                         <span style="color:#d97706;">⏳ Pending</span>
                                     <?php endif; ?>

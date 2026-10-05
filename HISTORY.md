@@ -6,6 +6,27 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 133: Membership Cancellation Reason Popup & Match Rejection Reason Modal
+- **Objective**:
+  1. Add a mandatory Reason & Feedback modal popup for PMPro Membership Cancellation when users cancel on the account or cancel confirmation pages.
+  2. Add a mandatory Rejection Feedback prompt and textarea in Step 4 of the Member Portal when a member declines a match.
+  3. Upgrade Database Schema to v2.12.0 in `DBMigrator.php` with `user_one_rejection_reason text` and `user_two_rejection_reason text` columns in `wp_matches`.
+  4. Store cancellation reason and detailed feedback in `wp_usermeta` (`mm_cancellation_reason`, `mm_cancellation_details`, `mm_cancellation_date`) and log audit events.
+  5. Display cancellation feedback card in the Admin Candidate Profile (`user-single.php`) and rejection feedback in Single Match view (`match-single.php`) and Candidate Match History tables.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`: Bumped DB version to `2.12.0` and added `user_one_rejection_reason` and `user_two_rejection_reason` to `wp_matches`.
+  - `src/Repository/MatchRepository.php`: Updated `update_match_response()` to store rejection reasons and updated `find_match_history_for_user()` / `find_all_matches_for_user()` to select rejection reason columns.
+  - `src/Service/MatchService.php`: Updated `handle_match_response()` to pass and log rejection reasons.
+  - `src/Service/NotificationService.php`: Updated `send_match_expired_admin_email()` to include member rejection feedback.
+  - `src/Frontend/PortalController.php`: Validated mandatory rejection reason ($\ge 5$ characters) upon match decline in AJAX handler.
+  - `src/View/frontend/portal/steps/step-4-decline.php` & `assets/js/member-portal.js`: Added rejection prompt, textarea, live error validation, and payload submission.
+  - `assets/css/cancellation-modal.css` & `assets/js/cancellation-modal.js`: Built on-brand cancellation modal with radio reasons and required detail box.
+  - `src/Core/PMProSync.php`: Enqueued cancellation assets, rendered footer modal markup, and extracted/saved cancellation metadata during deferred cancellation.
+  - `src/View/admin/pool/user-single.php` & `src/View/admin/matches/match-single.php`: Surfaced cancellation notices and match rejection feedback quotes.
+  - `tests/Unit/CancellationAndRejectionReasonTest.php`: Added automated tests verifying cancellation saving, match decline validation, DB storage, and history querying.
+- **Verification**: Full test suite executed with **224/224 tests passing (0 failures, 0 errors)**.
+
+
 ### Task 132: Extract Email Verification CSS/JS to Prevent wpautop Paragraph Tag Injection
 - **Objective**:
   1. Resolve WordPress core `wpautop` filter injecting `<p>` and `</p>` tags into `<script>` and `<style>` blocks when `[matchmaker_member_portal]` renders the email verification screen on member pages.

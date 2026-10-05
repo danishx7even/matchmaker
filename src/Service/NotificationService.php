@@ -442,12 +442,13 @@ class NotificationService {
     /**
      * Send email notification to admin when a match pair expires.
      *
-     * @param int      $match_id          The match ID.
-     * @param string   $reason            Reason for expiry ('declined_by_user', '7_day_idle_timeout').
-     * @param int|null $declining_user_id Optional user ID who declined the match.
+     * @param int         $match_id          The match ID.
+     * @param string      $reason            Reason for expiry ('declined_by_user', '7_day_idle_timeout').
+     * @param int|null    $declining_user_id Optional user ID who declined the match.
+     * @param string|null $rejection_reason  Optional rejection feedback from the declining member.
      * @return void
      */
-    public function send_match_expired_admin_email(int $match_id, string $reason, ?int $declining_user_id = null): void
+    public function send_match_expired_admin_email(int $match_id, string $reason, ?int $declining_user_id = null, ?string $rejection_reason = null): void
     {
         $repo  = MatchRepository::instance();
         $match = $repo->find_match_by_id($match_id);
@@ -479,10 +480,13 @@ class NotificationService {
         $subject = sprintf(__('[Arab Zawaj Matchmaker] Match Pair #%d Expired: %s', 'matchmaker'), $match_id, $reason_label);
 
         $admin_pool_url = admin_url('admin.php?page=matchmaking-pool');
+        $feedback_html  = !empty($rejection_reason) ? "<strong>" . esc_html__('Member Feedback / Reason:', 'matchmaker') . "</strong> " . esc_html($rejection_reason) . "<br>" : "";
+
         $body = "<h2>" . esc_html__('Match Pair Expiry Alert', 'matchmaker') . "</h2>"
             . "<p><strong>" . esc_html__('Match ID:', 'matchmaker') . "</strong> #" . (int)$match_id . "<br>"
             . "<strong>" . esc_html__('Status:', 'matchmaker') . "</strong> Expired<br>"
             . "<strong>" . esc_html__('Expiry Reason:', 'matchmaker') . "</strong> " . esc_html($reason_label) . "<br>"
+            . $feedback_html
             . "<strong>" . esc_html__('Compatibility Score:', 'matchmaker') . "</strong> " . (int)($match['score'] ?? 0) . " / 6</p>"
             . "<h3>" . esc_html__('Member 1 Details', 'matchmaker') . "</h3>"
             . "<p>Name: " . esc_html($u1 ? $u1->display_name : "User #{$u1_id}") . "<br>"
@@ -503,7 +507,7 @@ class NotificationService {
 
         if (class_exists(FileLoggerService::class)) {
             if ($admin_sent) {
-                FileLoggerService::info('Admin match expiry alert sent to ' . $admin_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'reason' => $reason], 'email');
+                FileLoggerService::info('Admin match expiry alert sent to ' . $admin_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'reason' => $reason, 'rejection_reason' => $rejection_reason], 'email');
             } else {
                 FileLoggerService::error('Admin match expiry alert failed to send to ' . $admin_email . ' for match #' . $match_id . '.', ['match_id' => $match_id, 'reason' => $reason], 'email');
             }

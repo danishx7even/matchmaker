@@ -157,6 +157,27 @@
         submitResponse: function (matchId, responseAction) {
             if (!matchId || !responseAction) return;
 
+            var rejectionReason = '';
+            if (responseAction === 'decline') {
+                var reasonInput = document.getElementById('mm-rejection-reason');
+                var errorEl = document.getElementById('mm-rejection-error');
+                if (reasonInput) {
+                    rejectionReason = (reasonInput.value || '').trim();
+                    if (rejectionReason.length < 5) {
+                        if (errorEl) {
+                            errorEl.textContent = 'Please provide a reason why you are declining this match (at least 5 characters).';
+                            errorEl.style.display = 'block';
+                        } else {
+                            alert('Please provide a reason why you are declining this match (at least 5 characters).');
+                        }
+                        reasonInput.focus();
+                        return;
+                    } else if (errorEl) {
+                        errorEl.style.display = 'none';
+                    }
+                }
+            }
+
             // Show loading state on clicked button
             var clickedBtn = document.querySelector('[data-mm-action="submit-response"][data-decision="' + responseAction + '"]');
             var originalHtml = '';
@@ -170,6 +191,9 @@
             data.append('action', 'mm_submit_match_response');
             data.append('match_id', matchId);
             data.append('response_action', responseAction);
+            if (rejectionReason) {
+                data.append('rejection_reason', rejectionReason);
+            }
             data.append('nonce', (window.mmPortalData && window.mmPortalData.nonce) ? window.mmPortalData.nonce : '');
 
             var ajaxUrl = (window.mmPortalData && window.mmPortalData.ajaxUrl)

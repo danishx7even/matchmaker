@@ -90,15 +90,16 @@ class MatchService {
     /**
      * Handle match response.
      *
-     * @param int $match_id The match ID.
-     * @param int $user_id The user ID responding.
-     * @param string $action The action taken ('accepted' or 'rejected' or 'decline').
+     * @param int         $match_id         The match ID.
+     * @param int         $user_id          The user ID responding.
+     * @param string      $action           The action taken ('accepted' or 'rejected' or 'decline').
+     * @param string|null $rejection_reason Optional rejection feedback from the member.
      * @return array
      */
-    public function handle_match_response(int $match_id, int $user_id, string $action): array {
+    public function handle_match_response(int $match_id, int $user_id, string $action, ?string $rejection_reason = null): array {
         $repo = MatchRepository::instance();
         $norm_action = in_array(strtolower(trim($action)), ['decline', 'declined', 'reject', 'rejected'], true) ? 'decline' : 'accept';
-        $result = $repo->update_match_response($match_id, $user_id, $norm_action);
+        $result = $repo->update_match_response($match_id, $user_id, $norm_action, $rejection_reason);
 
         $match = $repo->find_match_by_id($match_id);
         if ($match) {
@@ -113,17 +114,23 @@ class MatchService {
         $user_obj = get_userdata($user_id);
         $user_name = $user_obj ? $user_obj->display_name : "User #{$user_id}";
 
+        $log_desc = sprintf(__('User #%d responded with "%s" for match #%d. Result status: %s.', 'matchmaker'), $user_id, $action, $match_id, $result['status'] ?? 'unknown');
+        if (!empty($rejection_reason)) {
+            $log_desc .= ' ' . sprintf(__('Rejection reason: %s', 'matchmaker'), $rejection_reason);
+        }
+
         $repo->log_event(
             'match_lifecycle',
             $norm_action === 'accept' ? 'user_accepted' : 'user_rejected',
             sprintf(__('Member %s: %s Match #%d', 'matchmaker'), ucfirst($action), $user_name, $match_id),
-            sprintf(__('User #%d responded with "%s" for match #%d. Result status: %s.', 'matchmaker'), $user_id, $action, $match_id, $result['status'] ?? 'unknown'),
+            $log_desc,
             [
-                'match_id'      => $match_id,
-                'user_id'       => $user_id,
-                'action'        => $action,
-                'result_status' => $result['status'] ?? '',
-                'match'         => $match,
+                'match_id'         => $match_id,
+                'user_id'          => $user_id,
+                'action'           => $action,
+                'result_status'    => $result['status'] ?? '',
+                'rejection_reason' => $rejection_reason ?? '',
+                'match'            => $match,
             ],
             $match_id,
             $user_id,

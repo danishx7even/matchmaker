@@ -1593,12 +1593,16 @@ class MatchRepository
                 'phone_number'         => $is_mutual ? (string) get_user_meta($other_id, 'phone_number', true) : '',
                 'user_social_links'    => $is_mutual ? (string) get_user_meta($other_id, 'user_social_links', true) : '',
                 'user_email'           => $is_mutual ? (string) ($other_user ? $other_user->user_email : '') : '',
-                'my_response'          => $my_response,
-                'my_response_label'    => $my_fmt['label'],
-                'my_response_class'    => $my_fmt['class'],
-                'their_response'       => $their_response,
-                'their_response_label' => $their_fmt['label'],
-                'their_response_class' => $their_fmt['class'],
+                'my_response'               => $my_response,
+                'my_response_label'         => $my_fmt['label'],
+                'my_response_class'         => $my_fmt['class'],
+                'their_response'            => $their_response,
+                'their_response_label'      => $their_fmt['label'],
+                'their_response_class'      => $their_fmt['class'],
+                'my_rejection_reason'       => (string) ($is_user_one ? ($row['user_one_rejection_reason'] ?? '') : ($row['user_two_rejection_reason'] ?? '')),
+                'their_rejection_reason'    => (string) ($is_user_one ? ($row['user_two_rejection_reason'] ?? '') : ($row['user_one_rejection_reason'] ?? '')),
+                'user_one_rejection_reason' => (string) ($row['user_one_rejection_reason'] ?? ''),
+                'user_two_rejection_reason' => (string) ($row['user_two_rejection_reason'] ?? ''),
             ];
         }
 
@@ -1621,11 +1625,13 @@ class MatchRepository
                 "SELECT m.*,
                     CASE WHEN m.user_one_id = %d THEN m.user_two_id   ELSE m.user_one_id    END AS candidate_id,
                     CASE WHEN m.user_one_id = %d THEN m.user_one_response ELSE m.user_two_response END AS my_response,
-                    CASE WHEN m.user_one_id = %d THEN m.user_two_response ELSE m.user_one_response END AS their_response
+                    CASE WHEN m.user_one_id = %d THEN m.user_two_response ELSE m.user_one_response END AS their_response,
+                    CASE WHEN m.user_one_id = %d THEN m.user_one_rejection_reason ELSE m.user_two_rejection_reason END AS my_rejection_reason,
+                    CASE WHEN m.user_one_id = %d THEN m.user_two_rejection_reason ELSE m.user_one_rejection_reason END AS their_rejection_reason
                  FROM {$table} m
                  WHERE m.user_one_id = %d OR m.user_two_id = %d
                  ORDER BY (m.status = 'pending_review') DESC, m.score DESC, m.created_at DESC",
-                $user_id, $user_id, $user_id, $user_id, $user_id
+                $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id
             ),
             ARRAY_A
         );
@@ -1897,12 +1903,13 @@ class MatchRepository
     /**
      * Update a user's response on a match record and handle status transitions.
      *
-     * @param int    $match_id   Match record ID.
-     * @param int    $user_id    The responding user's ID.
-     * @param string $action     'accept' or 'decline'.
+     * @param int         $match_id         Match record ID.
+     * @param int         $user_id          The responding user's ID.
+     * @param string      $action           'accept' or 'decline'.
+     * @param string|null $rejection_reason Optional rejection feedback from the user.
      * @return array<string, mixed> Result with updated fields and next_step.
      */
-    public function update_match_response(int $match_id, int $user_id, string $action): array
+    public function update_match_response(int $match_id, int $user_id, string $action, ?string $rejection_reason = null): array
     {
         global $wpdb;
         $table = $wpdb->prefix . 'matches';
@@ -1932,6 +1939,10 @@ class MatchRepository
         $is_mutual = false;
         if ($is_declining) {
             $update_data['status'] = 'rejected';
+            if (!empty($rejection_reason)) {
+                $reason_col = $is_user_one ? 'user_one_rejection_reason' : 'user_two_rejection_reason';
+                $update_data[$reason_col] = sanitize_textarea_field($rejection_reason);
+            }
         } elseif ($is_accepting && $other_is_acc) {
             $update_data['status']           = 'matched';
             $update_data['contact_revealed'] = 1;
@@ -1941,7 +1952,7 @@ class MatchRepository
         $wpdb->update($table, $update_data, ['id' => $match_id]);
 
         if ($is_declining) {
-            \Matchmaker\Service\NotificationService::instance()->send_match_expired_admin_email($match_id, 'declined_by_user', $user_id);
+            \Matchmaker\Service\NotificationService::instance()->send_match_expired_admin_email($match_id, 'declined_by_user', $user_id, $rejection_reason);
         } elseif ($is_mutual) {
             \Matchmaker\Service\NotificationService::instance()->send_mutual_match_notifications($match_id);
         }

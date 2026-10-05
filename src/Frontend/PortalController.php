@@ -224,7 +224,15 @@ class PortalController
             wp_send_json_error(['message' => __('Invalid action request.', 'matchmaker')]);
         }
 
-        $result = \Matchmaker\Service\MatchService::instance()->handle_match_response($match_id, $user_id, $action);
+        $rejection_reason = null;
+        if ($action === 'decline') {
+            $rejection_reason = isset($_POST['rejection_reason']) ? sanitize_textarea_field(wp_unslash((string) $_POST['rejection_reason'])) : '';
+            if (empty(trim($rejection_reason)) || mb_strlen(trim($rejection_reason)) < 5) {
+                wp_send_json_error(['message' => __('Please provide a reason why you are declining this match (at least 5 characters).', 'matchmaker')]);
+            }
+        }
+
+        $result = \Matchmaker\Service\MatchService::instance()->handle_match_response($match_id, $user_id, $action, $rejection_reason);
 
         if ($result['success']) {
             wp_send_json_success($result);

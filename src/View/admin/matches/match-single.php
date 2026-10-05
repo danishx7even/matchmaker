@@ -71,7 +71,17 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['religion'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p1) ? ($p1['modesty'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo $repo->format_social_links_html($m1['user_social_links'] ?? ''); ?></td></tr>
-            <tr><th><?php esc_html_e('Response', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($match['user_one_response'] ?? 'pending')); ?></strong></td></tr>
+            <tr>
+                <th><?php esc_html_e('Response', 'matchmaker'); ?></th>
+                <td>
+                    <strong><?php echo esc_html(ucfirst($match['user_one_response'] ?? 'pending')); ?></strong>
+                    <?php if (!empty($match['user_one_rejection_reason'])) : ?>
+                        <div style="margin-top:4px; padding:6px 10px; background:#fee2e2; border-left:3px solid #ef4444; border-radius:4px; font-size:12px; color:#991b1b; line-height:1.4;">
+                            <strong><?php esc_html_e('Reason:', 'matchmaker'); ?></strong> <?php echo esc_html($match['user_one_rejection_reason']); ?>
+                        </div>
+                    <?php endif; ?>
+                </td>
+            </tr>
         </table>
     </div>
 
@@ -95,7 +105,17 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <tr><th><?php esc_html_e('Religion', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['religion'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Modesty', 'matchmaker'); ?></th><td><?php echo esc_html(is_array($p2) ? ($p2['modesty'] ?? '—') : '—'); ?></td></tr>
             <tr><th><?php esc_html_e('Social Links', 'matchmaker'); ?></th><td><?php echo $repo->format_social_links_html($m2['user_social_links'] ?? ''); ?></td></tr>
-            <tr><th><?php esc_html_e('Response', 'matchmaker'); ?></th><td><strong><?php echo esc_html(ucfirst($match['user_two_response'] ?? 'pending')); ?></strong></td></tr>
+            <tr>
+                <th><?php esc_html_e('Response', 'matchmaker'); ?></th>
+                <td>
+                    <strong><?php echo esc_html(ucfirst($match['user_two_response'] ?? 'pending')); ?></strong>
+                    <?php if (!empty($match['user_two_rejection_reason'])) : ?>
+                        <div style="margin-top:4px; padding:6px 10px; background:#fee2e2; border-left:3px solid #ef4444; border-radius:4px; font-size:12px; color:#991b1b; line-height:1.4;">
+                            <strong><?php esc_html_e('Reason:', 'matchmaker'); ?></strong> <?php echo esc_html($match['user_two_rejection_reason']); ?>
+                        </div>
+                    <?php endif; ?>
+                </td>
+            </tr>
         </table>
     </div>
 </div>

@@ -41,7 +41,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.11.0';
+        $new_version = '2.12.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -122,6 +122,8 @@ class DBMigrator {
             status enum('pending_review','approved','admin_rejected','matched','rejected','expired') NOT NULL DEFAULT 'pending_review',
             user_one_response enum('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
             user_two_response enum('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
+            user_one_rejection_reason text DEFAULT NULL,
+            user_two_rejection_reason text DEFAULT NULL,
             match_source enum('auto','manual') NOT NULL DEFAULT 'auto',
             score smallint(5) unsigned DEFAULT NULL,
             contact_revealed tinyint(1) NOT NULL DEFAULT 0,
@@ -239,6 +241,16 @@ class DBMigrator {
             $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_languages longtext DEFAULT NULL");
             $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_smoking longtext DEFAULT NULL");
             $wpdb->query("ALTER TABLE {$pool_table} MODIFY COLUMN pref_drinking longtext DEFAULT NULL");
+        }
+
+        $match_cols = (array) $wpdb->get_col("DESC {$matches_table}", 0);
+        if (!empty($match_cols)) {
+            if (!in_array('user_one_rejection_reason', $match_cols, true)) {
+                $wpdb->query("ALTER TABLE {$matches_table} ADD COLUMN user_one_rejection_reason text DEFAULT NULL AFTER user_two_response");
+            }
+            if (!in_array('user_two_rejection_reason', $match_cols, true)) {
+                $wpdb->query("ALTER TABLE {$matches_table} ADD COLUMN user_two_rejection_reason text DEFAULT NULL AFTER user_one_rejection_reason");
+            }
         }
 
         // Synchronize all user types strictly to base tiers ('free', 'monthly', 'event')

@@ -78,6 +78,7 @@ class PMProSync {
         add_action('init', [$this, 'handle_special_link_sync_trigger'], 5);
         add_action('init', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
         add_action('template_redirect', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
+        add_action('wp_enqueue_scripts', [$this, 'enqueue_cancellation_assets']);
         add_action('wp_footer', [$this, 'render_account_cancel_blockade_script']);
         add_action('pmpro_account_preheader', [$this, 'render_account_error_notice']);
         add_action('pmpro_membership_account_after_level_card_content', [$this, 'render_membership_account_card_details'], 10, 1);
@@ -727,22 +728,60 @@ class PMProSync {
         }
 
         // 3. Store user metadata tracking cancellation
+        $reason  = isset($_REQUEST['mm_cancellation_reason']) ? sanitize_text_field(wp_unslash((string) $_REQUEST['mm_cancellation_reason'])) : '';
+        $details = isset($_REQUEST['mm_cancellation_details']) ? sanitize_textarea_field(wp_unslash((string) $_REQUEST['mm_cancellation_details'])) : '';
+
         update_user_meta($user_id, 'mm_subscription_cancelled_at', current_time('mysql'));
         update_user_meta($user_id, 'mm_subscription_expires_at', $enddate_mysql);
         update_user_meta($user_id, 'mm_cancelled_level_id', $level_id);
+        if (!empty($reason)) {
+            update_user_meta($user_id, 'mm_cancellation_reason', $reason);
+        }
+        if (!empty($details)) {
+            update_user_meta($user_id, 'mm_cancellation_details', $details);
+        }
+        update_user_meta($user_id, 'mm_cancellation_date', current_time('mysql'));
 
         // 4. Log cancellation event
+        $log_desc = sprintf(__('PMPro membership cancellation deferred to end of billing cycle for user #%d (level %d, expires %s).', 'matchmaker'), $user_id, $level_id, $enddate_mysql);
+        if (!empty($reason)) {
+            $log_desc .= ' ' . sprintf(__('Reason: %s.', 'matchmaker'), $reason);
+        }
+        if (!empty($details)) {
+            $log_desc .= ' ' . sprintf(__('Details: %s', 'matchmaker'), $details);
+        }
+
         if (class_exists(FileLoggerService::class)) {
             FileLoggerService::info(
-                'PMPro membership cancellation deferred to end of billing cycle for user #' . $user_id . ' (level ' . $level_id . ', expires ' . $enddate_mysql . ').',
+                $log_desc,
                 [
-                    'user_id'    => $user_id,
-                    'level_id'   => $level_id,
-                    'expires_at' => $enddate_mysql,
+                    'user_id'              => $user_id,
+                    'level_id'             => $level_id,
+                    'expires_at'           => $enddate_mysql,
+                    'cancellation_reason'  => $reason,
+                    'cancellation_details' => $details,
                 ],
                 'pmpro'
             );
         }
+
+        \Matchmaker\Repository\MatchRepository::instance()->log_event(
+            'pmpro_sync',
+            'subscription_cancelled',
+            sprintf(__('Membership Cancelled (Deferred): User #%d', 'matchmaker'), $user_id),
+            $log_desc,
+            [
+                'user_id'              => $user_id,
+                'level_id'             => $level_id,
+                'expires_at'           => $enddate_mysql,
+                'cancellation_reason'  => $reason,
+                'cancellation_details' => $details,
+            ],
+            null,
+            $user_id,
+            null,
+            'warning'
+        );
 
         // 5. If running on frontend HTTP request, redirect with friendly notice
         if (!defined('MM_UNIT_TESTS') && !wp_doing_ajax() && !wp_doing_cron()) {
@@ -987,7 +1026,29 @@ class PMProSync {
     }
 
     /**
-     * Injects client-side safety script on PMPro Account page to hide base membership cancel links when services are active.
+     * Enqueues cancellation modal CSS and JS assets on frontend pages.
+     *
+     * @return void
+     */
+    public function enqueue_cancellation_assets(): void
+    {
+        if (!is_user_logged_in()) {
+            return;
+        }
+
+        $plugin_url = defined('MM_URL') ? MM_URL : (function_exists('plugin_dir_url') ? plugin_dir_url(dirname(__DIR__, 2) . '/matchmaker.php') : '');
+        $version    = defined('MM_VERSION') ? MM_VERSION : '2.12.0';
+
+        if (function_exists('wp_enqueue_style') && !wp_style_is('mm-cancellation-modal-styles', 'enqueued')) {
+            wp_enqueue_style('mm-cancellation-modal-styles', $plugin_url . 'assets/css/cancellation-modal.css', [], $version);
+        }
+        if (function_exists('wp_enqueue_script') && !wp_script_is('mm-cancellation-modal-script', 'enqueued')) {
+            wp_enqueue_script('mm-cancellation-modal-script', $plugin_url . 'assets/js/cancellation-modal.js', [], $version, true);
+        }
+    }
+
+    /**
+     * Injects cancellation modal markup and safety blockade script on frontend pages.
      *
      * @return void
      */
@@ -998,7 +1059,75 @@ class PMProSync {
         }
 
         $user_id = get_current_user_id();
-        if ($user_id <= 0 || !$this->has_active_one_on_one_service($user_id)) {
+        if ($user_id <= 0) {
+            return;
+        }
+
+        // Render cancellation reason modal markup
+        ?>
+        <div id="mm-cancellation-modal" class="mm-cancel-modal-overlay" style="display:none;">
+            <div class="mm-cancel-modal-container">
+                <div class="mm-cancel-modal-header">
+                    <div class="mm-cancel-modal-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                    </div>
+                    <h3 class="mm-cancel-modal-title"><?php esc_html_e('Cancel Membership', 'matchmaker'); ?></h3>
+                    <p class="mm-cancel-modal-desc"><?php esc_html_e("We're sorry to see you go. Please let us know why you are cancelling your membership so we can continue improving Arab Zawaj:", 'matchmaker'); ?></p>
+                </div>
+                <form id="mm-cancellation-modal-form">
+                    <div class="mm-cancel-radio-group">
+                        <label class="mm-cancel-radio-option">
+                            <input type="radio" name="mm_cancellation_reason" value="Found partner through Arab Zawaj" required>
+                            <span><?php esc_html_e('I found my partner through Arab Zawaj', 'matchmaker'); ?></span>
+                        </label>
+                        <label class="mm-cancel-radio-option">
+                            <input type="radio" name="mm_cancellation_reason" value="Found partner elsewhere">
+                            <span><?php esc_html_e('I found a partner elsewhere', 'matchmaker'); ?></span>
+                        </label>
+                        <label class="mm-cancel-radio-option">
+                            <input type="radio" name="mm_cancellation_reason" value="Not enough suitable matches in my area">
+                            <span><?php esc_html_e('Not enough suitable matches in my area/criteria', 'matchmaker'); ?></span>
+                        </label>
+                        <label class="mm-cancel-radio-option">
+                            <input type="radio" name="mm_cancellation_reason" value="Too expensive / financial reasons">
+                            <span><?php esc_html_e('Too expensive / financial reasons', 'matchmaker'); ?></span>
+                        </label>
+                        <label class="mm-cancel-radio-option">
+                            <input type="radio" name="mm_cancellation_reason" value="Technical or website issues">
+                            <span><?php esc_html_e('Technical or website issues', 'matchmaker'); ?></span>
+                        </label>
+                        <label class="mm-cancel-radio-option">
+                            <input type="radio" name="mm_cancellation_reason" value="Taking a temporary break">
+                            <span><?php esc_html_e('Taking a temporary break', 'matchmaker'); ?></span>
+                        </label>
+                        <label class="mm-cancel-radio-option">
+                            <input type="radio" name="mm_cancellation_reason" value="Other">
+                            <span><?php esc_html_e('Other (please explain below)', 'matchmaker'); ?></span>
+                        </label>
+                    </div>
+                    
+                    <div class="mm-cancel-details-box">
+                        <label for="mm-cancellation-details-input" class="mm-cancel-label">
+                            <?php esc_html_e('Please share more details about your experience *', 'matchmaker'); ?>
+                        </label>
+                        <textarea id="mm-cancellation-details-input" name="mm_cancellation_details" rows="3" class="mm-cancel-textarea" placeholder="<?php esc_attr_e('Your honest feedback helps us improve...', 'matchmaker'); ?>" required></textarea>
+                        <div id="mm-cancellation-error" class="mm-cancel-error" style="display:none;"></div>
+                    </div>
+
+                    <div class="mm-cancel-modal-actions">
+                        <button type="button" id="mm-cancel-modal-keep-btn" class="mm-btn-secondary">
+                            <?php esc_html_e('Keep My Membership', 'matchmaker'); ?>
+                        </button>
+                        <button type="submit" id="mm-cancel-modal-confirm-btn" class="mm-btn-danger">
+                            <?php esc_html_e('Confirm Cancellation', 'matchmaker'); ?>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <?php
+
+        if (!$this->has_active_one_on_one_service($user_id)) {
             return;
         }
 
