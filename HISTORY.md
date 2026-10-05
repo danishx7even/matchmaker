@@ -6,6 +6,16 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 130: Align PMPro Checkout Date of Birth Field Styling
+- **Objective**:
+  1. Remove rigid inline styles (`max-width: 320px;`, manual borders, padding) from the Date of Birth (`user_dob`) input and label on the PMPro checkout form.
+  2. Apply standard PMPro field hierarchy classes (`pmpro_checkout-field pmpro_checkout-field-user_dob`, `label.pmpro_label`, `input.input.pmpro_required.pmpro_input`).
+  3. Add dynamic JS inheritance in the checkout placement handler to copy input classes and label classes from the adjacent `#bconfirmemail` / `#bemail` fields, ensuring `#user_dob` perfectly mirrors the exact styling, font, width, height, and border styling of all other checkout fields across any theme.
+- **Implemented**:
+  - `src/Frontend/AuthController.php`:
+    - Updated `render_checkout_privacy_policy_checkbox()` DOB field markup and added dynamic class inheritance in `placeComplianceFields()`.
+- **Verification**: Ran automated test suite with **220/220 tests passing** (0 failures, 0 errors).
+
 ### Task 129: PMPro Signup DOB & Age Confirmation, AUP Checkbox, Age-Gate Validation, and LONGTEXT Schema Migration
 - **Objective**:
   1. Add required Date of Birth (`user_dob`) input on the PMPro registration/checkout form positioned directly after the email confirmation field (`#bconfirmemail`).

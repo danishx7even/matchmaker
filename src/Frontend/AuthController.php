@@ -702,11 +702,9 @@ class AuthController
         <div id="pmpro_privacy_policy_wrapper" class="pmpro_checkout-fields-compliance" style="margin: 16px 0 20px 0; box-sizing: border-box;">
             
             <!-- 1. Date of Birth Field -->
-            <div class="pmpro_checkout-field pmpro_checkout-field-date pmpro_checkout-field-user-dob" style="margin-bottom: 18px;">
-                <label for="user_dob" class="pmpro_label" style="display: block; font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 6px;">
-                    <?php esc_html_e('Date of Birth', 'matchmaker'); ?> <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span>
-                </label>
-                <input type="date" id="user_dob" name="user_dob" value="<?php echo esc_attr($dob_val); ?>" required="required" max="<?php echo esc_attr(date('Y-m-d')); ?>" class="input pmpro_input pmpro_input-date" style="width: 100%; max-width: 320px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; color: #1e293b; box-sizing: border-box; background: #fff;" />
+            <div class="pmpro_checkout-field pmpro_checkout-field-user_dob pmpro_checkout-field-date" style="margin: 16px 0;">
+                <label for="user_dob" class="pmpro_label"><?php esc_html_e('Date of Birth', 'matchmaker'); ?> <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span></label>
+                <input type="date" id="user_dob" name="user_dob" value="<?php echo esc_attr($dob_val); ?>" required="required" max="<?php echo esc_attr(date('Y-m-d')); ?>" class="input pmpro_required pmpro_input" size="30" />
             </div>
 
             <!-- 2. Age Confirmation Card -->
@@ -779,6 +777,33 @@ class AuthController
                     
                     if (container && container.parentNode && container.nextSibling !== wrapper) {
                         container.parentNode.insertBefore(wrapper, container.nextSibling);
+                    }
+
+                    // Dynamically inherit input classes from confirmEmail for perfect styling consistency
+                    var userDob = document.getElementById('user_dob');
+                    if (userDob && confirmEmail) {
+                        if (confirmEmail.className) {
+                            var classes = confirmEmail.className.split(/\s+/);
+                            for (var i = 0; i < classes.length; i++) {
+                                var cls = classes[i].trim();
+                                if (cls && !userDob.classList.contains(cls)) {
+                                    userDob.classList.add(cls);
+                                }
+                            }
+                        }
+                    }
+
+                    // Dynamically inherit label classes if available
+                    var confirmLabel = container.querySelector('label');
+                    var dobLabel = wrapper.querySelector('label[for="user_dob"]');
+                    if (confirmLabel && dobLabel && confirmLabel.className) {
+                        var lClasses = confirmLabel.className.split(/\s+/);
+                        for (var j = 0; j < lClasses.length; j++) {
+                            var lCls = lClasses[j].trim();
+                            if (lCls && !dobLabel.classList.contains(lCls)) {
+                                dobLabel.classList.add(lCls);
+                            }
+                        }
                     }
                 }
             }
