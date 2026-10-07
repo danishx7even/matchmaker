@@ -2416,6 +2416,90 @@ class MatchRepository
     }
 
     /**
+     * Reset a rejected, admin-rejected, or expired match back to pending review status.
+     *
+     * @param int $match_id Match record ID.
+     * @param int $admin_id The admin user ID performing the reset.
+     * @return array<string, mixed> Result array with success flag, message, match_id, u1_id, u2_id.
+     */
+    public function reset_match_to_pending(int $match_id, int $admin_id): array
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'matches';
+
+        $match = $this->find_match_by_id($match_id);
+        if (!$match) {
+            return ['success' => false, 'message' => __('Match record not found.', 'matchmaker')];
+        }
+
+        $prev_status = (string) ($match['status'] ?? 'unknown');
+        if (!in_array($prev_status, ['rejected', 'admin_rejected', 'expired'], true)) {
+            return [
+                'success' => false,
+                'message' => sprintf(__('Only rejected or expired matches can be reset to pending. Current status: %s.', 'matchmaker'), $prev_status),
+            ];
+        }
+
+        $u1_id = (int) $match['user_one_id'];
+        $u2_id = (int) $match['user_two_id'];
+
+        $updated = $wpdb->update(
+            $table,
+            [
+                'status'                     => 'pending_review',
+                'approved_by'                => null,
+                'approved_at'                => null,
+                'user_one_response'          => 'pending',
+                'user_two_response'          => 'pending',
+                'user_one_rejection_reason'  => null,
+                'user_two_rejection_reason'  => null,
+                'dismissed_at'               => null,
+                'updated_at'                 => current_time('mysql'),
+            ],
+            ['id' => $match_id],
+            ['%s', null, null, '%s', '%s', null, null, null, '%s'],
+            ['%d']
+        );
+
+        if ($updated === false) {
+            return ['success' => false, 'message' => __('Database error while resetting match.', 'matchmaker')];
+        }
+
+        // Dismiss unread notifications for this match
+        $this->dismiss_notifications_for_match($match_id);
+
+        // Synchronize / recalculate quota for both members
+        $this->recalculate_user_quota($u1_id);
+        $this->recalculate_user_quota($u2_id);
+
+        $this->log_event(
+            'match_lifecycle',
+            'admin_reset_pending',
+            sprintf(__('Match #%d Reset to Pending Review', 'matchmaker'), $match_id),
+            sprintf(__('Admin #%d reset match #%d back to pending review status (previous status: %s).', 'matchmaker'), $admin_id, $match_id, $prev_status),
+            ['match_id' => $match_id, 'admin_id' => $admin_id, 'prev_status' => $prev_status],
+            $match_id,
+            $admin_id,
+            null,
+            'info'
+        );
+
+        \Matchmaker\Service\FileLoggerService::info(
+            'Match #' . $match_id . ' reset to pending review by admin #' . $admin_id . ' (prev_status: ' . $prev_status . ').',
+            ['match_id' => $match_id, 'admin_id' => $admin_id, 'prev_status' => $prev_status],
+            'repository'
+        );
+
+        return [
+            'success'  => true,
+            'message'  => sprintf(__('Match #%d has been reset to pending review.', 'matchmaker'), $match_id),
+            'match_id' => $match_id,
+            'u1_id'    => $u1_id,
+            'u2_id'    => $u2_id,
+        ];
+    }
+
+    /**
      * Get match statistics for a user's portal dashboard.
      *
      * @param int $user_id WordPress user ID.

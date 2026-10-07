@@ -6,6 +6,35 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 138: Shift Approve/Reject CTAs to Match Detail, Add View Comparison in Match Lists, and Add Reset to Pending Action
+- **Objective**:
+  1. **Matches Queue & Single User Match History View Update**:
+     - Replace individual `Approve` / `Reject` / `Cancel` action buttons in the Matches Queue (`matches-list.php`) and Single User pool detail view (`user-single.php`) with a unified, primary **"View Comparison"** button leading directly to the dual-profile side-by-side match detail page (`match-single.php`).
+  2. **Relocate CTAs to Single Match Detail Review**:
+     - Move the **Approve Match** and **Reject Match** buttons exclusively into the side-by-side comparison page (`match-single.php`), allowing matchmakers to thoroughly inspect compatibility and profile attributes before taking action.
+     - Provide dual action containers (in the top header and bottom action bar) for ergonomic review.
+  3. **Reset to Pending Action**:
+     - Implement `reset_match_to_pending` in `MatchRepository` and `MatchService`, allowing admins to reset any match in `rejected`, `admin_rejected`, or `expired` status back to `pending_review`.
+     - Revert `user_one_response` and `user_two_response` back to `pending`, clear rejection reasons, recalculate/synchronize quotas, dismiss obsolete notifications, and log the transition.
+     - Add `Reset to Pending` action CTA in `match-single.php` and handle the GET request in `AdminPortal::handle_admin_actions()`.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Added `reset_match_to_pending(int $match_id, int $admin_id): array` with full state rollback, quota sync, and logging.
+  - `src/Service/MatchService.php`:
+    - Added `process_admin_reset_pending(int $match_id, int $admin_id): array`.
+  - `src/Admin/AdminPortal.php`:
+    - Added `reset_pending` GET query handler in `handle_admin_actions()` with nonce validation and admin notices.
+    - Updated `render_single_match_view()` to provide `$reset_url`.
+  - `src/View/admin/matches/matches-list.php`:
+    - Updated Actions column for all match statuses to render the uniform **"View Comparison"** button.
+  - `src/View/admin/pool/user-single.php`:
+    - Updated match history Actions column to render the uniform **"View Comparison"** button.
+  - `src/View/admin/matches/match-single.php`:
+    - Added Approve/Reject, Cancel Approval, and Reset to Pending CTAs in both the top header and bottom action bar.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Updated and added automated tests for `matches-list.php` view comparison links, `match-single.php` CTAs, `reset_pending` action handling, and `reset_match_to_pending` repository logic.
+- **Verification**: Ran full automated test suite with **238/238 tests passing (0 failures, 0 errors)**.
+
 ### Task 137: Add Direct Member Search Tab with Informational Compatibility Breakdown in Manual Matchmaker
 - **Objective**:
   1. Add a 2-tab navigation system to the Admin Manual Matchmaker tool (`manual-match.php`):

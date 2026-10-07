@@ -801,6 +801,29 @@ class AdminPortal
             return;
         }
 
+        // --- RESET MATCH TO PENDING (FOR REJECTED / EXPIRED MATCHES) ---
+        if ($action === 'reset_pending' && $match_id > 0 && wp_verify_nonce($nonce, 'mm_reset_pending_' . $match_id)) {
+            $admin_id = get_current_user_id();
+            $result   = MatchService::instance()->process_admin_reset_pending($match_id, $admin_id);
+
+            if (!empty($result['success'])) {
+                \Matchmaker\Service\FileLoggerService::info(
+                    'Admin #' . $admin_id . ' reset match #' . $match_id . ' to pending review.',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id, 'message' => $result['message'] ?? ''],
+                    'admin'
+                );
+                add_settings_error('mm_admin_notices', 'reset_pending_success', $result['message'] ?? sprintf(__('Match #%d reset to pending review.', 'matchmaker'), $match_id), 'updated');
+            } else {
+                \Matchmaker\Service\FileLoggerService::warning(
+                    'Admin #' . $admin_id . ' failed to reset match #' . $match_id . ' to pending: ' . ($result['message'] ?? 'unknown error') . '.',
+                    ['match_id' => $match_id, 'admin_id' => $admin_id, 'message' => $result['message'] ?? ''],
+                    'admin'
+                );
+                add_settings_error('mm_admin_notices', 'reset_pending_failed', $result['message'] ?? __('Failed to reset match to pending review.', 'matchmaker'), 'error');
+            }
+            return;
+        }
+
         // --- CREATE MANUAL MATCH PAIR ---
         if ($action === 'create_manual_match' && wp_verify_nonce($nonce, 'mm_manual_match')) {
             $u1 = (int) ($_GET['u1'] ?? 0);
@@ -1130,9 +1153,10 @@ class AdminPortal
         $m2 = $repo->get_meta_block($u2_id);
 
         $back_url    = admin_url('admin.php?page=matchmaking-matches');
-        $approve_url = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&mm_action=approve&match_id=' . $match_id), 'mm_approve_' . $match_id);
-        $reject_url  = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&mm_action=reject&match_id=' . $match_id), 'mm_reject_' . $match_id);
+        $approve_url = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&view_match=' . $match_id . '&mm_action=approve&match_id=' . $match_id), 'mm_approve_' . $match_id);
+        $reject_url  = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&view_match=' . $match_id . '&mm_action=reject&match_id=' . $match_id), 'mm_reject_' . $match_id);
         $cancel_url  = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&view_match=' . $match_id . '&mm_action=cancel_approved&match_id=' . $match_id), 'mm_cancel_approved_' . $match_id);
+        $reset_url   = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&view_match=' . $match_id . '&mm_action=reset_pending&match_id=' . $match_id), 'mm_reset_pending_' . $match_id);
         $st          = (string) $match['status'];
 
         require dirname(__DIR__) . '/View/admin/matches/match-single.php';

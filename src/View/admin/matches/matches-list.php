@@ -89,17 +89,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                         <td style="white-space:nowrap;"><small>U1: <?php echo esc_html($m['user_one_response'] ?? 'pending'); ?> | U2: <?php echo esc_html($m['user_two_response'] ?? 'pending'); ?></small></td>
                         <td style="text-align:center; white-space:nowrap;"><small><?php echo esc_html(substr($m['created_at'] ?? '—', 0, 10)); ?></small></td>
                         <td style="text-align:center; white-space:nowrap;">
-                            <?php if ($st === 'pending_review') : ?>
-                                <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-small"><?php esc_html_e('Approve', 'matchmaker'); ?></a>
-                                <a href="<?php echo esc_url($reject_url); ?>" class="button button-small mm-reject-link"><?php esc_html_e('Reject', 'matchmaker'); ?></a>
-                            <?php elseif ($st === 'approved') :
-                                $cancel_url = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&mm_action=cancel_approved&match_id=' . $mid), 'mm_cancel_approved_' . $mid);
-                            ?>
-                                <a href="<?php echo esc_url($view_url); ?>" class="button button-small"><?php esc_html_e('View', 'matchmaker'); ?></a>
-                                <a href="<?php echo esc_url($cancel_url); ?>" class="button button-small mm-cancel-approval-link" style="color:#b91c1c; margin-left:3px;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to cancel this approved match and revert it to pending review? Member quotas will be restored.', 'matchmaker')); ?>');"><?php esc_html_e('Cancel', 'matchmaker'); ?></a>
-                            <?php else : ?>
-                                <a href="<?php echo esc_url($view_url); ?>" class="button button-small"><?php esc_html_e('View', 'matchmaker'); ?></a>
-                            <?php endif; ?>
+                            <a href="<?php echo esc_url($view_url); ?>" class="button button-small button-primary"><?php esc_html_e('View Comparison', 'matchmaker'); ?></a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

@@ -562,4 +562,19 @@ class MatchService {
 
         return $result;
     }
+
+    /**
+     * Process admin resetting a rejected or expired match back to pending review.
+     *
+     * @param int $match_id The match ID.
+     * @param int $admin_id The admin ID performing the reset.
+     * @return array<string, mixed> Result array.
+     */
+    public function process_admin_reset_pending(int $match_id, int $admin_id): array
+    {
+        $repo   = MatchRepository::instance();
+        $result = $repo->reset_match_to_pending($match_id, $admin_id);
+
+        return $result;
+    }
 }

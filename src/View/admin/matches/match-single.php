@@ -17,6 +17,7 @@
  *   @var string               $approve_url
  *   @var string               $reject_url
  *   @var string               $cancel_url
+ *   @var string               $reset_url
  *   @var string               $st
  *
  * @package Matchmaker\Admin
@@ -45,7 +46,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
             <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary button-hero" style="margin-right:8px;"><?php esc_html_e('Approve Match', 'matchmaker'); ?></a>
             <a href="<?php echo esc_url($reject_url); ?>" class="button button-secondary button-hero mm-reject-link"><?php esc_html_e('Reject Match', 'matchmaker'); ?></a>
         <?php elseif ($st === 'approved') : ?>
-            <a href="<?php echo esc_url($cancel_url); ?>" class="button button-secondary button-hero" style="color:#b91c1c;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to cancel this approved match and revert it to pending review? Member quotas will be restored.', 'matchmaker')); ?>');"><?php esc_html_e('Cancel Approval', 'matchmaker'); ?></a>
+            <a href="<?php echo esc_url($cancel_url); ?>" class="button button-secondary button-hero mm-cancel-approval-link" style="color:#b91c1c;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to cancel this approved match and revert it to pending review? Member quotas will be restored.', 'matchmaker')); ?>');"><?php esc_html_e('Cancel Approval', 'matchmaker'); ?></a>
+        <?php elseif (in_array($st, ['rejected', 'admin_rejected', 'expired'], true)) : ?>
+            <a href="<?php echo esc_url($reset_url); ?>" class="button button-secondary button-hero mm-reset-pending-link" style="color:#0284c7; border-color:#0284c7;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to reset this match to pending review? Member responses will be reset to pending and the match can be re-evaluated.', 'matchmaker')); ?>');"><?php esc_html_e('Reset to Pending', 'matchmaker'); ?></a>
         <?php endif; ?>
     </div>
 </div>
@@ -120,5 +123,18 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
     </div>
 </div>
 
+<div class="mm-card" style="margin-top:20px; display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; padding:15px 20px;">
+    <div>
+        <strong><?php esc_html_e('Match Status:', 'matchmaker'); ?></strong> <span class="mm-status mm-status-<?php echo esc_attr($st); ?>"><?php echo esc_html($st_label); ?></span>
+    </div>
+    <div style="display:flex; gap:8px;">
+        <?php if ($st === 'pending_review') : ?>
+            <a href="<?php echo esc_url($approve_url); ?>" class="button button-primary"><?php esc_html_e('Approve Match', 'matchmaker'); ?></a>
+            <a href="<?php echo esc_url($reject_url); ?>" class="button button-secondary mm-reject-link"><?php esc_html_e('Reject Match', 'matchmaker'); ?></a>
+        <?php elseif ($st === 'approved') : ?>
+            <a href="<?php echo esc_url($cancel_url); ?>" class="button button-secondary mm-cancel-approval-link" style="color:#b91c1c;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to cancel this approved match and revert it to pending review? Member quotas will be restored.', 'matchmaker')); ?>');"><?php esc_html_e('Cancel Approval', 'matchmaker'); ?></a>
+        <?php elseif (in_array($st, ['rejected', 'admin_rejected', 'expired'], true)) : ?>
+            <a href="<?php echo esc_url($reset_url); ?>" class="button button-secondary mm-reset-pending-link" style="color:#0284c7; border-color:#0284c7;" onclick="return confirm('<?php echo esc_js(__('Are you sure you want to reset this match to pending review? Member responses will be reset to pending and the match can be re-evaluated.', 'matchmaker')); ?>');"><?php esc_html_e('Reset to Pending', 'matchmaker'); ?></a>
+        <?php endif; ?>
     </div>
 </div>

@@ -8,8 +8,3 @@
 
 *Set task details here when starting a new task, and clear back to IDLE upon completion.*
 
-
-
-
-
-

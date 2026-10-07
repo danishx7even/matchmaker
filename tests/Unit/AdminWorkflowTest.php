@@ -293,7 +293,102 @@ class AdminWorkflowTest
         unset($_GET['page'], $_GET['mm_action'], $_GET['match_id'], $_GET['_wpnonce'], $GLOBALS['__mm_current_user_id']);
     }
 
-    public function test_matches_list_view_renders_unified_approve_reject_and_cancel_cta(): void
+    public function test_admin_handle_reset_pending_action(): void
+    {
+        $GLOBALS['__mm_settings_errors'] = [];
+        $admin_id = 1;
+        $GLOBALS['__mm_current_user_id'] = $admin_id;
+
+        $match_id = 88;
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 88"] = [
+            'id'                        => 88,
+            'user_one_id'               => 501,
+            'user_two_id'               => 502,
+            'initiator_user_id'         => 501,
+            'status'                    => 'rejected',
+            'approved_by'               => 1,
+            'approved_at'               => current_time('mysql'),
+            'user_one_response'         => 'rejected',
+            'user_two_response'         => 'pending',
+            'user_one_rejection_reason' => 'Too far distance',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 501"] = [
+            'user_id'   => 501,
+            'user_type' => 'monthly',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 502"] = [
+            'user_id'   => 502,
+            'user_type' => 'free',
+        ];
+
+        $_GET['page']      = 'matchmaking-matches';
+        $_GET['mm_action'] = 'reset_pending';
+        $_GET['match_id']  = '88';
+        $_GET['_wpnonce']  = wp_create_nonce('mm_reset_pending_88');
+
+        $this->admin->handle_admin_actions();
+
+        $errors = \get_settings_errors('mm_admin_notices');
+        if (empty($errors)) {
+            throw new \RuntimeException("Expected settings error notice for reset_pending_success");
+        }
+        if (($errors[0]['code'] ?? '') !== 'reset_pending_success') {
+            throw new \RuntimeException("Expected code 'reset_pending_success', got " . ($errors[0]['code'] ?? ''));
+        }
+        if (!str_contains($errors[0]['message'] ?? '', 'Match #88 has been reset to pending review')) {
+            throw new \RuntimeException("Expected success message for Match #88, got " . ($errors[0]['message'] ?? ''));
+        }
+
+        unset($_GET['page'], $_GET['mm_action'], $_GET['match_id'], $_GET['_wpnonce'], $GLOBALS['__mm_current_user_id']);
+    }
+
+    public function test_reset_match_to_pending_in_repository(): void
+    {
+        $repo = MatchRepository::instance();
+
+        // 1. Rejected match
+        $match_id = 89;
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 89"] = [
+            'id'                        => 89,
+            'user_one_id'               => 501,
+            'user_two_id'               => 502,
+            'initiator_user_id'         => 501,
+            'status'                    => 'admin_rejected',
+            'approved_by'               => null,
+            'approved_at'               => null,
+            'user_one_response'         => 'pending',
+            'user_two_response'         => 'pending',
+            'user_one_rejection_reason' => null,
+            'user_two_rejection_reason' => null,
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 501"] = [
+            'user_id'   => 501,
+            'user_type' => 'monthly',
+        ];
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 502"] = [
+            'user_id'   => 502,
+            'user_type' => 'free',
+        ];
+
+        $res = $repo->reset_match_to_pending(89, 1);
+        if (!$res['success']) {
+            throw new \RuntimeException("Expected reset_match_to_pending to succeed for admin_rejected match");
+        }
+
+        // 2. Non-reversible match (e.g. pending_review or matched) should fail
+        $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matches WHERE id = 90"] = [
+            'id'          => 90,
+            'user_one_id' => 501,
+            'user_two_id' => 502,
+            'status'      => 'pending_review',
+        ];
+        $res_invalid = $repo->reset_match_to_pending(90, 1);
+        if ($res_invalid['success']) {
+            throw new \RuntimeException("Expected reset_match_to_pending to fail for pending_review match");
+        }
+    }
+
+    public function test_matches_list_view_renders_view_comparison_cta(): void
     {
         $repo = MatchRepository::instance();
         $search = '';
@@ -323,9 +418,20 @@ class AdminWorkflowTest
                 'user_two_response' => 'pending',
                 'created_at'        => '2026-09-21 12:00:00',
             ],
+            [
+                'id'                => 12,
+                'user_one_id'       => 601,
+                'user_two_id'       => 604,
+                'score'             => 4,
+                'status'            => 'rejected',
+                'match_source'      => 'auto',
+                'user_one_response' => 'rejected',
+                'user_two_response' => 'pending',
+                'created_at'        => '2026-09-21 12:00:00',
+            ],
         ];
 
-        // User 601 is monthly, User 602 is free (previously triggered is_foe)
+        // User 601 is monthly, User 602 is free
         $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 601"] = [
             'user_id'   => 601,
             'user_type' => 'monthly',
@@ -339,19 +445,74 @@ class AdminWorkflowTest
         include dirname(dirname(__DIR__)) . '/src/View/admin/matches/matches-list.php';
         $html = (string) ob_get_clean();
 
-        // Must NOT contain Free/Event warning
-        if (str_contains($html, '⚠️ Free/Event')) {
-            throw new \RuntimeException("Expected matches list to not contain Free/Event warning badge");
+        // Must render View Comparison for all matches
+        if (!str_contains($html, 'view_match=10') || !str_contains($html, 'view_match=11') || !str_contains($html, 'view_match=12')) {
+            throw new \RuntimeException("Expected all matches to render View Comparison links");
+        }
+        if (!str_contains($html, 'View Comparison')) {
+            throw new \RuntimeException("Expected matches list to render View Comparison button label");
+        }
+    }
+
+    public function test_single_match_view_renders_appropriate_ctas(): void
+    {
+        $repo = MatchRepository::instance();
+
+        // 1. Pending Match Review
+        $match_id = 10;
+        $match = [
+            'id'                => 10,
+            'user_one_id'       => 601,
+            'user_two_id'       => 602,
+            'score'             => 5,
+            'status'            => 'pending_review',
+            'match_source'      => 'auto',
+            'user_one_response' => 'pending',
+            'user_two_response' => 'pending',
+        ];
+        $u1_id = 601;
+        $u2_id = 602;
+        $u1 = get_userdata(601);
+        $u2 = get_userdata(602);
+        $p1 = ['user_id' => 601, 'gender' => 'male'];
+        $p2 = ['user_id' => 602, 'gender' => 'female'];
+        $m1 = [];
+        $m2 = [];
+        $back_url = 'admin.php?page=matchmaking-matches';
+        $approve_url = 'admin.php?page=matchmaking-matches&mm_action=approve&match_id=10';
+        $reject_url = 'admin.php?page=matchmaking-matches&mm_action=reject&match_id=10';
+        $cancel_url = 'admin.php?page=matchmaking-matches&mm_action=cancel_approved&match_id=10';
+        $reset_url = 'admin.php?page=matchmaking-matches&mm_action=reset_pending&match_id=10';
+        $st = 'pending_review';
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/match-single.php';
+        $html_pending = (string) ob_get_clean();
+
+        if (!str_contains($html_pending, 'Approve Match') || !str_contains($html_pending, 'Reject Match')) {
+            throw new \RuntimeException("Expected pending match to render Approve Match and Reject Match buttons");
         }
 
-        // Pending match #10 must render Approve and Reject buttons
-        if (!str_contains($html, 'mm_action=approve') || !str_contains($html, 'match_id=10') || !str_contains($html, 'mm_action=reject')) {
-            throw new \RuntimeException("Expected pending match #10 to render Approve and Reject buttons");
+        // 2. Rejected Match Review
+        $st = 'rejected';
+        $match['status'] = 'rejected';
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/match-single.php';
+        $html_rejected = (string) ob_get_clean();
+
+        if (!str_contains($html_rejected, 'Reset to Pending') || !str_contains($html_rejected, 'mm_action=reset_pending')) {
+            throw new \RuntimeException("Expected rejected match to render Reset to Pending button");
         }
 
-        // Approved match #11 must render View and Cancel buttons
-        if (!str_contains($html, 'view_match=11') || !str_contains($html, 'mm_action=cancel_approved') || !str_contains($html, 'mm-cancel-approval-link')) {
-            throw new \RuntimeException("Expected approved match #11 to render View and Cancel buttons");
+        // 3. Approved Match Review
+        $st = 'approved';
+        $match['status'] = 'approved';
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/match-single.php';
+        $html_approved = (string) ob_get_clean();
+
+        if (!str_contains($html_approved, 'Cancel Approval') || !str_contains($html_approved, 'mm_action=cancel_approved')) {
+            throw new \RuntimeException("Expected approved match to render Cancel Approval button");
         }
     }
 
