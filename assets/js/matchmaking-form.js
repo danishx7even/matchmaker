@@ -279,10 +279,16 @@
                 var sVal = userStateSel.value.trim();
                 var cities = ['Select city'];
                 if (cVal && sVal && data[cVal] && data[cVal][sVal] && Array.isArray(data[cVal][sVal])) {
-                    var cKeys = data[cVal][sVal].slice().sort(function (a, b) {
+                    var cKeys = data[cVal][sVal].slice();
+                    if (cKeys.length === 0 && sVal && !/^select\b/i.test(sVal)) {
+                        cKeys = [sVal];
+                    }
+                    cKeys.sort(function (a, b) {
                         return a.localeCompare(b, undefined, { sensitivity: 'base' });
                     });
                     cities = cities.concat(cKeys);
+                } else if (sVal && !/^select\b/i.test(sVal)) {
+                    cities.push(sVal);
                 }
                 updateCustomSelect('user_city', cities, '', 'Select city');
             });
@@ -348,17 +354,27 @@
                     if (states.length > 0) {
                         states.forEach(function (s) {
                             if (data[c][s] && Array.isArray(data[c][s])) {
-                                data[c][s].forEach(function (cty) {
-                                    citySet[cty] = true;
-                                });
+                                if (data[c][s].length === 0) {
+                                    citySet[s] = true;
+                                } else {
+                                    data[c][s].forEach(function (cty) {
+                                        citySet[cty] = true;
+                                    });
+                                }
+                            } else if (s && !/^any\b/i.test(s)) {
+                                citySet[s] = true;
                             }
                         });
                     } else {
                         Object.keys(data[c]).forEach(function (s) {
                             if (data[c][s] && Array.isArray(data[c][s])) {
-                                data[c][s].forEach(function (cty) {
-                                    citySet[cty] = true;
-                                });
+                                if (data[c][s].length === 0) {
+                                    citySet[s] = true;
+                                } else {
+                                    data[c][s].forEach(function (cty) {
+                                        citySet[cty] = true;
+                                    });
+                                }
                             }
                         });
                     }

@@ -452,6 +452,12 @@ class AdminWorkflowTest
         if (!str_contains($html, 'View Comparison')) {
             throw new \RuntimeException("Expected matches list to render View Comparison button label");
         }
+        if (!str_contains($html, 'mm_action=approve&amp;match_id=10') && !str_contains($html, 'mm_action=approve&match_id=10')) {
+            throw new \RuntimeException("Expected pending match #10 to render Approve CTA");
+        }
+        if (!str_contains($html, 'mm_action=reject&amp;match_id=10') && !str_contains($html, 'mm_action=reject&match_id=10')) {
+            throw new \RuntimeException("Expected pending match #10 to render Reject CTA");
+        }
     }
 
     public function test_single_match_view_renders_appropriate_ctas(): void

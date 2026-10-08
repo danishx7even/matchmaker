@@ -6,6 +6,32 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 139: Fix Reset to Pending SQL Query, Member Rejection Reason Retrieval, State-as-City Fallback, and Restore Match Row CTAs
+- **Objective**:
+  1. **Fix Reset to Pending DB Error**: Fix MySQL error caused by referencing a non-existent column (`dismissed_at`) and invalid format specifiers in `MatchRepository::reset_match_to_pending()`. Use a clean direct `$wpdb->prepare()` statement.
+  2. **Fix Member Decline Rejection Reason**: Ensure member decline feedback entered into `#step-4 textarea` is reliably captured via multi-layer selector fallbacks in `member-portal.js` and transmitted in the AJAX payload, eliminating false 5-character validation warnings.
+  3. **Implement State-as-City Fallback for London & City-States**: When a user selects a state/province that has an empty list of sub-cities in `hierarchy_names.json` (such as London, UK), automatically inject the state name itself (`[sVal]`, e.g. "London") as the selectable City option in `matchmaking-form.js` and `FieldGenerator.php`, ensuring no user is ever blocked from completing their profile.
+  4. **Restore Approve & Reject CTAs in Match Queue and Pool Member Views**: Render `Approve`, `Reject`, and `View Comparison` in the match rows of `matches-list.php` and `user-single.php` for pending matches, while maintaining `Reset to Pending` on `match-single.php`.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `reset_match_to_pending()` with schema-exact `$wpdb->query($wpdb->prepare(...))` query.
+  - `assets/js/member-portal.js`:
+    - Upgraded `submitResponse()` textarea resolution to multi-layer fallback (`#step-4 textarea`, `#mm-rejection-reason`, `.mm-rejection-textarea`, `textarea[name="rejection_reason"]`), ensuring reliable value extraction and client-side error handling.
+  - `assets/js/matchmaking-form.js`:
+    - In Step 1 location cascading, added fallback: when `data[cVal][sVal]` is empty, inject `[sVal]` (the state name itself) as the city option.
+    - In Step 2 preferred location cascading, added fallback for empty state city lists to include the state name.
+  - `src/Frontend/FieldGenerator.php`:
+    - In `options_user_city()` and `options_pref_city()`, added fallback to `[$clean_state]` when cities list is empty.
+  - `src/View/admin/matches/matches-list.php`:
+    - Restored `Approve` and `Reject` buttons alongside `View Comparison` for `pending_review` rows.
+  - `src/View/admin/pool/user-single.php`:
+    - Restored `Approve` and `Reject` buttons alongside `View Comparison` for `pending_review` rows.
+  - `tests/Unit/LocationCascadeTest.php`:
+    - Added `test_state_with_empty_city_list_falls_back_to_state_as_city()`.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Updated test assertions for matches queue row CTAs and single match review CTAs.
+- **Verification**: Ran full automated test suite with **239/239 tests passing (0 failures, 0 errors)**.
+
 ### Task 138: Shift Approve/Reject CTAs to Match Detail, Add View Comparison in Match Lists, and Add Reset to Pending Action
 - **Objective**:
   1. **Matches Queue & Single User Match History View Update**:

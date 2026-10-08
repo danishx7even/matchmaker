@@ -2443,23 +2443,20 @@ class MatchRepository
         $u1_id = (int) $match['user_one_id'];
         $u2_id = (int) $match['user_two_id'];
 
-        $updated = $wpdb->update(
-            $table,
-            [
-                'status'                     => 'pending_review',
-                'approved_by'                => null,
-                'approved_at'                => null,
-                'user_one_response'          => 'pending',
-                'user_two_response'          => 'pending',
-                'user_one_rejection_reason'  => null,
-                'user_two_rejection_reason'  => null,
-                'dismissed_at'               => null,
-                'updated_at'                 => current_time('mysql'),
-            ],
-            ['id' => $match_id],
-            ['%s', null, null, '%s', '%s', null, null, null, '%s'],
-            ['%d']
-        );
+        $updated = $wpdb->query($wpdb->prepare(
+            "UPDATE {$table}
+             SET status = 'pending_review',
+                 approved_by = NULL,
+                 approved_at = NULL,
+                 user_one_response = 'pending',
+                 user_two_response = 'pending',
+                 user_one_rejection_reason = NULL,
+                 user_two_rejection_reason = NULL,
+                 updated_at = %s
+             WHERE id = %d",
+            current_time('mysql'),
+            $match_id
+        ));
 
         if ($updated === false) {
             return ['success' => false, 'message' => __('Database error while resetting match.', 'matchmaker')];

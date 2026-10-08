@@ -226,6 +226,21 @@ final class LocationCascadeTest extends TestCase
         $this->assertStringContainsString('REPLACE INTO wp_matchmaking_pool', $last_query);
         $this->assertStringContainsString('Egyptian', $last_query);
     }
+
+    public function test_state_with_empty_city_list_falls_back_to_state_as_city(): void
+    {
+        $fg = FieldGenerator::instance();
+
+        // 1. In United Kingdom -> London (which has empty city list in JSON dataset)
+        $london_cities = $fg->options_user_city('United Kingdom', 'London');
+        $this->assertEquals('Select city', $london_cities[0]);
+        $this->assertContains('London', $london_cities);
+
+        // 2. Preferred city with London state
+        $london_pref_cities = $fg->options_pref_city('United Kingdom', 'London');
+        $this->assertEquals('Any City', $london_pref_cities[0]);
+        $this->assertContains('London', $london_pref_cities);
+    }
 }
 
 

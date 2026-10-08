@@ -117,6 +117,9 @@ class FieldGenerator {
         $clean_state   = trim($state);
         if (!empty($clean_country) && !empty($clean_state) && isset($hierarchy[$clean_country][$clean_state]) && is_array($hierarchy[$clean_country][$clean_state])) {
             $cities = $hierarchy[$clean_country][$clean_state];
+            if (empty($cities)) {
+                $cities = [$clean_state];
+            }
             sort($cities, SORT_STRING | SORT_FLAG_CASE);
             return array_merge(['Select city'], $cities);
         }
@@ -206,8 +209,12 @@ class FieldGenerator {
 
             foreach ($filtered_states as $s) {
                 if (isset($hierarchy[$c][$s]) && is_array($hierarchy[$c][$s])) {
-                    foreach ($hierarchy[$c][$s] as $city) {
-                        $cities[$city] = true;
+                    if (empty($hierarchy[$c][$s])) {
+                        $cities[$s] = true;
+                    } else {
+                        foreach ($hierarchy[$c][$s] as $city) {
+                            $cities[$city] = true;
+                        }
                     }
                 }
             }

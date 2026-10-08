@@ -159,22 +159,30 @@
 
             var rejectionReason = '';
             if (responseAction === 'decline') {
-                var reasonInput = document.getElementById('mm-rejection-reason');
-                var errorEl = document.getElementById('mm-rejection-error');
+                var reasonInput = document.querySelector('#step-4 textarea') ||
+                                  document.getElementById('mm-rejection-reason') ||
+                                  document.querySelector('.mm-rejection-textarea') ||
+                                  document.querySelector('textarea[name="rejection_reason"]');
+                var errorEl = document.getElementById('mm-rejection-error') || document.querySelector('.mm-rejection-error');
                 if (reasonInput) {
                     rejectionReason = (reasonInput.value || '').trim();
-                    if (rejectionReason.length < 5) {
-                        if (errorEl) {
-                            errorEl.textContent = 'Please provide a reason why you are declining this match (at least 5 characters).';
-                            errorEl.style.display = 'block';
-                        } else {
-                            alert('Please provide a reason why you are declining this match (at least 5 characters).');
-                        }
-                        reasonInput.focus();
-                        return;
-                    } else if (errorEl) {
-                        errorEl.style.display = 'none';
+                } else if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                    rejectionReason = (document.activeElement.value || '').trim();
+                }
+
+                if (rejectionReason.length < 5) {
+                    if (errorEl) {
+                        errorEl.textContent = 'Please provide a reason why you are declining this match (at least 5 characters).';
+                        errorEl.style.display = 'block';
+                    } else {
+                        alert('Please provide a reason why you are declining this match (at least 5 characters).');
                     }
+                    if (reasonInput) {
+                        reasonInput.focus();
+                    }
+                    return;
+                } else if (errorEl) {
+                    errorEl.style.display = 'none';
                 }
             }
 
