@@ -520,6 +520,68 @@ class AdminWorkflowTest
         if (!str_contains($html_approved, 'Cancel Approval') || !str_contains($html_approved, 'mm_action=cancel_approved')) {
             throw new \RuntimeException("Expected approved match to render Cancel Approval button");
         }
+
+        // 4. Verify Dual Full Profiles and Criteria Breakdown Table Rendering
+        $breakdown = [
+            'criteria' => [
+                [
+                    'id'            => 'religion',
+                    'label'         => 'Religion / Sect',
+                    'category'      => 'gate',
+                    'target_val'    => 'Muslim (Prefers: Sunni)',
+                    'candidate_val' => 'Muslim (Prefers: Any)',
+                    'is_match'      => true,
+                    'note'          => 'Religious preferences compatible',
+                ],
+                [
+                    'id'            => 'origin',
+                    'label'         => 'Origin / Ethnicity',
+                    'category'      => 'score',
+                    'target_val'    => 'Arab (Prefers: Arab)',
+                    'candidate_val' => 'Arab (Prefers: Arab)',
+                    'is_match'      => true,
+                    'note'          => '+1 pt: Origin preferences match',
+                ],
+            ],
+            'flexible_score'          => 5,
+            'matching_criteria_count' => 2,
+            'total_criteria_count'    => 2,
+        ];
+
+        $m1 = [
+            'user_photo1'          => 'https://example.com/u1_photo1.jpg',
+            'user_about_me'        => 'I am an adventurous engineer.',
+            'pref_additional_info' => 'Looking for a kind partner.',
+            'user_citizenship'     => 'United Kingdom',
+            'pref_citizenship'     => 'United Kingdom',
+        ];
+        $m2 = [
+            'user_photo1'          => 'https://example.com/u2_photo1.jpg',
+            'user_about_me'        => 'Passionate teacher and traveler.',
+            'pref_additional_info' => 'Looking for a pious companion.',
+            'user_citizenship'     => 'United Kingdom',
+            'pref_citizenship'     => 'United Kingdom',
+        ];
+
+        $st = 'pending_review';
+        $match['status'] = 'pending_review';
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/match-single.php';
+        $html_full = (string) ob_get_clean();
+
+        if (!str_contains($html_full, 'Self Profile') || !str_contains($html_full, 'Partner Preferences')) {
+            throw new \RuntimeException("Expected match-single.php to render Self Profile and Partner Preferences sections for both candidates");
+        }
+        if (!str_contains($html_full, 'About Myself:') || !str_contains($html_full, 'About My Perfect Match:')) {
+            throw new \RuntimeException("Expected match-single.php to render About Myself and About My Perfect Match cards");
+        }
+        if (!str_contains($html_full, 'mm-breakdown-table') || !str_contains($html_full, 'Side-by-Side Compatibility Criteria Comparison')) {
+            throw new \RuntimeException("Expected match-single.php to render the Side-by-Side Compatibility Breakdown Table");
+        }
+        if (!str_contains($html_full, 'mm-pill-match') || !str_contains($html_full, 'Religion / Sect')) {
+            throw new \RuntimeException("Expected match-single.php breakdown table to render criteria labels and match pills");
+        }
     }
 
     public function test_pool_list_view_renders_quota_column(): void

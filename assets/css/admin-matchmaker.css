@@ -1114,11 +1114,30 @@ body.mm-lightbox-open {
     border-radius: 12px;
 }
 
+@media (max-width: 900px) {
+    .mm-grid-two {
+        grid-template-columns: 1fr !important;
+    }
+    .mm-detail-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+}
+
 @media (max-width: 782px) {
     .mm-compare-members-grid {
         grid-template-columns: 1fr !important;
     }
+    .mm-photos-grid {
+        flex-wrap: wrap;
+    }
+    .mm-photos-grid img {
+        width: 80px;
+        height: 100px;
+    }
 }
+
 
 
 

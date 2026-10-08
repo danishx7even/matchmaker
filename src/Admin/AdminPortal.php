@@ -1159,6 +1159,10 @@ class AdminPortal
         $reset_url   = wp_nonce_url(admin_url('admin.php?page=matchmaking-matches&view_match=' . $match_id . '&mm_action=reset_pending&match_id=' . $match_id), 'mm_reset_pending_' . $match_id);
         $st          = (string) $match['status'];
 
+        $breakdown   = ($p1 && $p2)
+            ? MatchService::instance()->get_criteria_comparison_breakdown($p1, $p2)
+            : ['criteria' => [], 'flexible_score' => (int) ($match['score'] ?? 0), 'matching_criteria_count' => 0, 'total_criteria_count' => 0];
+
         require dirname(__DIR__) . '/View/admin/matches/match-single.php';
     }
 

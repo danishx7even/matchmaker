@@ -6,6 +6,23 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 140: Enhance Single Match Review View with Full Member Profiles and Responsive Criteria Comparison Table
+- **Objective**:
+  1. **Dual Full Profiles Side-by-Side Presentation**:
+     - Upgrade `src/View/admin/matches/match-single.php` to display complete full profiles for both User 1 and User 2 matching the visual fidelity and structure of the pool browser single candidate view (`user-single.php`).
+     - Includes tier badges, parent applicant indicators, active service tags, subscription cancellation warnings, contact details, 3-photo gallery with lightbox modal triggers, Self Profile attribute table, Partner Preferences attribute table, About Myself and Perfect Match narrative blocks, and individual member response status with decline feedback.
+  2. **Side-by-Side Compatibility Criteria Comparison Table**:
+     - Position the comprehensive 11-criteria compatibility breakdown matrix (`.mm-breakdown-table`) directly beneath the profile blocks.
+     - Displays all evaluated criteria, User 1 and User 2 values and preferences, gate and scoring point badges, match/differ status pills (`.mm-pill-match` / `.mm-pill-differ`), and scoring notes.
+  3. **Responsive Mobile & Tablet Optimization**:
+     - Added responsive CSS media queries in `assets/css/admin-matchmaker.css` to collapse `.mm-grid-two` and `.mm-detail-header` cleanly to single-column on viewport widths $\le 900\text{px}$ and ensure photo grids wrap properly.
+- **Implemented**:
+  - `src/Admin/AdminPortal.php`: Updated `render_single_match_view()` to compute criteria breakdown via `MatchService::get_criteria_comparison_breakdown($p1, $p2)`.
+  - `src/View/admin/matches/match-single.php`: Refactored layout to render dual full profiles, photo galleries with lightbox triggers, and criteria comparison table.
+  - `assets/css/admin-matchmaker.css`: Added responsive rules for `.mm-grid-two`, `.mm-detail-header`, and `.mm-photos-grid`.
+  - `tests/Unit/AdminWorkflowTest.php`: Added automated tests verifying dual full profiles and criteria comparison table rendering in single match review.
+- **Verification**: Ran full automated test suite with **239/239 tests passing (0 failures, 0 errors)**.
+
 ### Task 139: Fix Reset to Pending SQL Query, Member Rejection Reason Retrieval, State-as-City Fallback, and Restore Match Row CTAs
 - **Objective**:
   1. **Fix Reset to Pending DB Error**: Fix MySQL error caused by referencing a non-existent column (`dismissed_at`) and invalid format specifiers in `MatchRepository::reset_match_to_pending()`. Use a clean direct `$wpdb->prepare()` statement.
