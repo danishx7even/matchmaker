@@ -6,6 +6,38 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 142: Enhance Admin Table Pagination Design and Responsiveness
+- **Objective**:
+  1. **Modern Brand-Aligned Pagination Styling**:
+     - Upgrade table pagination across the entire admin portal (Matches Queue, Candidate Pool, Match Logs, and Notification Logs) to follow the official design system (`#CC723F` brand ochre, rounded controls, subtle shadows, and clean border tokens).
+     - Style `.tablenav.bottom` as a card container with rounded corners and elevated visual depth.
+     - Modernize item counters (`.displaying-num`) as pill badges with clear contrast.
+     - Style page number links (`.page-numbers`), current page highlights (`.page-numbers.current`), navigation controls (`.prev`, `.next`), and ellipsis dots (`.dots`) with smooth hover transitions and elevated active states.
+  2. **Responsive Mobile & Tablet Layout**:
+     - Ensure pagination controls stack vertically on small viewports ($\le 782\text{px}$) with touch-friendly button targets (`32px` - `36px`).
+- **Implemented**:
+  - `assets/css/admin-matchmaker.css`: Added modern pagination styles for `.tablenav.bottom`, `.tablenav-pages`, `.displaying-num`, `.page-numbers`, `.page-numbers.current`, `.prev`, `.next`, and mobile breakpoint rules.
+- **Verification**: Ran full automated test suite with **239/239 tests passing (0 failures, 0 errors)**.
+
+### Task 141: Add Match ID Filtering Support to Matches Queue Search and Update Placeholder
+- **Objective**:
+  1. **Support Match ID Search in Matches Queue**:
+     - Enable admins to filter matches by Match ID (e.g. `42`, `#42`, `match 42`, or `match #42`) in addition to searching candidate/initiator names and email addresses.
+     - Automatically detect numeric match ID formats, searching `m.id = %d` while maintaining simultaneous broad name/email fuzzy matching (`LIKE %s`).
+  2. **Update Search Filter Input Placeholder**:
+     - Update placeholder on the All Matches Queue page (`matches-list.php`) to `"Search match ID, name, email"`.
+  3. **Zero Regressions**:
+     - Ensure existing status filters, source filters, pagination, and sorting on the All Matches Queue page remain fully operative.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `get_all_matches()` and `search_matches_count()` to regex-match numeric and `#`-prefixed IDs and add `m.id = %d` to the SQL query `WHERE` clause.
+  - `src/View/admin/matches/matches-list.php`:
+    - Updated search input placeholder to `"Search match ID, name, email"`.
+  - `tests/Unit/AdminWorkflowTest.php`:
+    - Enhanced `test_search_matches_query_generation` with assertions for numeric, `#`-prefixed, and `match #`-prefixed searches on both record retrieval and count queries.
+    - Added assertion for placeholder rendering in `test_matches_list_view_renders_pagination`.
+- **Verification**: Ran full automated test suite with **239/239 tests passing (0 failures, 0 errors)**.
+
 ### Task 140: Enhance Single Match Review View with Full Member Profiles and Responsive Criteria Comparison Table
 - **Objective**:
   1. **Dual Full Profiles Side-by-Side Presentation**:

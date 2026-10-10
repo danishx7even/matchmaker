@@ -87,6 +87,7 @@ class AdminWorkflowTest
         global $wpdb;
         $wpdb->queries = [];
 
+        // 1. Text Search (Name / Email)
         $filters = [
             'search' => 'Farhan',
             'status' => 'pending_review',
@@ -96,12 +97,41 @@ class AdminWorkflowTest
         $matches = $this->repo->search_matches($filters);
 
         $queries_str = implode("\n", $wpdb->queries);
-        if (!str_contains($queries_str, 'wp_matches') || !str_contains($queries_str, 'm.status =') || !str_contains($queries_str, 'm.match_source =')) {
-            throw new \RuntimeException("Expected matches search query with status and match_source, executed:\n{$queries_str}");
+        if (!str_contains($queries_str, 'wp_matches') || !str_contains($queries_str, 'm.status =') || !str_contains($queries_str, 'm.match_source =') || !str_contains($queries_str, 'u1.display_name LIKE')) {
+            throw new \RuntimeException("Expected matches search query with status, match_source, and display_name LIKE, executed:\n{$queries_str}");
         }
 
         if (!is_array($matches)) {
             throw new \RuntimeException("Expected search_matches to return an array");
+        }
+
+        // 2. Numeric Match ID Search (e.g. '42', '#42', 'match #42')
+        $wpdb->queries = [];
+        $this->repo->search_matches(['search' => '42']);
+        $q_num = implode("\n", $wpdb->queries);
+        if (!str_contains($q_num, 'm.id = 42')) {
+            throw new \RuntimeException("Expected search_matches('42') to query 'm.id = 42', got:\n{$q_num}");
+        }
+
+        $wpdb->queries = [];
+        $this->repo->search_matches(['search' => '#42']);
+        $q_hash = implode("\n", $wpdb->queries);
+        if (!str_contains($q_hash, 'm.id = 42')) {
+            throw new \RuntimeException("Expected search_matches('#42') to query 'm.id = 42', got:\n{$q_hash}");
+        }
+
+        $wpdb->queries = [];
+        $this->repo->search_matches(['search' => 'match #42']);
+        $q_match_hash = implode("\n", $wpdb->queries);
+        if (!str_contains($q_match_hash, 'm.id = 42')) {
+            throw new \RuntimeException("Expected search_matches('match #42') to query 'm.id = 42', got:\n{$q_match_hash}");
+        }
+
+        $wpdb->queries = [];
+        $this->repo->search_matches_count(['search' => '#42']);
+        $q_count = implode("\n", $wpdb->queries);
+        if (!str_contains($q_count, 'm.id = 42')) {
+            throw new \RuntimeException("Expected search_matches_count('#42') to query 'm.id = 42', got:\n{$q_count}");
         }
     }
 
@@ -1224,6 +1254,9 @@ class AdminWorkflowTest
         }
         if (!str_contains($html, '45 matches')) {
             throw new \RuntimeException("Expected matches-list.php to render '45 matches' displaying-num text");
+        }
+        if (!str_contains($html, 'placeholder="Search match ID, name, email"')) {
+            throw new \RuntimeException("Expected matches-list.php to render 'Search match ID, name, email' placeholder");
         }
     }
 

@@ -1138,6 +1138,130 @@ body.mm-lightbox-open {
     }
 }
 
+/* =============================================================
+   Admin Table Pagination
+   ============================================================= */
+.tablenav.bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-top: 18px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    height: auto;
+}
+
+.tablenav .tablenav-pages {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    float: none;
+    height: auto;
+    margin: 0;
+    font-size: 13px;
+    color: #475569;
+}
+
+.tablenav .displaying-num {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    padding: 4px 10px;
+    border-radius: 6px;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 12px;
+}
+
+.tablenav-pages .pagination-links {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.tablenav-pages .page-numbers {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    text-decoration: none;
+    color: #334155;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-sizing: border-box;
+    line-height: 1;
+    transition: all 0.15s ease-in-out;
+}
+
+.tablenav-pages a.page-numbers:hover {
+    background: #f8fafc;
+    border-color: #CC723F;
+    color: #CC723F;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(204, 114, 63, 0.12);
+}
+
+.tablenav-pages span.page-numbers.current {
+    background: #CC723F;
+    border-color: #CC723F;
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(204, 114, 63, 0.3);
+    cursor: default;
+}
+
+.tablenav-pages .page-numbers.prev,
+.tablenav-pages .page-numbers.next {
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.tablenav-pages .page-numbers.dots {
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    min-width: 20px;
+    cursor: default;
+}
+
+@media (max-width: 782px) {
+    .tablenav.bottom {
+        padding: 12px 14px;
+    }
+    .tablenav .tablenav-pages {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        text-align: center;
+    }
+    .tablenav .displaying-num {
+        margin-right: 0;
+    }
+    .tablenav-pages .page-numbers {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        font-size: 12px;
+    }
+}
+
+
 
 
 

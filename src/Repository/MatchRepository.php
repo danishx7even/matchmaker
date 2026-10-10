@@ -1703,12 +1703,24 @@ class MatchRepository
         }
 
         if (!empty($filters['search'])) {
-            $where[] = '(u1.display_name LIKE %s OR u1.user_email LIKE %s OR u2.display_name LIKE %s OR u2.user_email LIKE %s)';
-            $wc      = '%' . $wpdb->esc_like($filters['search']) . '%';
-            $args[]  = $wc;
-            $args[]  = $wc;
-            $args[]  = $wc;
-            $args[]  = $wc;
+            $search_str = trim((string) $filters['search']);
+            $wc         = '%' . $wpdb->esc_like($search_str) . '%';
+
+            if (preg_match('/^(?:match\s*#?|#)?(\d+)$/i', $search_str, $id_match)) {
+                $match_id_num = (int) $id_match[1];
+                $where[]      = '(m.id = %d OR u1.display_name LIKE %s OR u1.user_email LIKE %s OR u2.display_name LIKE %s OR u2.user_email LIKE %s)';
+                $args[]       = $match_id_num;
+                $args[]       = $wc;
+                $args[]       = $wc;
+                $args[]       = $wc;
+                $args[]       = $wc;
+            } else {
+                $where[] = '(u1.display_name LIKE %s OR u1.user_email LIKE %s OR u2.display_name LIKE %s OR u2.user_email LIKE %s)';
+                $args[]  = $wc;
+                $args[]  = $wc;
+                $args[]  = $wc;
+                $args[]  = $wc;
+            }
         }
 
         $where_sql = implode(' AND ', $where);
@@ -1790,12 +1802,24 @@ class MatchRepository
         }
 
         if (!empty($filters['search'])) {
-            $where[] = '(u1.display_name LIKE %s OR u1.user_email LIKE %s OR u2.display_name LIKE %s OR u2.user_email LIKE %s)';
-            $wc      = '%' . $wpdb->esc_like($filters['search']) . '%';
-            $args[]  = $wc;
-            $args[]  = $wc;
-            $args[]  = $wc;
-            $args[]  = $wc;
+            $search_str = trim((string) $filters['search']);
+            $wc         = '%' . $wpdb->esc_like($search_str) . '%';
+
+            if (preg_match('/^(?:match\s*#?|#)?(\d+)$/i', $search_str, $id_match)) {
+                $match_id_num = (int) $id_match[1];
+                $where[]      = '(m.id = %d OR u1.display_name LIKE %s OR u1.user_email LIKE %s OR u2.display_name LIKE %s OR u2.user_email LIKE %s)';
+                $args[]       = $match_id_num;
+                $args[]       = $wc;
+                $args[]       = $wc;
+                $args[]       = $wc;
+                $args[]       = $wc;
+            } else {
+                $where[] = '(u1.display_name LIKE %s OR u1.user_email LIKE %s OR u2.display_name LIKE %s OR u2.user_email LIKE %s)';
+                $args[]  = $wc;
+                $args[]  = $wc;
+                $args[]  = $wc;
+                $args[]  = $wc;
+            }
         }
 
         $where_sql = implode(' AND ', $where);

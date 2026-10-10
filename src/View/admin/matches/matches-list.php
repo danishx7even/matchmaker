@@ -22,7 +22,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 
 <form method="get" class="mm-filter-bar">
     <input type="hidden" name="page" value="matchmaking-matches">
-    <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search member name or email...', 'matchmaker'); ?>" class="regular-text">
+    <input type="search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search match ID, name, email', 'matchmaker'); ?>" class="regular-text">
 
     <select name="filter_status">
         <option value=""><?php esc_html_e('All Match Statuses', 'matchmaker'); ?></option>
