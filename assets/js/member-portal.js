@@ -101,21 +101,48 @@
         /**
          * Navigate between 5-state match views (#step-1 to #step-5)
          */
+        /**
+         * Navigate between 5-state match views (#step-1 to #step-5)
+         */
         navigateStep: function (stepNumber) {
             var views = document.querySelectorAll('.view-state');
             views.forEach(function (v) {
                 v.classList.remove('active');
             });
 
-            var target = document.getElementById('step-' + stepNumber);
-            if (target) {
-                target.classList.add('active');
+            var targets = document.querySelectorAll('.view-state[id="step-' + stepNumber + '"], #step-' + stepNumber);
+            if (targets.length > 0) {
+                targets.forEach(function (t) {
+                    t.classList.add('active');
+                });
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 stepHistory.push(stepNumber);
             }
 
             if (stepNumber === 2 || stepNumber === 5) {
                 MM_Portal.markNotificationsRead();
+            }
+
+            if (stepNumber === 4) {
+                var ta = document.querySelector('#step-4 textarea, .mm-rejection-textarea, textarea[name="rejection_reason"]');
+                if (ta) {
+                    var curLen = (ta.value || '').trim().length;
+                    document.querySelectorAll('#mm-rejection-counter, .mm-rejection-counter').forEach(function (counter) {
+                        if (curLen === 0) {
+                            counter.textContent = '0 / 5 min characters';
+                            counter.style.color = '#64748b';
+                        } else if (curLen < 5) {
+                            counter.textContent = curLen + ' / 5 characters (' + (5 - curLen) + ' more needed)';
+                            counter.style.color = '#d97706';
+                        } else {
+                            counter.textContent = '✓ ' + curLen + ' characters';
+                            counter.style.color = '#16a34a';
+                        }
+                    });
+                    setTimeout(function () {
+                        try { ta.focus(); } catch (e) {}
+                    }, 120);
+                }
             }
         },
 
@@ -154,40 +181,91 @@
         /**
          * Submit AJAX match response (accept / decline)
          */
-        submitResponse: function (matchId, responseAction) {
+        submitResponse: function (matchId, responseAction, triggerBtn) {
             if (!matchId || !responseAction) return;
 
             var rejectionReason = '';
             if (responseAction === 'decline') {
-                var reasonInput = document.querySelector('#step-4 textarea') ||
-                                  document.getElementById('mm-rejection-reason') ||
-                                  document.querySelector('.mm-rejection-textarea') ||
-                                  document.querySelector('textarea[name="rejection_reason"]');
-                var errorEl = document.getElementById('mm-rejection-error') || document.querySelector('.mm-rejection-error');
-                if (reasonInput) {
+                // 1. Scoped search from trigger button container
+                var scopeContainer = triggerBtn ? triggerBtn.closest('#step-4, .centered-state-wrapper, .view-state') : null;
+                var reasonInput = scopeContainer ? scopeContainer.querySelector('textarea') : null;
+
+                // 2. Search all candidate textareas in DOM and pick whichever has content
+                var allTextareas = document.querySelectorAll('#step-4 textarea, #mm-rejection-reason, .mm-rejection-textarea, textarea[name="rejection_reason"]');
+                if (!reasonInput || !reasonInput.value || !reasonInput.value.trim()) {
+                    for (var i = 0; i < allTextareas.length; i++) {
+                        var val = (allTextareas[i].value || '').trim();
+                        if (val.length > 0) {
+                            reasonInput = allTextareas[i];
+                            rejectionReason = val;
+                            break;
+                        }
+                    }
+                } else {
                     rejectionReason = (reasonInput.value || '').trim();
-                } else if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
-                    rejectionReason = (document.activeElement.value || '').trim();
+                }
+
+                // 3. If still empty, check activeElement or visible textarea
+                if (!rejectionReason) {
+                    if (document.activeElement && document.activeElement.tagName === 'TEXTAREA') {
+                        rejectionReason = (document.activeElement.value || '').trim();
+                        if (rejectionReason) {
+                            reasonInput = document.activeElement;
+                        }
+                    }
+                }
+                if (!rejectionReason && allTextareas.length > 0) {
+                    for (var j = 0; j < allTextareas.length; j++) {
+                        if (allTextareas[j].offsetParent !== null || allTextareas[j].offsetWidth > 0) {
+                            var visVal = (allTextareas[j].value || '').trim();
+                            if (visVal.length > 0) {
+                                rejectionReason = visVal;
+                                reasonInput = allTextareas[j];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Synchronize non-empty value across all duplicate textareas in the DOM
+                if (rejectionReason) {
+                    allTextareas.forEach(function (ta) {
+                        if (ta.value !== rejectionReason) {
+                            ta.value = rejectionReason;
+                        }
+                    });
+                }
+
+                // 4. Resolve error elements across scope and global DOM
+                var errorEls = scopeContainer ? scopeContainer.querySelectorAll('#mm-rejection-error, .mm-rejection-error') : [];
+                if (!errorEls || errorEls.length === 0) {
+                    errorEls = document.querySelectorAll('#mm-rejection-error, .mm-rejection-error');
                 }
 
                 if (rejectionReason.length < 5) {
-                    if (errorEl) {
-                        errorEl.textContent = 'Please provide a reason why you are declining this match (at least 5 characters).';
-                        errorEl.style.display = 'block';
+                    var errorMsg = 'Please provide a reason why you are declining this match (at least 5 characters).';
+                    if (errorEls && errorEls.length > 0) {
+                        errorEls.forEach(function (el) {
+                            el.textContent = errorMsg;
+                            el.style.display = 'block';
+                        });
                     } else {
-                        alert('Please provide a reason why you are declining this match (at least 5 characters).');
+                        alert(errorMsg);
                     }
                     if (reasonInput) {
+                        reasonInput.style.borderColor = '#dc2626';
                         reasonInput.focus();
                     }
                     return;
-                } else if (errorEl) {
-                    errorEl.style.display = 'none';
+                } else if (errorEls && errorEls.length > 0) {
+                    errorEls.forEach(function (el) {
+                        el.style.display = 'none';
+                    });
                 }
             }
 
             // Show loading state on clicked button
-            var clickedBtn = document.querySelector('[data-mm-action="submit-response"][data-decision="' + responseAction + '"]');
+            var clickedBtn = triggerBtn || document.querySelector('[data-mm-action="submit-response"][data-decision="' + responseAction + '"]');
             var originalHtml = '';
             if (clickedBtn) {
                 originalHtml = clickedBtn.innerHTML;
@@ -611,7 +689,7 @@
                     var matchId = actionBtn.getAttribute('data-match-id');
                     var decision = actionBtn.getAttribute('data-decision');
                     if (matchId && decision) {
-                        MM_Portal.submitResponse(matchId, decision);
+                        MM_Portal.submitResponse(matchId, decision, actionBtn);
                     }
                 } else if (action === 'paginate-events') {
                     var pageNum = parseInt(actionBtn.getAttribute('data-page'), 10) || 1;
@@ -650,6 +728,45 @@
                 var initialTitle = titleEl ? titleEl.textContent.trim() : '';
 
                 MM_Portal.openEventLinkModal(eventId, initialLink, initialTitle);
+            }
+        });
+
+        // 2b. Live input listener for rejection textarea: updates character count & syncs duplicate elements
+        document.addEventListener('input', function (e) {
+            if (e.target && e.target.matches('#step-4 textarea, #mm-rejection-reason, .mm-rejection-textarea, textarea[name="rejection_reason"]')) {
+                var val = e.target.value || '';
+                var len = val.trim().length;
+
+                // Sync value across all duplicate rejection textareas (handles mobile vs desktop duplicate templates)
+                document.querySelectorAll('#step-4 textarea, #mm-rejection-reason, .mm-rejection-textarea, textarea[name="rejection_reason"]').forEach(function (ta) {
+                    if (ta !== e.target && ta.value !== val) {
+                        ta.value = val;
+                    }
+                });
+
+                // Update character counter elements
+                document.querySelectorAll('#mm-rejection-counter, .mm-rejection-counter').forEach(function (counter) {
+                    if (len === 0) {
+                        counter.textContent = '0 / 5 min characters';
+                        counter.style.color = '#64748b';
+                    } else if (len < 5) {
+                        counter.textContent = len + ' / 5 characters (' + (5 - len) + ' more needed)';
+                        counter.style.color = '#d97706';
+                    } else {
+                        counter.textContent = '✓ ' + len + ' characters';
+                        counter.style.color = '#16a34a';
+                    }
+                });
+
+                // Clear inline error border & message when requirement is satisfied
+                if (len >= 5) {
+                    document.querySelectorAll('#mm-rejection-error, .mm-rejection-error').forEach(function (el) {
+                        el.style.display = 'none';
+                    });
+                    document.querySelectorAll('#step-4 textarea, #mm-rejection-reason, .mm-rejection-textarea').forEach(function (ta) {
+                        ta.style.borderColor = '#cbd5e1';
+                    });
+                }
             }
         });
 

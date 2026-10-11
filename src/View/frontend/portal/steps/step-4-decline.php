@@ -31,26 +31,29 @@ if (!defined('ABSPATH')) {
 
         <div class="mm-rejection-prompt-box" style="text-align: left; margin: 20px 0 16px 0; width: 100%;">
             <label for="mm-rejection-reason" style="display: block; font-weight: 600; font-size: 14px; color: #1e293b; margin-bottom: 6px;">
-                <?php esc_html_e('Help Us Improve Your Matches *', 'matchmaker'); ?>
+                <?php esc_html_e('Help Us Improve Your Matches *', 'matchmaker'); ?> <span style="font-size: 12px; font-weight: 500; color: #64748b;"><?php esc_html_e('(Minimum 5 characters)', 'matchmaker'); ?></span>
             </label>
             <p style="font-size: 13px; color: #64748b; margin-bottom: 10px; line-height: 1.5;">
-                <?php esc_html_e("Please tell us why this match wasn't right for you so our matchmakers can curate better recommendations for your profile.", 'matchmaker'); ?>
+                <?php esc_html_e("Please tell us why this match wasn't right for you (at least 5 characters) so our matchmakers can curate better recommendations for your profile.", 'matchmaker'); ?>
             </p>
             <textarea 
                 id="mm-rejection-reason" 
                 name="rejection_reason" 
                 class="mm-rejection-textarea" 
                 rows="4" 
-                placeholder="<?php esc_attr_e('e.g., Looking for someone in a different location, age preference, lifestyle differences, etc.', 'matchmaker'); ?>" 
-                style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px; font-size: 14px; font-family: inherit; box-sizing: border-box; resize: vertical; outline: none; transition: border-color 0.2s;"
+                placeholder="<?php esc_attr_e('e.g., Looking for someone in a different location, age preference, lifestyle differences, etc. (at least 5 characters)', 'matchmaker'); ?>" 
+                style="width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px; font-size: 15px; font-family: inherit; box-sizing: border-box; resize: vertical; outline: none; transition: border-color 0.2s;"
                 onfocus="this.style.borderColor='#CC723F';"
                 onblur="this.style.borderColor='#cbd5e1';"
                 required
             ></textarea>
-            <div id="mm-rejection-error" style="color: #dc2626; font-size: 13px; font-weight: 500; margin-top: 6px; display: none;"></div>
+            <div class="mm-rejection-meta-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; flex-wrap: wrap; gap: 6px;">
+                <div id="mm-rejection-error" class="mm-rejection-error" style="color: #dc2626; font-size: 13px; font-weight: 500; display: none;"></div>
+                <div id="mm-rejection-counter" class="mm-rejection-counter" style="color: #64748b; margin-left: auto; font-size: 12px;"></div>
+            </div>
         </div>
 
-        <div style="display: flex; gap: 14px; width: 100%;">
+        <div class="mm-decline-actions" style="display: flex; gap: 14px; width: 100%;">
             <button type="button" class="btn btn-primary" style="flex: 1;" data-mm-action="navigate-step" data-step="2">
                 <?php esc_html_e('Keep Match', 'matchmaker'); ?>
             </button>

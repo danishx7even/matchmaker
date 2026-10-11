@@ -6,6 +6,25 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 143: Fix Member Match Decline Rejection Reason Capture & Mobile/Small Devices Responsiveness
+- **Objective**:
+  1. **Resolve Multi-Instance / Mobile Textarea Extraction Failure**:
+     - Fix issue where `document.querySelector('#step-4 textarea')` targeted the first (hidden) instance in DOM when page builders like Elementor render duplicate responsive sections for Desktop and Mobile, causing the user's typed rejection reason in the active mobile section to be ignored.
+     - Pass the clicked action button element (`triggerBtn`) into `MM_Portal.submitResponse(matchId, decision, triggerBtn)` and search within its closest parent container (`#step-4, .centered-state-wrapper, .view-state`).
+     - Added robust multi-textarea scanning across all candidate elements (`#step-4 textarea, #mm-rejection-reason, .mm-rejection-textarea, textarea[name="rejection_reason"]`), prioritizing non-empty typed values and synchronizing the text across all duplicate DOM instances.
+  2. **Add Live Character Counter & Minimum Length Guidance**:
+     - Updated `step-4-decline.php` label and description to explicitly show `(Minimum 5 characters)`.
+     - Added dynamic character counter (`0 / 5 min characters`, amber when $< 5$, green `✓` when $\ge 5$) giving members real-time feedback so they know their response length is valid before hitting submit.
+  3. **Mobile & Small Device Layout Optimization**:
+     - Added responsive CSS media queries in `member-portal.css` (`@media (max-width: 540px)`) to stack action buttons vertically with full width (`100%`) and touch-friendly padding.
+     - Set `font-size: 16px !important;` on the rejection textarea for mobile viewports to prevent iOS Safari from automatically zooming into the page on input focus.
+     - Enhanced `navigateStep` to activate all matching `.view-state[id="step-X"]` elements in the DOM.
+- **Implemented**:
+  - `src/View/frontend/portal/steps/step-4-decline.php`: Added explicit length indicators, character counter element, and `.mm-decline-actions` container.
+  - `assets/js/member-portal.js`: Updated `submitResponse` with scoped search and global textarea scanning, updated `navigateStep` for multi-instance activation, and added live input counter & duplicate synchronization.
+  - `assets/css/member-portal.css`: Added responsive styles for `.mm-decline-actions`, mobile stacked buttons, and `font-size: 16px` on textarea.
+- **Verification**: Ran full automated test suite with **239/239 tests passing (0 failures, 0 errors)**.
+
 ### Task 142: Enhance Admin Table Pagination Design and Responsiveness
 - **Objective**:
   1. **Modern Brand-Aligned Pagination Styling**:
