@@ -6,6 +6,21 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 144: Fix Browser & CDN Cache Staling of Portal Assets and Harden Decline Reason Form Payload
+- **Objective**:
+  1. **Resolve Production JS/CSS Caching Issue**:
+     - The user submitted network inspector output showing that the browser dispatched `action: mm_submit_match_response`, `match_id: 880`, `response_action: decline`, `nonce: 79a641c025`, with `rejection_reason` completely absent from the FormData payload.
+     - Root cause analysis revealed that `PortalController::enqueue_portal_assets()` was enqueuing `assets/js/member-portal.js` and `assets/css/member-portal.css` using the static version parameter `'2.0.0'`. As a result, browsers, Cloudflare, LiteSpeed, and browser HTTP cache retained the stale legacy version of `member-portal.js` (from prior to when `rejection_reason` was appended to the FormData payload).
+     - Fixed `enqueue_portal_assets()` to dynamically use `filemtime($js_file)` and `filemtime($css_file)` as the version parameter (matching `FormController` and `AdminPortal`), guaranteeing that every file update immediately busts browser and CDN caches.
+     - Also updated `PMProSync::enqueue_cancellation_assets()` to use `filemtime` for `cancellation-modal.js` and `cancellation-modal.css`.
+  2. **Harden Client-Side Payload Construction**:
+     - Updated `member-portal.js`: when `response_action === 'decline'`, `data.append('rejection_reason', rejectionReason)` is always included in the FormData payload, ensuring consistent parameter transmission even across edge case conditions.
+- **Implemented**:
+  - `src/Frontend/PortalController.php`: Updated `enqueue_portal_assets()` with dynamic `filemtime` versioning for `member-portal.js` and `member-portal.css`.
+  - `src/Core/PMProSync.php`: Updated `enqueue_cancellation_assets()` with dynamic `filemtime` versioning for `cancellation-modal.js` and `cancellation-modal.css`.
+  - `assets/js/member-portal.js`: Hardened `submitResponse` to unconditionally append `rejection_reason` for decline actions.
+- **Verification**: Ran full automated test suite with **239/239 tests passing (0 failures, 0 errors)**.
+
 ### Task 143: Fix Member Match Decline Rejection Reason Capture & Mobile/Small Devices Responsiveness
 - **Objective**:
   1. **Resolve Multi-Instance / Mobile Textarea Extraction Failure**:

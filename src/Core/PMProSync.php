@@ -1387,13 +1387,16 @@ class PMProSync {
         }
 
         $plugin_url = defined('MM_URL') ? MM_URL : (function_exists('plugin_dir_url') ? plugin_dir_url(dirname(__DIR__, 2) . '/matchmaker.php') : '');
-        $version    = defined('MM_VERSION') ? MM_VERSION : '2.12.0';
+        $js_file    = dirname(__DIR__, 2) . '/assets/js/cancellation-modal.js';
+        $css_file   = dirname(__DIR__, 2) . '/assets/css/cancellation-modal.css';
+        $js_ver     = file_exists($js_file) ? (string) filemtime($js_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
+        $css_ver    = file_exists($css_file) ? (string) filemtime($css_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
 
         if (function_exists('wp_enqueue_style') && !wp_style_is('mm-cancellation-modal-styles', 'enqueued')) {
-            wp_enqueue_style('mm-cancellation-modal-styles', $plugin_url . 'assets/css/cancellation-modal.css', [], $version);
+            wp_enqueue_style('mm-cancellation-modal-styles', $plugin_url . 'assets/css/cancellation-modal.css', [], $css_ver);
         }
         if (function_exists('wp_enqueue_script') && !wp_script_is('mm-cancellation-modal-script', 'enqueued')) {
-            wp_enqueue_script('mm-cancellation-modal-script', $plugin_url . 'assets/js/cancellation-modal.js', [], $version, true);
+            wp_enqueue_script('mm-cancellation-modal-script', $plugin_url . 'assets/js/cancellation-modal.js', [], $js_ver, true);
         }
     }
 

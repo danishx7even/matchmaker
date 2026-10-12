@@ -76,14 +76,17 @@ class PortalController
     public function enqueue_portal_assets(): void
     {
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
-        $version    = defined('MM_VERSION') ? MM_VERSION : '2.0.0';
+        $js_file    = dirname(__DIR__, 2) . '/assets/js/member-portal.js';
+        $css_file   = dirname(__DIR__, 2) . '/assets/css/member-portal.css';
+        $js_ver     = file_exists($js_file) ? (string) filemtime($js_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
+        $css_ver    = file_exists($css_file) ? (string) filemtime($css_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
 
         if (!wp_style_is('mm-member-portal-styles', 'enqueued')) {
             wp_enqueue_style(
                 'mm-member-portal-styles',
                 $plugin_url . 'assets/css/member-portal.css',
                 [],
-                $version
+                $css_ver
             );
         }
 
@@ -92,7 +95,7 @@ class PortalController
                 'mm-member-portal-script',
                 $plugin_url . 'assets/js/member-portal.js',
                 ['jquery', 'heartbeat'],
-                $version,
+                $js_ver,
                 true
             );
 

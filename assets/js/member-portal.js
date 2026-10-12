@@ -277,7 +277,7 @@
             data.append('action', 'mm_submit_match_response');
             data.append('match_id', matchId);
             data.append('response_action', responseAction);
-            if (rejectionReason) {
+            if (responseAction === 'decline') {
                 data.append('rejection_reason', rejectionReason);
             }
             data.append('nonce', (window.mmPortalData && window.mmPortalData.nonce) ? window.mmPortalData.nonce : '');
