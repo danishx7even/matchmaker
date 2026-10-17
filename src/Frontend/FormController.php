@@ -314,7 +314,7 @@ class FormController {
                         <?php echo $this->fg->render_single_field('user_income', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
-                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP). Only first one is mandatory and additional photos are optional.', 'upload-section', true); ?>
+                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 200KB each). Only first one is mandatory and additional photos are optional.', 'upload-section', true); ?>
                         <?php echo $this->fg->render_single_field('user_photo1', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo2', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo3', $v); ?>
@@ -506,9 +506,10 @@ class FormController {
             wp_send_json_error(['message' => __('Photo 1 is mandatory. Please provide your main profile photo.', 'matchmaker')]);
         }
 
-        // 4b. Validate image formats (Allowed: PNG, JPG, JPEG, WEBP)
+        // 4b. Validate image formats & size (Allowed: PNG, JPG, JPEG, WEBP | Max: 200KB each)
         $allowed_extensions = ['jpg', 'jpeg', 'png', 'webp'];
         $allowed_mimes      = ['image/jpeg', 'image/png', 'image/webp', 'image/pjpeg'];
+        $max_file_size      = 200 * 1024; // 200 KB in bytes (204,800 bytes)
 
         if (!empty($_FILES['form_fields']) && is_array($_FILES['form_fields']['name'] ?? null)) {
             foreach (['user_photo1', 'user_photo2', 'user_photo3'] as $photo_k) {
@@ -523,16 +524,29 @@ class FormController {
                 $file_type = wp_check_filetype($filename, null);
                 $ext       = strtolower((string) ($file_type['ext'] ?? ''));
                 $mime      = strtolower((string) ($file_type['type'] ?? ''));
+                $photo_num = preg_replace('/\D/', '', $photo_k);
+                $photo_label = $photo_num ? sprintf(__('Photo %s', 'matchmaker'), $photo_num) : __('Profile Photo', 'matchmaker');
 
                 if (!in_array($ext, $allowed_extensions, true) || (!empty($mime) && !in_array($mime, $allowed_mimes, true))) {
-                    $photo_num = preg_replace('/\D/', '', $photo_k);
-                    $photo_label = $photo_num ? sprintf(__('Photo %s', 'matchmaker'), $photo_num) : __('Profile Photo', 'matchmaker');
                     if (class_exists(FileLoggerService::class)) {
                         FileLoggerService::warning('Form submission photo format invalid for user #' . $user_id . ': ' . $photo_k . ' (' . $ext . '/' . $mime . ').', ['user_id' => $user_id, 'photo' => $photo_k, 'ext' => $ext, 'mime' => $mime], 'form');
                     }
                     wp_send_json_error([
                         'message' => sprintf(
                             __('Invalid file format for %s. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'matchmaker'),
+                            $photo_label
+                        )
+                    ]);
+                }
+
+                $file_size = (int) ($_FILES['form_fields']['size'][$photo_k] ?? 0);
+                if ($file_size > $max_file_size) {
+                    if (class_exists(FileLoggerService::class)) {
+                        FileLoggerService::warning('Form submission photo size exceeded for user #' . $user_id . ': ' . $photo_k . ' (' . $file_size . ' bytes > ' . $max_file_size . ' bytes).', ['user_id' => $user_id, 'photo' => $photo_k, 'size' => $file_size], 'form');
+                    }
+                    wp_send_json_error([
+                        'message' => sprintf(
+                            __('File size exceeds the 200KB limit for %s. Please upload an image under 200KB.', 'matchmaker'),
                             $photo_label
                         )
                     ]);

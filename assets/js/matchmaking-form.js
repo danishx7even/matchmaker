@@ -715,6 +715,7 @@
     ------------------------------------------------------- */
     var ALLOWED_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
     var ALLOWED_IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'image/pjpeg'];
+    var MAX_IMAGE_SIZE_BYTES = 200 * 1024; // 200KB limit (204,800 bytes)
 
     function isValidImageFile(file) {
         if (!file || !file.name) return false;
@@ -738,15 +739,26 @@
 
             if (!file) return;
 
+            var label = box.querySelector('.elementor-field-label');
+            var photoName = label ? label.textContent.replace('*', '').trim() : 'Photo';
+
             if (!isValidImageFile(file)) {
                 input.value = '';
                 var oldImg = box.querySelector('.upload-preview-img');
                 if (oldImg) oldImg.remove();
                 box.classList.remove('has-preview');
 
-                var label = box.querySelector('.elementor-field-label');
-                var photoName = label ? label.textContent.replace('*', '').trim() : 'Photo';
                 showMessage('Invalid file format for ' + photoName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'error');
+                return;
+            }
+
+            if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                input.value = '';
+                var oldImgSize = box.querySelector('.upload-preview-img');
+                if (oldImgSize) oldImgSize.remove();
+                box.classList.remove('has-preview');
+
+                showMessage('File size exceeds the 200KB limit for ' + photoName + '. Please upload an image under 200KB.', 'error');
                 return;
             }
 
@@ -831,7 +843,7 @@
             }
         }
 
-        // Step 1: Validate Photo 1 only and check all photo formats
+        // Step 1: Validate Photo 1 only and check all photo formats & size
         if (stepNumber == 1) {
             var pInput = form.querySelector('[name="form_fields[user_photo1]"]');
             var pBox = pInput ? pInput.closest('.elementor-field-group') : null;
@@ -847,11 +859,17 @@
                 var fIn = fileInputs[fIdx];
                 if (fIn.files && fIn.files.length > 0) {
                     var fFile = fIn.files[0];
+                    var fBox = fIn.closest('.elementor-field-group');
+                    var fLabel = fBox ? fBox.querySelector('.elementor-field-label') : null;
+                    var fName = fLabel ? fLabel.textContent.replace('*', '').trim() : 'Photo';
+
                     if (!isValidImageFile(fFile)) {
-                        var fBox = fIn.closest('.elementor-field-group');
-                        var fLabel = fBox ? fBox.querySelector('.elementor-field-label') : null;
-                        var fName = fLabel ? fLabel.textContent.replace('*', '').trim() : 'Photo';
                         showMessage('Invalid file format for ' + fName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'error');
+                        return false;
+                    }
+
+                    if (fFile.size > MAX_IMAGE_SIZE_BYTES) {
+                        showMessage('File size exceeds the 200KB limit for ' + fName + '. Please upload an image under 200KB.', 'error');
                         return false;
                     }
                 }

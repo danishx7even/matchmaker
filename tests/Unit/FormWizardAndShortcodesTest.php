@@ -168,13 +168,13 @@ class FormWizardAndShortcodesTest
             throw new \RuntimeException("Expected user_photo3 to have no required star or required attribute: " . $photo3_html);
         }
 
-        // 3. Photo section open has required star and format hint
-        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP). Only first one is mandatory and additional photos are optional.', 'upload-section', true);
+        // 3. Photo section open has required star, format hint, and 200KB size limit
+        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 200KB each). Only first one is mandatory and additional photos are optional.', 'upload-section', true);
         if (!str_contains($section_html, 'mm-required-star') || !str_contains($section_html, '*')) {
             throw new \RuntimeException("Expected photo section header to have required star indicator: " . $section_html);
         }
-        if (!str_contains($section_html, 'Allowed formats: PNG, JPG, JPEG, WEBP')) {
-            throw new \RuntimeException("Expected photo section header to include format hint: " . $section_html);
+        if (!str_contains($section_html, 'Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 200KB each')) {
+            throw new \RuntimeException("Expected photo section header to include format hint and size limit: " . $section_html);
         }
 
         // 4. Yearly Income Range labels
@@ -298,6 +298,45 @@ class FormWizardAndShortcodesTest
 
         if (!$caught || !str_contains($out, 'Only PNG, JPG, JPEG, and WEBP formats are allowed')) {
             throw new \RuntimeException("Expected disallowed file format .gif to be rejected with format error message. Output: " . $out);
+        }
+
+        // Clean up
+        unset($_FILES['form_fields'], $_POST['form_fields'], $_POST['mmf_nonce']);
+    }
+
+    public function test_photo_size_limit_validation_in_ajax(): void
+    {
+        $GLOBALS['__mm_current_user_id'] = 100;
+        update_user_meta(100, 'mm_email_verified', 1);
+
+        $_POST['mmf_nonce'] = 'dummy_nonce';
+        $_POST['form_fields'] = [
+            'full_name'   => 'Jane Doe',
+            'email'       => 'jane@example.com',
+            'user_gender' => 'Female',
+            'pref_gender' => 'Male',
+        ];
+
+        // Upload a valid .jpg file that exceeds 200KB (e.g. 250KB = 256,000 bytes)
+        $_FILES['form_fields'] = [
+            'name'     => ['user_photo1' => 'large_photo.jpg'],
+            'type'     => ['user_photo1' => 'image/jpeg'],
+            'tmp_name' => ['user_photo1' => '/tmp/large_photo.jpg'],
+            'error'    => ['user_photo1' => UPLOAD_ERR_OK],
+            'size'     => ['user_photo1' => 256000],
+        ];
+
+        $caught = false;
+        ob_start();
+        try {
+            $this->form_controller->handle_ajax();
+        } catch (\RuntimeException $e) {
+            $caught = ($e->getMessage() === 'wp_send_json_error');
+        }
+        $out = ob_get_clean();
+
+        if (!$caught || !str_contains($out, 'exceeds the 200KB limit')) {
+            throw new \RuntimeException("Expected photo exceeding 200KB to be rejected with size limit error message. Output: " . $out);
         }
 
         // Clean up

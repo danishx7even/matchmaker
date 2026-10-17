@@ -6,6 +6,27 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 145: Profile Photo 200KB Upload Limit Enforcement and Subtitle Notice Update
+- **Objective**:
+  1. **Enforce 200KB File Size Limit on Profile Photos**:
+     - Limit profile photo uploads (`user_photo1`, `user_photo2`, `user_photo3`) to a maximum of 200KB (`204,800` bytes) per image.
+     - Display a clear error message to the user if any uploaded photo exceeds 200KB.
+  2. **Display Size Information in Section Subtitle**:
+     - Update the Profile Photos section subtitle in the matchmaking form wizard to clearly specify the 200KB limit:
+       `"Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 200KB each). Only first one is mandatory and additional photos are optional."`
+  3. **Multi-Layer Validation (Client-Side & Server-Side)**:
+     - **Client-Side Instant Feedback (`matchmaking-form.js`)**:
+       - On file input `change`, inspect `file.size`. If `file.size > 200 * 1024`, immediately clear the input value, remove any previous preview, and display an error: `"File size exceeds the 200KB limit for Photo X. Please upload an image under 200KB."`
+       - In `validateStep(1)`, re-verify the file size of all selected photos to prevent navigating to Step 2 if any file exceeds 200KB.
+     - **Server-Side Security & Validation (`FormController.php`)**:
+       - In `handle_ajax()`, inspect `$_FILES['form_fields']['size'][$photo_k]`. If `> 200 * 1024` bytes, reject the request with `wp_send_json_error()` returning: `"File size exceeds the 200KB limit for Photo X. Please upload an image under 200KB."` and log a warning via `FileLoggerService`.
+- **Implemented**:
+  - `src/Frontend/FormController.php`: Updated `Profile Photos` section subtitle; added backend 200KB size validation check in `handle_ajax()`.
+  - `assets/js/matchmaking-form.js`: Added `MAX_IMAGE_SIZE_BYTES = 200 * 1024` with instant validation on file selection and during step 1 validation.
+  - `context/form_handler.md`: Updated Profile Photos documentation to include the 200KB limit and updated subtitle text.
+  - `tests/Unit/FormWizardAndShortcodesTest.php`: Updated subtitle unit test and added `test_photo_size_limit_validation_in_ajax`.
+- **Verification**: Ran full automated test suite with **240/240 tests passing (0 failures, 0 errors)**.
+
 ### Task 144: Fix Browser & CDN Cache Staling of Portal Assets and Harden Decline Reason Form Payload
 - **Objective**:
   1. **Resolve Production JS/CSS Caching Issue**:
