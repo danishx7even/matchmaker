@@ -72,9 +72,13 @@ Top-level admin menu **Matchmaking** (`admin.php?page=matchmaking-pool`):
 
 - **Events Organizer**:
   - **Role Slug**: `events_organizer` (Display Name: `Events Organizer`).
-  - **Capabilities**: `manage_events_organizer`, `manage_matchmaker` (for analytics access), standard post/event capabilities (`edit_events`, `publish_events`, `delete_events`, `upload_files`, etc.).
-  - **Restricted wp-admin Access**: Events Organizers only see and can only access the Events CPT menu (`edit.php?post_type={$cpt_slug}`), its submenus (All Events, Add New, Categories/Taxonomies, Join Click Analytics `matchmaking-event-clicks`), and edit their own profile (`profile.php`).
-  - Matchmaking top-level menu (`matchmaking-pool`), WordPress core menus, and third-party menus (PMPro, Elementor) are stripped.
+  - **Capabilities**: `manage_events_organizer`, `manage_matchmaker` (for analytics access), standard post/event capabilities (`edit_events`, `publish_events`, `delete_events`, `upload_files`, etc.), and Forminator capabilities (`manage_forminator`, `manage_forminator_modules`, `manage_forminator_submissions`, `manage_forminator_templates`, `manage_forminator_addons`, `manage_forminator_integrations`, `manage_forminator_reports`, `manage_forminator_settings`).
+  - **Restricted wp-admin Access**: Events Organizers can access:
+    1. The Events CPT menu (`edit.php?post_type={$cpt_slug}`) and its submenus (All Events, Add New, Categories/Taxonomies, Join Click Analytics `matchmaking-event-clicks`).
+    2. Forminator top-level menu (`forminator`) and all its submenus (Forms, Submissions, Integrations, Settings, Reports, etc.).
+    3. User profile editing (`profile.php`).
+  - Matchmaking top-level menu (`matchmaking-pool`), WordPress core administrative menus, and non-whitelisted third-party menus (PMPro, Elementor) are stripped.
   - Direct navigation to unauthorized screens redirects to `admin_url('edit.php?post_type=' . $cpt_slug)`.
   - Login redirect automatically sends Events Organizers to `admin_url('edit.php?post_type=' . $cpt_slug)`.
+
 

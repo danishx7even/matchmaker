@@ -6,6 +6,25 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 146: Grant Forminator Menu and Submenus Access to Events Organizer Role
+- **Objective**:
+  1. **Make Forminator Menu & Submenus Accessible for Events Organizer**:
+     - The user requested making the Forminator menu (`https://arabzawaj.org/wp-admin/admin.php?page=forminator`) and all its submenus accessible to the `events_organizer` role.
+  2. **Grant Necessary Capabilities**:
+     - Added Forminator capabilities to `events_organizer`: `manage_forminator`, `manage_forminator_modules`, `manage_forminator_submissions`, `manage_forminator_templates`, `manage_forminator_addons`, `manage_forminator_integrations`, `manage_forminator_reports`, and `manage_forminator_settings`.
+  3. **Preserve Forminator in Admin Menu & Dynamic Sweep**:
+     - Updated `restrict_admin_menus_for_matchmaker_admin()` in `AdminPortal.php`:
+       - Do not remove `forminator` for `events_organizer` (still removed for `matchmaker_admin`).
+       - Whitelisted `forminator` in the global dynamic `$menu` sweep array for `events_organizer` alongside the Events CPT and `profile.php`.
+  4. **Allow Forminator Screens in Screen Restrictions**:
+     - Updated `enforce_matchmaker_admin_screen_restrictions()` in `AdminPortal.php`: allowed access to `forminator` and any `forminator*` sub-pages (`page === 'forminator' || str_starts_with($page, 'forminator')`) without redirecting.
+- **Implemented**:
+  - `src/Admin/AdminPortal.php`: Added Forminator capabilities to `events_organizer`, whitelisted Forminator in menu restriction logic and screen gating enforcement.
+  - `context/admin_portal.md`: Updated role documentation for `events_organizer`.
+  - `tests/bootstrap.php`: Updated `events_organizer` mock role with `manage_forminator`.
+  - `tests/Unit/AdminWorkflowTest.php`: Added capability assertions and menu preservation assertions for Forminator.
+- **Verification**: Ran full automated test suite with **240/240 tests passing (0 failures, 0 errors)**.
+
 ### Task 145: Profile Photo 200KB Upload Limit Enforcement and Subtitle Notice Update
 - **Objective**:
   1. **Enforce 200KB File Size Limit on Profile Photos**:

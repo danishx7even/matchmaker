@@ -114,33 +114,42 @@ class AdminPortal
             // 3. Register or update events_organizer role
             $eo_role = get_role('events_organizer');
             $eo_caps = [
-                'read'                    => true,
-                'manage_events_organizer' => true,
-                'manage_matchmaker'       => true, // Allows access to matchmaking-event-clicks
-                'edit_posts'              => true,
-                'edit_others_posts'       => true,
-                'publish_posts'           => true,
-                'read_private_posts'      => true,
-                'delete_posts'            => true,
-                'delete_others_posts'     => true,
-                'delete_published_posts'  => true,
-                'delete_private_posts'    => true,
-                'edit_published_posts'    => true,
-                'edit_private_posts'      => true,
-                'upload_files'            => true,
-                'edit_events'             => true,
-                'edit_others_events'      => true,
-                'publish_events'          => true,
-                'read_private_events'     => true,
-                'delete_events'           => true,
-                'delete_others_events'    => true,
-                'delete_published_events' => true,
-                'edit_published_events'   => true,
-                'manage_events'           => true,
-                'assign_event_terms'      => true,
-                'manage_event_terms'      => true,
-                'edit_event_terms'        => true,
-                'delete_event_terms'      => true,
+                'read'                           => true,
+                'manage_events_organizer'        => true,
+                'manage_matchmaker'              => true, // Allows access to matchmaking-event-clicks
+                'edit_posts'                     => true,
+                'edit_others_posts'              => true,
+                'publish_posts'                  => true,
+                'read_private_posts'             => true,
+                'delete_posts'                   => true,
+                'delete_others_posts'            => true,
+                'delete_published_posts'         => true,
+                'delete_private_posts'           => true,
+                'edit_published_posts'           => true,
+                'edit_private_posts'             => true,
+                'upload_files'                   => true,
+                'edit_events'                    => true,
+                'edit_others_events'             => true,
+                'publish_events'                 => true,
+                'read_private_events'            => true,
+                'delete_events'                  => true,
+                'delete_others_events'           => true,
+                'delete_published_events'        => true,
+                'edit_published_events'          => true,
+                'manage_events'                  => true,
+                'assign_event_terms'             => true,
+                'manage_event_terms'             => true,
+                'edit_event_terms'               => true,
+                'delete_event_terms'             => true,
+                // Forminator capabilities
+                'manage_forminator'              => true,
+                'manage_forminator_modules'      => true,
+                'manage_forminator_submissions'  => true,
+                'manage_forminator_templates'    => true,
+                'manage_forminator_addons'       => true,
+                'manage_forminator_integrations' => true,
+                'manage_forminator_reports'      => true,
+                'manage_forminator_settings'     => true,
             ];
 
             if (!$eo_role) {
@@ -231,11 +240,12 @@ class AdminPortal
         ];
 
         if ($is_events_organizer) {
-            // Events Organizer only has access to Events menu & submenus + profile
+            // Events Organizer only has access to Events menu & submenus, Forminator, and profile
             $disallowed_menus[] = 'matchmaking-pool';
         } else {
             // Matchmaker Admin only has access to Matchmaking menu & submenus + profile
             $disallowed_menus[] = 'edit.php?post_type=' . $cpt_slug;
+            $disallowed_menus[] = 'forminator';
         }
 
         foreach ($disallowed_menus as $menu_slug) {
@@ -245,14 +255,17 @@ class AdminPortal
         // Dynamic $menu sweep: purge any remaining non-whitelisted top-level menu
         global $menu;
         if (is_array($menu)) {
-            $allowed_slug = $is_events_organizer ? ('edit.php?post_type=' . $cpt_slug) : 'matchmaking-pool';
+            $allowed_slugs = $is_events_organizer
+                ? ['edit.php?post_type=' . $cpt_slug, 'forminator', 'profile.php']
+                : ['matchmaking-pool', 'profile.php'];
+
             foreach ($menu as $idx => $item) {
                 $slug = $item[2] ?? '';
                 $is_separator = str_contains((string) ($item[4] ?? ''), 'wp-menu-separator');
                 if ($is_separator) {
                     continue;
                 }
-                if ($slug !== $allowed_slug && $slug !== 'profile.php') {
+                if (!in_array($slug, $allowed_slugs, true)) {
                     remove_menu_page($slug);
                     unset($menu[$idx]);
                 }
@@ -364,6 +377,11 @@ class AdminPortal
 
             // 3. Matchmaking event clicks analytics submenu under events
             if ($page === 'matchmaking-event-clicks') {
+                $is_allowed = true;
+            }
+
+            // 4. Forminator top-level page and submenus
+            if ($page === 'forminator' || str_starts_with($page, 'forminator')) {
                 $is_allowed = true;
             }
 

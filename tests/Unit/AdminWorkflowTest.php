@@ -209,6 +209,10 @@ class AdminWorkflowTest
             throw new \RuntimeException("Expected events_organizer role with manage_events_organizer, edit_events, and read capabilities");
         }
 
+        if (!$role->has_cap('manage_forminator') || !$role->has_cap('manage_forminator_modules') || !$role->has_cap('manage_forminator_submissions')) {
+            throw new \RuntimeException("Expected events_organizer role to have Forminator management capabilities");
+        }
+
         $admin_role = get_role('administrator');
         if (!$admin_role || !$admin_role->has_cap('manage_events_organizer')) {
             throw new \RuntimeException("Expected administrator role to have manage_events_organizer capability");
@@ -220,6 +224,10 @@ class AdminWorkflowTest
 
         if (!user_can(803, 'manage_events_organizer')) {
             throw new \RuntimeException("Expected events_organizer user to satisfy user_can('manage_events_organizer')");
+        }
+
+        if (!user_can(803, 'manage_forminator')) {
+            throw new \RuntimeException("Expected events_organizer user to satisfy user_can('manage_forminator')");
         }
 
         if (user_can(803, 'manage_options')) {
@@ -237,15 +245,16 @@ class AdminWorkflowTest
         $GLOBALS['__mm_users'][804] = $eo_user;
         $GLOBALS['__mm_current_user_id'] = 804;
 
-        // Mock global $menu with standard items including Elementor and custom items
+        // Mock global $menu with standard items including Elementor, Forminator, and custom items
         $GLOBALS['menu'] = [
             0 => ['Dashboard', 'read', 'index.php', '', 'menu-top'],
             1 => ['Events', 'edit_posts', 'edit.php?post_type=event', '', 'menu-top'],
-            2 => ['Elementor', 'edit_posts', 'elementor', '', 'menu-top'],
-            3 => ['Templates', 'edit_posts', 'edit.php?post_type=elementor_library', '', 'menu-top'],
-            4 => ['Submissions', 'edit_posts', 'e-form-submissions', '', 'menu-top'],
-            5 => ['ThirdParty', 'edit_posts', 'third_party_addon', '', 'menu-top'],
-            6 => ['', 'read', 'separator1', '', 'wp-menu-separator'],
+            2 => ['Forminator', 'read', 'forminator', '', 'menu-top'],
+            3 => ['Elementor', 'edit_posts', 'elementor', '', 'menu-top'],
+            4 => ['Templates', 'edit_posts', 'edit.php?post_type=elementor_library', '', 'menu-top'],
+            5 => ['Submissions', 'edit_posts', 'e-form-submissions', '', 'menu-top'],
+            6 => ['ThirdParty', 'edit_posts', 'third_party_addon', '', 'menu-top'],
+            7 => ['', 'read', 'separator1', '', 'wp-menu-separator'],
         ];
 
         $GLOBALS['admin_removed_menus'] = [];
@@ -269,6 +278,10 @@ class AdminWorkflowTest
 
         if (!empty($GLOBALS['admin_removed_menus']['edit.php?post_type=event'])) {
             throw new \RuntimeException("Expected Events CPT menu to be kept for events_organizer");
+        }
+
+        if (!empty($GLOBALS['admin_removed_menus']['forminator'])) {
+            throw new \RuntimeException("Expected Forminator menu to be kept for events_organizer");
         }
 
         unset($GLOBALS['__mm_current_user_id']);
