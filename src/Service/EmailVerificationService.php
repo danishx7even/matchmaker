@@ -800,14 +800,18 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
     public function enqueue_verification_assets(): void
     {
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__DIR__, 2));
-        $version    = defined('MM_VERSION') ? MM_VERSION : '2.11.0';
+        $css_file   = dirname(__DIR__, 2) . '/assets/css/email-verification.css';
+        $js_file    = dirname(__DIR__, 2) . '/assets/js/email-verification.js';
+        $base_ver   = defined('MM_VERSION') ? MM_VERSION : '2.14.0';
+        $css_ver    = $base_ver . '.' . (file_exists($css_file) ? (string) filemtime($css_file) : '0');
+        $js_ver     = $base_ver . '.' . (file_exists($js_file) ? (string) filemtime($js_file) : '0');
 
         if (function_exists('wp_enqueue_style') && !wp_style_is('mm-email-verification-styles', 'enqueued')) {
-            wp_enqueue_style('mm-email-verification-styles', $plugin_url . 'assets/css/email-verification.css', [], $version);
+            wp_enqueue_style('mm-email-verification-styles', $plugin_url . 'assets/css/email-verification.css', [], $css_ver);
         }
 
         if (function_exists('wp_enqueue_script') && !wp_script_is('mm-email-verification-script', 'enqueued')) {
-            wp_enqueue_script('mm-email-verification-script', $plugin_url . 'assets/js/email-verification.js', [], $version, true);
+            wp_enqueue_script('mm-email-verification-script', $plugin_url . 'assets/js/email-verification.js', [], $js_ver, true);
         }
 
         // Register footer fallback in case scripts were enqueued after wp_enqueue_scripts fired

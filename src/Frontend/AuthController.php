@@ -699,17 +699,49 @@ class AuthController
         $aup_url     = function_exists('home_url') ? home_url('/law-enforcement-requests-member-safety-policy/') : 'https://arabzawaj.org/law-enforcement-requests-member-safety-policy/';
 
         ?>
-        <div id="pmpro_privacy_policy_wrapper" class="pmpro_checkout-fields-compliance" style="margin: 16px 0 20px 0; box-sizing: border-box;">
+        <style>
+        #pmpro_privacy_policy_wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 0 0 100% !important;
+            grid-column: 1 / -1 !important;
+            clear: both !important;
+            box-sizing: border-box !important;
+            margin: 16px 0 20px 0 !important;
+            display: block !important;
+        }
+        #pmpro_privacy_policy_wrapper .pmpro_checkout-field {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            clear: both !important;
+        }
+        #pmpro_privacy_policy_wrapper input[type="date"],
+        #pmpro_privacy_policy_wrapper #user_dob {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            display: block !important;
+        }
+        #pmpro_privacy_policy_wrapper .pmpro_checkout-field-age-confirm,
+        #pmpro_privacy_policy_wrapper .pmpro_checkout-field-privacy-policy,
+        #pmpro_privacy_policy_wrapper .pmpro_checkout-field-aup {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        </style>
+        <div id="pmpro_privacy_policy_wrapper" class="pmpro_checkout-fields-compliance" style="width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; grid-column: 1 / -1 !important; clear: both !important; margin: 16px 0 20px 0; box-sizing: border-box; display: block;">
             
             <!-- 1. Date of Birth Field -->
-            <div class="pmpro_checkout-field pmpro_checkout-field-user_dob pmpro_checkout-field-date" style="margin: 16px 0;">
+            <div class="pmpro_checkout-field pmpro_checkout-field-user_dob pmpro_checkout-field-date" style="width: 100% !important; max-width: 100% !important; margin: 16px 0; box-sizing: border-box;">
                 <label for="user_dob" class="pmpro_label"><?php esc_html_e('Date of Birth', 'matchmaker'); ?> <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span></label>
-                <input type="date" id="user_dob" name="user_dob" value="<?php echo esc_attr($dob_val); ?>" required="required" max="<?php echo esc_attr(date('Y-m-d')); ?>" class="input pmpro_required pmpro_input" size="30" />
+                <input type="date" id="user_dob" name="user_dob" value="<?php echo esc_attr($dob_val); ?>" required="required" max="<?php echo esc_attr(date('Y-m-d')); ?>" class="input pmpro_required pmpro_input" style="width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;" />
                 <div id="mm_dob_error" style="display: none; color: #e11d48; font-size: 13px; font-weight: 500; margin-top: 6px; line-height: 1.4;"></div>
             </div>
 
             <!-- 2. Age Confirmation Card -->
-            <div class="pmpro_checkout-field pmpro_checkout-field-age-confirm" style="margin-bottom: 16px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
+            <div class="pmpro_checkout-field pmpro_checkout-field-age-confirm" style="width: 100% !important; max-width: 100% !important; margin-bottom: 16px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
                 <div style="font-weight: 700; font-size: 14px; color: #1e293b; margin-bottom: 6px;">
                     <?php esc_html_e('Confirm your age', 'matchmaker'); ?>
                 </div>
@@ -725,7 +757,7 @@ class AuthController
             </div>
 
             <!-- 3. Privacy Policy Checkbox Card -->
-            <div class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-privacy-policy" style="margin-bottom: 12px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
+            <div class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-privacy-policy" style="width: 100% !important; max-width: 100% !important; margin-bottom: 12px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
                 <div class="pmpro_checkout-field-inner" style="display: flex; align-items: flex-start; gap: 10px;">
                     <input type="checkbox" id="privacy_policy_consent" name="privacy_policy_consent" value="1" <?php echo $privacy_checked; ?> required="required" style="margin-top: 3px; accent-color: #CC723F; width: 18px; height: 18px; cursor: pointer;" />
                     <label for="privacy_policy_consent" class="pmpro_label" style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0; cursor: pointer; display: inline;">
@@ -741,7 +773,7 @@ class AuthController
             </div>
 
             <!-- 4. AUP Checkbox Card -->
-            <div class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-aup" style="margin-bottom: 16px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
+            <div class="pmpro_checkout-field pmpro_checkout-field-checkbox pmpro_checkout-field-aup" style="width: 100% !important; max-width: 100% !important; margin-bottom: 16px; padding: 14px 16px; background: #FFFDF9; border: 1px solid #F0E6D8; border-radius: 8px; box-sizing: border-box;">
                 <div class="pmpro_checkout-field-inner" style="display: flex; align-items: flex-start; gap: 10px;">
                     <input type="checkbox" id="mm_aup_consent" name="mm_aup_consent" value="1" <?php echo $aup_checked; ?> required="required" style="margin-top: 3px; accent-color: #CC723F; width: 18px; height: 18px; cursor: pointer;" />
                     <label for="mm_aup_consent" class="pmpro_label" style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0; cursor: pointer; display: inline;">
@@ -852,9 +884,18 @@ class AuthController
                         || confirmEmail.closest('div.pmpro_form_field')
                         || confirmEmail.closest('.form-group')
                         || confirmEmail.parentElement;
-                    
-                    if (container && container.parentNode && container.nextSibling !== wrapper) {
-                        container.parentNode.insertBefore(wrapper, container.nextSibling);
+
+                    if (container) {
+                        // If container is inside a multi-column row container (.pmpro_cols-2, .row, etc.),
+                        // insert AFTER that entire container row so wrapper stays full width.
+                        var colsRow = container.closest('.pmpro_cols-2')
+                            || container.closest('.pmpro_checkout-fields-row')
+                            || container.closest('.row');
+
+                        var target = colsRow || container;
+                        if (target && target.parentNode && target.nextSibling !== wrapper) {
+                            target.parentNode.insertBefore(wrapper, target.nextSibling);
+                        }
                     }
 
                     // Dynamically inherit input classes from confirmEmail for perfect styling consistency

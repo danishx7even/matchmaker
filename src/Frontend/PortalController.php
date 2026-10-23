@@ -78,8 +78,9 @@ class PortalController
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
         $js_file    = dirname(__DIR__, 2) . '/assets/js/member-portal.js';
         $css_file   = dirname(__DIR__, 2) . '/assets/css/member-portal.css';
-        $js_ver     = file_exists($js_file) ? (string) filemtime($js_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
-        $css_ver    = file_exists($css_file) ? (string) filemtime($css_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
+        $base_ver   = defined('MM_VERSION') ? MM_VERSION : '2.14.0';
+        $js_ver     = $base_ver . '.' . (file_exists($js_file) ? (string) filemtime($js_file) : '0');
+        $css_ver    = $base_ver . '.' . (file_exists($css_file) ? (string) filemtime($css_file) : '0');
 
         if (!wp_style_is('mm-member-portal-styles', 'enqueued')) {
             wp_enqueue_style(

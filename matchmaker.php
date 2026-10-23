@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Plugin Name:       Arab Zawaj Matchmaker
  * Plugin URI:        https://arabzawaj.com
  * Description:       Advanced Islamic Matchmaking Platform with Paid Memberships Pro, Action Scheduler, tabbed member portal, 5-state match flow, and bi-directional algorithmic matching.
- * Version:           2.13.0
+ * Version:           2.14.0
  * Author:            Arab Zawaj Development Team
  * Author URI:        https://arabzawaj.com
  * Text Domain:       matchmaker
@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
 // Plugin constants
 // =============================================================================
 
-define('MM_VERSION',  '2.13.0');
+define('MM_VERSION',  '2.14.0');
 define('MM_PATH',     plugin_dir_path(__FILE__));
 define('MM_URL',      plugin_dir_url(__FILE__));
 define('MM_SRC_PATH', MM_PATH . 'src/');

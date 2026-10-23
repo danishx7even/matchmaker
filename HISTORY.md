@@ -6,6 +6,26 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 148: Asset Versioning Cache-Busting & Full-Width PMPro Checkout Compliance Container
+- **Objective**:
+  1. **Guarantee Instant Cache Invalidation Across Browsers, CDNs & Caching Plugins**:
+     - Bumped plugin version and `MM_VERSION` constant to `2.14.0` in `matchmaker.php` and header.
+     - Upgraded asset enqueues across the entire plugin (`AdminPortal.php`, `FormController.php`, `PortalController.php`, `PMProSync.php`, `EmailVerificationService.php`) to use composite versioning: `MM_VERSION . '.' . filemtime(...)`.
+     - Whenever the plugin version is updated, every enqueued script and style receives a fresh cache-busting query string parameter, preventing stale browser, Cloudflare, LiteSpeed, or proxy cache retention.
+  2. **Make PMPro Checkout Compliance Fields 100% Full Width of the Container**:
+     - Resolved the 50% half-width column truncation on the PMPro checkout page where `#pmpro_privacy_policy_wrapper` was confined by multi-column parent grids (`.pmpro_cols-2`, `.pmpro_form_row`).
+     - Added CSS rules (`width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; grid-column: 1 / -1 !important; clear: both !important; box-sizing: border-box !important;`) applied to `#pmpro_privacy_policy_wrapper`, all inner fields, cards, and `#user_dob`.
+     - Upgraded `placeComplianceFields()` DOM placement script to detect parent row wrappers (`.pmpro_cols-2`, `.pmpro_checkout-fields-row`, `.row`) and insert the compliance wrapper after the entire row rather than inside a half-width column.
+- **Implemented**:
+  - `matchmaker.php`: Bumped `Version: 2.14.0` and `define('MM_VERSION', '2.14.0')`.
+  - `src/Admin/AdminPortal.php`: Updated asset versioning to `MM_VERSION . '.' . filemtime(...)`.
+  - `src/Frontend/FormController.php`: Updated asset versioning to `MM_VERSION . '.' . filemtime(...)`.
+  - `src/Frontend/PortalController.php`: Updated asset versioning to `MM_VERSION . '.' . filemtime(...)`.
+  - `src/Core/PMProSync.php`: Updated asset versioning to `MM_VERSION . '.' . filemtime(...)`.
+  - `src/Service/EmailVerificationService.php`: Updated asset versioning to `MM_VERSION . '.' . filemtime(...)`.
+  - `src/Frontend/AuthController.php`: Added dedicated full-width `<style>` block and inline styles; updated `placeComplianceFields()` to escape `.pmpro_cols-2` containers.
+- **Verification**: Ran full automated test suite with **240/240 tests passing (0 failures, 0 errors)**.
+
 ### Task 147: PMPro Checkout Frontend 18+ Verification & Payment Fieldset Gating
 - **Objective**:
   1. **Strict Client-Side 18+ Real-Time Verification**:

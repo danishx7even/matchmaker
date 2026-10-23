@@ -435,8 +435,9 @@ class AdminPortal
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
         $css_file   = dirname(dirname(__DIR__)) . '/assets/css/admin-matchmaker.css';
         $js_file    = dirname(dirname(__DIR__)) . '/assets/js/admin-matchmaker.js';
-        $css_ver    = file_exists($css_file) ? (string) filemtime($css_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
-        $js_ver     = file_exists($js_file) ? (string) filemtime($js_file) : (defined('MM_VERSION') ? MM_VERSION : '2.13.0');
+        $base_ver   = defined('MM_VERSION') ? MM_VERSION : '2.14.0';
+        $css_ver    = $base_ver . '.' . (file_exists($css_file) ? (string) filemtime($css_file) : '0');
+        $js_ver     = $base_ver . '.' . (file_exists($js_file) ? (string) filemtime($js_file) : '0');
 
         wp_enqueue_style(
             'mm-admin-styles',
