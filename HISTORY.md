@@ -6,6 +6,25 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 147: PMPro Checkout Frontend 18+ Verification & Payment Fieldset Gating
+- **Objective**:
+  1. **Strict Client-Side 18+ Real-Time Verification**:
+     - Provide instantaneous validation on the PMPro checkout page as the user enters their Date of Birth (`#user_dob`).
+     - Display a prominent red inline error (`#mm_dob_error`) directly below the field: `"You do not meet the minimum age requirement (18+) to use Arab Zawaj."` when the calculated age is under 18 or in the future.
+     - Highlight the Date of Birth input field with a red border (`#e11d48`) on invalid inputs.
+  2. **Intercept & Prevent Form Submission**:
+     - Block form submission on `#pmpro_form` submit and `#pmpro_btn-submit` click if the user is under 18, the DOB is empty, or the Age Confirmation checkbox (`#mm_age_confirmed`) is not checked.
+     - Smoothly scroll and focus on the invalid input.
+  3. **Conditional Payment Container Gating**:
+     - Conditionally gate `#pmpro_payment_information_fields` so payment details are completely hidden (`display: none`) until both conditions are met:
+       a) Date of Birth verifies as at least 18 years old ($\text{Age} \ge 18$).
+       b) Age Confirmation checkbox (`#mm_age_confirmed`) is ticked.
+     - If the user changes their DOB back to an ineligible age or unchecks the box, `#pmpro_payment_information_fields` is immediately re-hidden.
+- **Implemented**:
+  - `src/Frontend/AuthController.php`: Added `#mm_dob_error` element below `#user_dob` and implemented `calculateAge()`, `syncAgeGateState()`, and `initAgeGateEvents()` with event listeners on `input`, `change`, `blur`, and form `submit`.
+  - `tests/Unit/AuthAndRedirectsTest.php`: Added assertions for `#mm_dob_error`, `calculateAge`, `pmpro_payment_information_fields` gating, and the 18+ error copy.
+- **Verification**: Ran full automated test suite with **240/240 tests passing (0 failures, 0 errors)**.
+
 ### Task 146: Grant Forminator Menu and Submenus Access to Events Organizer Role
 - **Objective**:
   1. **Make Forminator Menu & Submenus Accessible for Events Organizer**:

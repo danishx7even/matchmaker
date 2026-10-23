@@ -705,6 +705,7 @@ class AuthController
             <div class="pmpro_checkout-field pmpro_checkout-field-user_dob pmpro_checkout-field-date" style="margin: 16px 0;">
                 <label for="user_dob" class="pmpro_label"><?php esc_html_e('Date of Birth', 'matchmaker'); ?> <span class="pmpro_asterisk" style="color: #e11d48; font-weight: bold;">*</span></label>
                 <input type="date" id="user_dob" name="user_dob" value="<?php echo esc_attr($dob_val); ?>" required="required" max="<?php echo esc_attr(date('Y-m-d')); ?>" class="input pmpro_required pmpro_input" size="30" />
+                <div id="mm_dob_error" style="display: none; color: #e11d48; font-size: 13px; font-weight: 500; margin-top: 6px; line-height: 1.4;"></div>
             </div>
 
             <!-- 2. Age Confirmation Card -->
@@ -758,6 +759,83 @@ class AuthController
         </div>
         <script>
         (function() {
+            function calculateAge(dobString) {
+                if (!dobString) return null;
+                var parts = dobString.split('-');
+                if (parts.length !== 3) return null;
+                var y = parseInt(parts[0], 10);
+                var m = parseInt(parts[1], 10) - 1;
+                var d = parseInt(parts[2], 10);
+                var birthDate = new Date(y, m, d);
+                if (isNaN(birthDate.getTime())) return null;
+
+                var today = new Date();
+                var age = today.getFullYear() - birthDate.getFullYear();
+                var monthDiff = today.getMonth() - birthDate.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+                var isFuture = (birthDate.getTime() > today.getTime());
+                return { age: age, isFuture: isFuture };
+            }
+
+            function getPaymentContainer() {
+                return document.getElementById('pmpro_payment_information_fields');
+            }
+
+            function syncAgeGateState(showFeedback) {
+                var dobInput = document.getElementById('user_dob');
+                var errDiv = document.getElementById('mm_dob_error');
+                var ageCheckbox = document.getElementById('mm_age_confirmed');
+                var paymentContainer = getPaymentContainer();
+
+                if (!dobInput) return true;
+
+                var dobVal = (dobInput.value || '').trim();
+                var isDobValid18 = false;
+                var errorMessage = '';
+
+                if (!dobVal) {
+                    if (showFeedback) {
+                        errorMessage = '<?php echo esc_js(__('Please enter your date of birth.', 'matchmaker')); ?>';
+                    }
+                } else {
+                    var ageResult = calculateAge(dobVal);
+                    if (!ageResult || ageResult.isFuture || ageResult.age < 18) {
+                        errorMessage = '<?php echo esc_js(__('You do not meet the minimum age requirement (18+) to use Arab Zawaj.', 'matchmaker')); ?>';
+                    } else {
+                        isDobValid18 = true;
+                    }
+                }
+
+                // Error UI
+                if (errDiv) {
+                    if (errorMessage) {
+                        errDiv.textContent = errorMessage;
+                        errDiv.style.display = 'block';
+                    } else {
+                        errDiv.textContent = '';
+                        errDiv.style.display = 'none';
+                    }
+                }
+
+                if (errorMessage) {
+                    dobInput.style.borderColor = '#e11d48';
+                } else {
+                    dobInput.style.borderColor = '';
+                }
+
+                // Gate payment container: requires valid 18+ DOB and age confirmed checkbox
+                var isAgeConfirmed = !!(ageCheckbox && ageCheckbox.checked);
+                var canShowPayment = isDobValid18 && isAgeConfirmed;
+
+                if (paymentContainer) {
+                    paymentContainer.style.display = canShowPayment ? 'block' : 'none';
+                }
+
+                return isDobValid18 && isAgeConfirmed;
+            }
+
             function placeComplianceFields() {
                 var wrapper = document.getElementById('pmpro_privacy_policy_wrapper');
                 if (!wrapper) return;
@@ -807,12 +885,113 @@ class AuthController
                     }
                 }
             }
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', placeComplianceFields);
-            } else {
-                placeComplianceFields();
+
+            function initAgeGateEvents() {
+                var wrapper = document.getElementById('pmpro_privacy_policy_wrapper');
+                if (!wrapper || wrapper.dataset.ageGateBound === '1') {
+                    syncAgeGateState(false);
+                    return;
+                }
+                wrapper.dataset.ageGateBound = '1';
+
+                var dobInput = document.getElementById('user_dob');
+                var ageCheckbox = document.getElementById('mm_age_confirmed');
+
+                if (dobInput) {
+                    dobInput.addEventListener('input', function() {
+                        syncAgeGateState(true);
+                    });
+                    dobInput.addEventListener('change', function() {
+                        syncAgeGateState(true);
+                    });
+                    dobInput.addEventListener('blur', function() {
+                        if (dobInput.value) {
+                            syncAgeGateState(true);
+                        }
+                    });
+                }
+
+                if (ageCheckbox) {
+                    ageCheckbox.addEventListener('change', function() {
+                        syncAgeGateState(false);
+                    });
+                }
+
+                // Initial payment container gating state
+                syncAgeGateState(false);
+
+                // Intercept submission to prevent submit if DOB is invalid or under 18
+                var form = document.getElementById('pmpro_form') 
+                    || (dobInput ? dobInput.closest('form') : null)
+                    || document.querySelector('form.pmpro_form');
+
+                function handleFormSubmit(e) {
+                    var dobVal = dobInput ? (dobInput.value || '').trim() : '';
+                    var ageResult = calculateAge(dobVal);
+                    var isConfirmed = !!(ageCheckbox && ageCheckbox.checked);
+
+                    if (!dobVal || !ageResult || ageResult.isFuture || ageResult.age < 18) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                        }
+                        syncAgeGateState(true);
+                        if (dobInput) {
+                            dobInput.focus();
+                            dobInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return false;
+                    }
+
+                    if (!isConfirmed) {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                        }
+                        if (ageCheckbox) {
+                            ageCheckbox.focus();
+                            ageCheckbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                if (form) {
+                    form.addEventListener('submit', handleFormSubmit, true);
+                }
+
+                var submitBtn = document.getElementById('pmpro_btn-submit');
+                if (submitBtn) {
+                    submitBtn.addEventListener('click', function(e) {
+                        var dobVal = dobInput ? (dobInput.value || '').trim() : '';
+                        var ageResult = calculateAge(dobVal);
+                        if (!dobVal || !ageResult || ageResult.isFuture || ageResult.age < 18) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            syncAgeGateState(true);
+                            if (dobInput) {
+                                dobInput.focus();
+                                dobInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                            return false;
+                        }
+                    }, true);
+                }
             }
-            setTimeout(placeComplianceFields, 300);
+
+            function setup() {
+                placeComplianceFields();
+                initAgeGateEvents();
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setup);
+            } else {
+                setup();
+            }
+            setTimeout(setup, 300);
         })();
         </script>
         <?php

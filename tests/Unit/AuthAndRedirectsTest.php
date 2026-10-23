@@ -285,6 +285,17 @@ class AuthAndRedirectsTest
             throw new \RuntimeException("Expected required asterisk in compliance fields: " . $html);
         }
 
+        // Real-time error container and payment fieldset gating script
+        if (!str_contains($html, 'id="mm_dob_error"')) {
+            throw new \RuntimeException("Expected mm_dob_error element in HTML: " . $html);
+        }
+        if (!str_contains($html, 'pmpro_payment_information_fields') || !str_contains($html, 'calculateAge')) {
+            throw new \RuntimeException("Expected payment information fieldset gating and calculateAge script in HTML: " . $html);
+        }
+        if (!str_contains($html, 'You do not meet the minimum age requirement (18+) to use Arab Zawaj.')) {
+            throw new \RuntimeException("Expected 18+ requirement error message in client script: " . $html);
+        }
+
         // 2. Logged-in user should NOT render the compliance fields
         $GLOBALS['__mm_current_user_id'] = 109;
         ob_start();
