@@ -804,8 +804,12 @@ class AuthController
                 var today = new Date();
                 var age = today.getFullYear() - birthDate.getFullYear();
                 var monthDiff = today.getMonth() - birthDate.getMonth();
-                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                if (monthDiff < 0) {
                     age--;
+                } else if (monthDiff === 0) {
+                    if (today.getDate() < birthDate.getDate()) {
+                        age--;
+                    }
                 }
                 var isFuture = (birthDate.getTime() > today.getTime());
                 return { age: age, isFuture: isFuture };
@@ -858,14 +862,14 @@ class AuthController
                 }
 
                 // Gate payment container: requires valid 18+ DOB and age confirmed checkbox
-                var isAgeConfirmed = !!(ageCheckbox && ageCheckbox.checked);
-                var canShowPayment = isDobValid18 && isAgeConfirmed;
+                var isAgeConfirmed = Boolean(ageCheckbox ? ageCheckbox.checked : false);
+                var canShowPayment = (isDobValid18 ? isAgeConfirmed : false);
 
                 if (paymentContainer) {
                     paymentContainer.style.display = canShowPayment ? 'block' : 'none';
                 }
 
-                return isDobValid18 && isAgeConfirmed;
+                return (isDobValid18 ? isAgeConfirmed : false);
             }
 
             function placeComplianceFields() {
@@ -893,34 +897,48 @@ class AuthController
                             || container.closest('.row');
 
                         var target = colsRow || container;
-                        if (target && target.parentNode && target.nextSibling !== wrapper) {
-                            target.parentNode.insertBefore(wrapper, target.nextSibling);
+                        if (target) {
+                            if (target.parentNode) {
+                                if (target.nextSibling !== wrapper) {
+                                    target.parentNode.insertBefore(wrapper, target.nextSibling);
+                                }
+                            }
                         }
                     }
 
                     // Dynamically inherit input classes from confirmEmail for perfect styling consistency
                     var userDob = document.getElementById('user_dob');
-                    if (userDob && confirmEmail) {
-                        if (confirmEmail.className) {
-                            var classes = confirmEmail.className.split(/\s+/);
-                            for (var i = 0; i < classes.length; i++) {
-                                var cls = classes[i].trim();
-                                if (cls && !userDob.classList.contains(cls)) {
-                                    userDob.classList.add(cls);
+                    if (userDob) {
+                        if (confirmEmail) {
+                            if (confirmEmail.className) {
+                                var classes = confirmEmail.className.split(/\s+/);
+                                for (var i = 0; i < classes.length; i++) {
+                                    var cls = classes[i].trim();
+                                    if (cls) {
+                                        if (!userDob.classList.contains(cls)) {
+                                            userDob.classList.add(cls);
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
                     // Dynamically inherit label classes if available
-                    var confirmLabel = container.querySelector('label');
+                    var confirmLabel = container ? container.querySelector('label') : null;
                     var dobLabel = wrapper.querySelector('label[for="user_dob"]');
-                    if (confirmLabel && dobLabel && confirmLabel.className) {
-                        var lClasses = confirmLabel.className.split(/\s+/);
-                        for (var j = 0; j < lClasses.length; j++) {
-                            var lCls = lClasses[j].trim();
-                            if (lCls && !dobLabel.classList.contains(lCls)) {
-                                dobLabel.classList.add(lCls);
+                    if (confirmLabel) {
+                        if (dobLabel) {
+                            if (confirmLabel.className) {
+                                var lClasses = confirmLabel.className.split(/\s+/);
+                                for (var j = 0; j < lClasses.length; j++) {
+                                    var lCls = lClasses[j].trim();
+                                    if (lCls) {
+                                        if (!dobLabel.classList.contains(lCls)) {
+                                            dobLabel.classList.add(lCls);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -969,7 +987,7 @@ class AuthController
                 function handleFormSubmit(e) {
                     var dobVal = dobInput ? (dobInput.value || '').trim() : '';
                     var ageResult = calculateAge(dobVal);
-                    var isConfirmed = !!(ageCheckbox && ageCheckbox.checked);
+                    var isConfirmed = Boolean(ageCheckbox ? ageCheckbox.checked : false);
 
                     if (!dobVal || !ageResult || ageResult.isFuture || ageResult.age < 18) {
                         if (e) {

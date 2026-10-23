@@ -6,6 +6,18 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 149: Fix Uncaught SyntaxError from Ampersand Operator Encoding in Checkout Script
+- **Objective**:
+  1. **Resolve SyntaxError in JavaScript**:
+     - The user reported browser error: `Uncaught SyntaxError: '#' not followed by identifier` originating from `(monthDiff === 0 &#038;&#038; today.getDate() < birthDate.getDate())`.
+     - Root cause: WordPress `wptexturize` / content filter parses inline HTML content and escapes the `&` characters in `&&` into the HTML entity `&#038;&#038;`. In modern JavaScript engines, `#` indicates private class identifiers, so `#038` throws a fatal syntax error.
+  2. **Refactor Script to Zero-Ampersand Logic**:
+     - Refactored all `&&` operators inside `render_checkout_privacy_policy_checkbox()` in `AuthController.php` into clean nested conditionals, `Boolean(ternary)` expressions, and branch guards.
+     - Entire inline JavaScript block now contains exactly 0 ampersand (`&`) characters, preventing `wptexturize` from performing entity substitutions.
+- **Implemented**:
+  - `src/Frontend/AuthController.php`: Refactored `calculateAge`, `syncAgeGateState`, `placeComplianceFields`, and `initAgeGateEvents` to eliminate all `&&` operators.
+- **Verification**: Ran full automated test suite with **240/240 tests passing (0 failures, 0 errors)**.
+
 ### Task 148: Asset Versioning Cache-Busting & Full-Width PMPro Checkout Compliance Container
 - **Objective**:
   1. **Guarantee Instant Cache Invalidation Across Browsers, CDNs & Caching Plugins**:
