@@ -6,6 +6,29 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 150: Event RSVP Button & Form Resolver Shortcodes
+- **Objective**:
+  1. **Event RSVP Button Shortcode (`[event_rsvp_button]`)**:
+     - Built for display within loop items or single post templates for events.
+     - Automatically inspects the current post ID (or explicit `post_id`/`id` attribute) and fetches the ACF field `forminator_form_shortcode`.
+     - Extracts the Forminator form ID (from raw IDs, `[forminator_form id="123"]`, etc.).
+     - Dynamically computes a secure 32-character HMAC-SHA256 hash using WordPress salt (`wp_salt('auth')`).
+     - Renders an `<a>` tag with class `rsvp-btn` linking to `https://www.domain.com/event-reg/?e=<hash>`.
+     - Styled with the ArabZawaj design system (`#CC723F`, `#ffffff`, rounded 6px, font-weight 600, smooth hover transition) matching provided mockup.
+     - **Strict Separation**: Operates independently from the Join Event modal popup and click count tracking features (`wp_matchmaker_event_clicks`).
+  2. **Event Registration Resolver Shortcode (`[event_reg_form]`)**:
+     - Placed on the `/event-reg/` page.
+     - Reads the `?e=` URL parameter, performs a reverse lookup in `wp_posts` (`forminator_forms`) and ACF meta values (`forminator_form_shortcode`), comparing candidate form hashes using timing-safe `hash_equals()`.
+     - Dynamically executes and outputs `do_shortcode('[forminator_form id="<form_id>"]')`.
+     - Safely renders a user-friendly notice if no valid or active form is matched.
+- **Implemented**:
+  - `src/Frontend/EventRegistrationController.php`: Singleton controller registering shortcodes (`[event_rsvp_button]`, `[rsvp_button]`, `[az_event_rsvp_button]`, `[event_reg_form]`, `[event_registration_form]`, `[az_event_reg_form]`), hash generator, form extractor, DB reverse hash resolver, and inline styles.
+  - `matchmaker.php`: Bootstrapped `EventRegistrationController::instance()` on `plugins_loaded`.
+  - `tests/bootstrap.php`: Added stubs for `get_field()`, `shortcode_exists()`, and `Fakewpdb::$postmeta`.
+  - `tests/Unit/EventRegistrationShortcodeTest.php`: 7 comprehensive unit tests covering extraction, hashing, DB reverse lookup, RSVP button rendering, and form resolver.
+  - `tests/run_tests.php`: Registered `EventRegistrationShortcodeTest`.
+- **Verification**: Ran full automated test suite with **247/247 tests passing (0 failures, 0 errors)**.
+
 ### Task 149: Fix Uncaught SyntaxError from Ampersand Operator Encoding in Checkout Script
 - **Objective**:
   1. **Resolve SyntaxError in JavaScript**:

@@ -127,6 +127,9 @@ add_action('plugins_loaded', static function (): void {
     // 6. Member portal dashboard [matchmaker_member_portal] / [az_profile]
     \Matchmaker\Frontend\PortalController::instance();
 
+    // 6b. Event RSVP Button & Registration Page Form shortcodes [event_rsvp_button] / [event_reg_form]
+    \Matchmaker\Frontend\EventRegistrationController::instance();
+
     // 7. Notification service (Heartbeat API polling + email dispatch)
     \Matchmaker\Service\NotificationService::instance();
 

@@ -583,6 +583,13 @@ function update_post_meta(int $post_id, string $key, $value): bool {
     return true;
 }
 
+if (!function_exists('get_field')) {
+    function get_field(string $selector, $post_id = false, bool $format_value = true) {
+        $pid = is_numeric($post_id) ? (int) $post_id : get_the_ID();
+        return $GLOBALS['__mm_postmeta'][$pid][$selector] ?? null;
+    }
+}
+
 function get_the_title($post = 0): string {
     return $GLOBALS['post']->post_title ?? '';
 }
@@ -925,6 +932,10 @@ function add_shortcode($tag, $callback) {
     return true;
 }
 
+function shortcode_exists(string $tag): bool {
+    return isset($GLOBALS['__mm_shortcodes'][$tag]);
+}
+
 function do_shortcode($content) {
     return $content;
 }
@@ -1156,6 +1167,7 @@ class Fakewpdb {
     public string $usermeta = 'wp_usermeta';
     public string $users = 'wp_users';
     public string $posts = 'wp_posts';
+    public string $postmeta = 'wp_postmeta';
     public int $insert_id = 1;
     public array $queries = [];
     public array $mock_results = [];

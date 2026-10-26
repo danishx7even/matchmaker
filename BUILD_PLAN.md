@@ -6,8 +6,7 @@
 
 ---
 
-### Step-by-Step Execution Checklist:
-- [ ] No active task in progress.
+*No active task in progress. Standing by for instructions.*
 
 
 
