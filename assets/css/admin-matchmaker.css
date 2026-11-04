@@ -1261,6 +1261,142 @@ body.mm-lightbox-open {
     }
 }
 
+/* =============================================================
+   Manual Matchmaker — Multi-Select Dropdown Component
+   ============================================================= */
+.mm-multiselect-wrapper {
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mm-multiselect-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    padding: 6px 10px;
+    min-height: 36px;
+    font-size: 13px;
+    color: #2c3338;
+    cursor: pointer;
+    text-align: left;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mm-multiselect-toggle:hover {
+    border-color: #2271b1;
+}
+
+.mm-multiselect-toggle:focus,
+.mm-multiselect-wrapper.is-open .mm-multiselect-toggle {
+    border-color: #CC723F !important;
+    box-shadow: 0 0 0 1px #CC723F !important;
+    outline: none;
+}
+
+.mm-multiselect-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
+    margin-right: 8px;
+    font-weight: 500;
+}
+
+.mm-multiselect-arrow {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #64748b;
+    flex: 0 0 16px;
+    transition: transform 0.2s ease;
+}
+
+.mm-multiselect-wrapper.is-open .mm-multiselect-arrow {
+    transform: rotate(180deg);
+}
+
+.mm-multiselect-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    min-width: 200px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.mm-multiselect-wrapper.is-open .mm-multiselect-panel {
+    display: block;
+}
+
+.mm-multiselect-search-box {
+    padding: 8px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.mm-multiselect-search-input {
+    width: 100% !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    box-sizing: border-box !important;
+    outline: none !important;
+    background: #ffffff !important;
+}
+
+.mm-multiselect-search-input:focus {
+    border-color: #CC723F !important;
+    box-shadow: 0 0 0 1px #CC723F !important;
+}
+
+.mm-multiselect-options-list {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.mm-multiselect-option-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: #1e293b;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+}
+
+.mm-multiselect-option-item:hover {
+    background: #f8fafc;
+}
+
+.mm-multiselect-option-item.is-any-option {
+    font-weight: 600;
+    border-bottom: 1px solid #f1f5f9;
+    margin-bottom: 2px;
+    color: #0f172a;
+}
+
+.mm-multiselect-option-item input[type="checkbox"] {
+    margin: 0 !important;
+    accent-color: #CC723F;
+}
+
 
 
 

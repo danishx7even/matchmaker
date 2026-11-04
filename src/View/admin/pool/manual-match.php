@@ -35,15 +35,106 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 $fg   = \Matchmaker\Frontend\FieldGenerator::instance();
 
 $country_options     = $fg->options_pref_country();
-$state_options       = $fg->options_pref_state($f_country ?? '');
-$city_options        = $fg->options_pref_city($f_country ?? '', $f_state ?? '');
+$state_options       = $fg->options_pref_state(!empty($f_country_arr) ? $f_country_arr : ($f_country ?? ''));
+if (empty($state_options) || (count($state_options) === 1 && strcasecmp((string)$state_options[0], 'Any State') === 0)) {
+    $all_states = [];
+    foreach ($fg->get_hierarchy_data() as $c_name => $c_states) {
+        if (is_array($c_states)) {
+            foreach (array_keys($c_states) as $st_name) {
+                $all_states[$st_name] = true;
+            }
+        }
+    }
+    $state_list = array_keys($all_states);
+    sort($state_list, SORT_STRING | SORT_FLAG_CASE);
+    $state_options = array_merge(['Any State'], $state_list);
+}
+$city_options        = $fg->options_pref_city(!empty($f_country_arr) ? $f_country_arr : ($f_country ?? ''), !empty($f_state_arr) ? $f_state_arr : ($f_state ?? ''));
 $citizenship_options = $fg->options_pref_citizenship();
 $origin_options      = $fg->options_pref_origin();
 $cand_gender         = !empty($f_gender) ? $f_gender : ($pool['pref_gender'] ?? 'female');
 $modesty_options     = $fg->options_pref_modesty($cand_gender);
+$religion_options    = array_merge(['Any Religion'], $fg->options_religion());
 $hierarchy_json      = json_encode($fg->get_hierarchy_data(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['country'] ?: ($pool['location'] ?: '—')));
+
+if (!function_exists('mm_render_admin_multiselect')) {
+    /**
+     * Renders a multi-select dropdown with checkboxes for manual matchmaker admin filtering.
+     *
+     * @param string        $name        Field name (e.g. 'f_country')
+     * @param string        $id          DOM element ID (e.g. 'mm_f_country')
+     * @param array<string> $options     Available options
+     * @param array<string> $selected    Currently selected values
+     * @param string        $placeholder Default display placeholder
+     * @return void
+     */
+    function mm_render_admin_multiselect(string $name, string $id, array $options, array $selected = [], string $placeholder = ''): void {
+        $selected_clean = [];
+        $is_any_selected = false;
+        foreach ($selected as $s) {
+            $s_trim = trim((string) $s);
+            if ($s_trim === '') {
+                continue;
+            }
+            if (in_array(strtolower($s_trim), ['any', 'any country', 'any state', 'any city', 'any citizenship', 'any origin', 'any religion', 'any modesty', 'no preference', 'select country', 'select state', 'select city'], true)) {
+                $is_any_selected = true;
+            } else {
+                $selected_clean[] = $s_trim;
+            }
+        }
+
+        $first_opt = !empty($options) ? $options[0] : $placeholder;
+        if (empty($selected_clean) || $is_any_selected) {
+            $display_label = $first_opt ?: $placeholder;
+            $is_any_selected = true;
+        } else {
+            $count = count($selected_clean);
+            if ($count === 1) {
+                $display_label = $selected_clean[0];
+            } elseif ($count === 2) {
+                $display_label = implode(', ', $selected_clean);
+            } else {
+                $display_label = $selected_clean[0] . ', ' . $selected_clean[1] . ' (+' . ($count - 2) . ' more)';
+            }
+        }
+        $tooltip = !empty($selected_clean) ? implode(', ', $selected_clean) : $display_label;
+        $has_search = count($options) > 5;
+        ?>
+        <div class="mm-multiselect-wrapper" id="<?php echo esc_attr($id); ?>_wrap">
+            <button type="button" class="mm-multiselect-toggle" id="<?php echo esc_attr($id); ?>_toggle" aria-haspopup="listbox" aria-expanded="false" title="<?php echo esc_attr($tooltip); ?>">
+                <span class="mm-multiselect-label" id="<?php echo esc_attr($id); ?>_label"><?php echo esc_html($display_label); ?></span>
+                <span class="mm-multiselect-arrow dashicons dashicons-arrow-down-alt2"></span>
+            </button>
+            <div class="mm-multiselect-panel" id="<?php echo esc_attr($id); ?>_panel">
+                <?php if ($has_search) : ?>
+                    <div class="mm-multiselect-search-box">
+                        <input type="text" class="mm-multiselect-search-input" placeholder="<?php esc_attr_e('Search options...', 'matchmaker'); ?>" autocomplete="off">
+                    </div>
+                <?php endif; ?>
+                <div class="mm-multiselect-options-list" role="listbox">
+                    <?php foreach ($options as $opt) :
+                        $opt_trim = trim((string) $opt);
+                        $is_any = in_array(strtolower($opt_trim), ['any', 'any country', 'any state', 'any city', 'any citizenship', 'any origin', 'any religion', 'any modesty', 'no preference', 'select country', 'select state', 'select city'], true);
+                        $checked = false;
+                        if ($is_any) {
+                            $checked = $is_any_selected;
+                        } else {
+                            $checked = in_array($opt_trim, $selected_clean, true);
+                        }
+                    ?>
+                        <label class="mm-multiselect-option-item<?php echo $is_any ? ' is-any-option' : ''; ?>">
+                            <input type="checkbox" name="<?php echo esc_attr($name); ?>[]" value="<?php echo esc_attr($opt_trim); ?>" data-label="<?php echo esc_attr($opt_trim); ?>" data-is-any="<?php echo $is_any ? '1' : '0'; ?>" <?php checked($checked); ?>>
+                            <span><?php echo esc_html($opt_trim); ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+}
 ?>
 <p><a href="<?php echo esc_url($back_url); ?>">&larr; <?php echo esc_html(sprintf(__('Back to %s Profile', 'matchmaker'), $user_obj->display_name)); ?></a></p>
 
@@ -114,35 +205,17 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
 
                 <div style="flex:1 1 200px;">
                     <label><strong><?php esc_html_e('Country', 'matchmaker'); ?></strong></label><br>
-                    <select name="f_country" id="mm_f_country" style="width:100%;">
-                        <?php foreach ($country_options as $c_opt) : ?>
-                            <option value="<?php echo esc_attr($c_opt); ?>" <?php selected(strcasecmp($f_country ?? '', $c_opt) === 0); ?>>
-                                <?php echo esc_html($c_opt); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php mm_render_admin_multiselect('f_country', 'mm_f_country', $country_options, $f_country_arr ?? (!empty($f_country) ? [$f_country] : []), __('Any Country', 'matchmaker')); ?>
                 </div>
 
                 <div style="flex:1 1 180px;">
                     <label><strong><?php esc_html_e('State / Region', 'matchmaker'); ?></strong></label><br>
-                    <select name="f_state" id="mm_f_state" style="width:100%;">
-                        <?php foreach ($state_options as $s_opt) : ?>
-                            <option value="<?php echo esc_attr($s_opt); ?>" <?php selected(strcasecmp($f_state ?? '', $s_opt) === 0); ?>>
-                                <?php echo esc_html($s_opt); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php mm_render_admin_multiselect('f_state', 'mm_f_state', $state_options, $f_state_arr ?? (!empty($f_state) ? [$f_state] : []), __('Any State', 'matchmaker')); ?>
                 </div>
 
                 <div style="flex:1 1 180px;">
                     <label><strong><?php esc_html_e('City', 'matchmaker'); ?></strong></label><br>
-                    <select name="f_city" id="mm_f_city" style="width:100%;">
-                        <?php foreach ($city_options as $ct_opt) : ?>
-                            <option value="<?php echo esc_attr($ct_opt); ?>" <?php selected(strcasecmp($f_city ?? '', $ct_opt) === 0); ?>>
-                                <?php echo esc_html($ct_opt); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php mm_render_admin_multiselect('f_city', 'mm_f_city', $city_options, $f_city_arr ?? (!empty($f_city) ? [$f_city] : []), __('Any City', 'matchmaker')); ?>
                 </div>
             </div>
 
@@ -150,40 +223,22 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
                 <!-- Row 2: Cultural, Religious, Citizenship & Free Text Filters -->
                 <div style="flex:1 1 200px;">
                     <label><strong><?php esc_html_e('Citizenship', 'matchmaker'); ?></strong></label><br>
-                    <select name="f_citizenship" id="mm_f_citizenship" style="width:100%;">
-                        <?php foreach ($citizenship_options as $cz_opt) : ?>
-                            <option value="<?php echo esc_attr($cz_opt); ?>" <?php selected(strcasecmp($f_citizenship ?? '', $cz_opt) === 0); ?>>
-                                <?php echo esc_html($cz_opt); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php mm_render_admin_multiselect('f_citizenship', 'mm_f_citizenship', $citizenship_options, $f_citizenship_arr ?? (!empty($f_citizenship) ? [$f_citizenship] : []), __('Any Citizenship', 'matchmaker')); ?>
                 </div>
 
                 <div style="flex:1 1 180px;">
                     <label><strong><?php esc_html_e('Origin / Ethnicity', 'matchmaker'); ?></strong></label><br>
-                    <select name="f_origin" id="mm_f_origin" style="width:100%;">
-                        <?php foreach ($origin_options as $orig_opt) : ?>
-                            <option value="<?php echo esc_attr($orig_opt); ?>" <?php selected(strcasecmp($f_origin ?? '', $orig_opt) === 0); ?>>
-                                <?php echo esc_html($orig_opt); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php mm_render_admin_multiselect('f_origin', 'mm_f_origin', $origin_options, $f_origin_arr ?? (!empty($f_origin) ? [$f_origin] : []), __('Any Origin', 'matchmaker')); ?>
                 </div>
 
                 <div style="flex:1 1 180px;">
                     <label><strong><?php esc_html_e('Religion', 'matchmaker'); ?></strong></label><br>
-                    <input type="text" name="f_religion" value="<?php echo esc_attr($f_religion ?? ''); ?>" placeholder="<?php esc_attr_e('e.g. Muslim or Any', 'matchmaker'); ?>" style="width:100%;">
+                    <?php mm_render_admin_multiselect('f_religion', 'mm_f_religion', $religion_options, $f_religion_arr ?? (!empty($f_religion) ? [$f_religion] : []), __('Any Religion', 'matchmaker')); ?>
                 </div>
 
                 <div style="flex:1 1 180px;">
                     <label><strong><?php esc_html_e('Modesty Level', 'matchmaker'); ?></strong></label><br>
-                    <select name="f_modesty" id="mm_f_modesty" style="width:100%;">
-                        <?php foreach ($modesty_options as $mod_opt) : ?>
-                            <option value="<?php echo esc_attr($mod_opt); ?>" <?php selected(strcasecmp($f_modesty ?? '', $mod_opt) === 0); ?>>
-                                <?php echo esc_html($mod_opt); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php mm_render_admin_multiselect('f_modesty', 'mm_f_modesty', $modesty_options, $f_modesty_arr ?? (!empty($f_modesty) ? [$f_modesty] : []), __('Any Modesty', 'matchmaker')); ?>
                 </div>
 
                 <div style="flex:1 1 180px;">
@@ -330,88 +385,297 @@ $user_country_disp = trim(($pool['city'] ? $pool['city'] . ', ' : '') . ($pool['
 <script>
 (function() {
     var hierarchyData = <?php echo $hierarchy_json ?: '{}'; ?>;
-    var countrySelect = document.getElementById('mm_f_country');
-    var stateSelect   = document.getElementById('mm_f_state');
-    var citySelect    = document.getElementById('mm_f_city');
 
-    if (countrySelect && stateSelect && citySelect) {
-        function populateStates(country, selectedState) {
-            stateSelect.innerHTML = '<option value="Any State">Any State</option>';
-            citySelect.innerHTML  = '<option value="Any City">Any City</option>';
+    // Helper: update display label and title for a multiselect wrapper
+    function updateMultiselectDisplay(wrap) {
+        var labelEl = wrap.querySelector('.mm-multiselect-label');
+        var toggleEl = wrap.querySelector('.mm-multiselect-toggle');
+        if (!labelEl || !toggleEl) return;
 
-            if (!country || country.toLowerCase() === 'any country' || country.toLowerCase() === 'select country' || !hierarchyData[country]) {
-                return;
+        var anyCheckbox = wrap.querySelector('.mm-multiselect-option-item input[data-is-any="1"]');
+        var checkedSpecific = Array.prototype.slice.call(wrap.querySelectorAll('.mm-multiselect-option-item input[data-is-any="0"]:checked'));
+        var firstOpt = wrap.querySelector('.mm-multiselect-option-item input');
+        var defaultLabel = firstOpt ? firstOpt.getAttribute('data-label') : 'Any';
+
+        if (checkedSpecific.length === 0 || (anyCheckbox && anyCheckbox.checked)) {
+            labelEl.textContent = defaultLabel;
+            toggleEl.setAttribute('title', defaultLabel);
+        } else if (checkedSpecific.length === 1) {
+            var val = checkedSpecific[0].getAttribute('data-label');
+            labelEl.textContent = val;
+            toggleEl.setAttribute('title', val);
+        } else if (checkedSpecific.length === 2) {
+            var val = checkedSpecific[0].getAttribute('data-label') + ', ' + checkedSpecific[1].getAttribute('data-label');
+            labelEl.textContent = val;
+            toggleEl.setAttribute('title', val);
+        } else {
+            var val = checkedSpecific[0].getAttribute('data-label') + ', ' + checkedSpecific[1].getAttribute('data-label') + ' (+' + (checkedSpecific.length - 2) + ' more)';
+            var fullVal = checkedSpecific.map(function(c) { return c.getAttribute('data-label'); }).join(', ');
+            labelEl.textContent = val;
+            toggleEl.setAttribute('title', fullVal);
+        }
+    }
+
+    // Helper to get checked values array from a multiselect wrapper
+    function getCheckedValues(wrapId, excludeAny) {
+        var wrap = document.getElementById(wrapId);
+        if (!wrap) return [];
+        var anyBox = wrap.querySelector('input[data-is-any="1"]');
+        if (excludeAny && anyBox && anyBox.checked) {
+            return [];
+        }
+        var selector = excludeAny ? 'input[data-is-any="0"]:checked' : 'input:checked';
+        var boxes = wrap.querySelectorAll(selector);
+        return Array.prototype.slice.call(boxes).map(function(b) {
+            return b.value;
+        });
+    }
+
+    // Helper to rebuild an options list in a multiselect panel
+    function rebuildMultiselectOptions(wrapId, fieldName, options, currentSelected, anyLabel) {
+        var wrap = document.getElementById(wrapId);
+        if (!wrap) return;
+        var listEl = wrap.querySelector('.mm-multiselect-options-list');
+        if (!listEl) return;
+
+        var selectedMap = {};
+        (currentSelected || []).forEach(function(s) {
+            selectedMap[(s || '').toLowerCase()] = true;
+        });
+
+        var hasSpecificSelected = false;
+        var html = '';
+
+        options.forEach(function(opt) {
+            var optTrim = (opt || '').trim();
+            if (!optTrim) return;
+            var isAny = ['any', 'any country', 'any state', 'any city', 'any citizenship', 'any origin', 'any religion', 'any modesty', 'select country', 'select state', 'select city', 'no preference'].indexOf(optTrim.toLowerCase()) !== -1;
+            var isChecked = !isAny && selectedMap[optTrim.toLowerCase()] === true;
+            if (isChecked) {
+                hasSpecificSelected = true;
             }
+            html += '<label class="mm-multiselect-option-item' + (isAny ? ' is-any-option' : '') + '">';
+            html += '<input type="checkbox" name="' + fieldName + '[]" value="' + escapeHtml(optTrim) + '" data-label="' + escapeHtml(optTrim) + '" data-is-any="' + (isAny ? '1' : '0') + '"' + (isChecked ? ' checked' : '') + '>';
+            html += '<span>' + escapeHtml(optTrim) + '</span>';
+            html += '</label>';
+        });
 
-            var states = Object.keys(hierarchyData[country]).sort(function(a, b) {
-                return a.localeCompare(b, undefined, { sensitivity: 'base' });
+        listEl.innerHTML = html;
+
+        // If no specific options are checked, check the Any option
+        if (!hasSpecificSelected) {
+            var anyInput = listEl.querySelector('input[data-is-any="1"]');
+            if (anyInput) {
+                anyInput.checked = true;
+            }
+        }
+
+        updateMultiselectDisplay(wrap);
+
+        // Re-apply search filter if user typed in search box
+        var searchInput = wrap.querySelector('.mm-multiselect-search-input');
+        if (searchInput && searchInput.value) {
+            filterOptionsList(wrap, searchInput.value);
+        }
+    }
+
+    function escapeHtml(str) {
+        return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function filterOptionsList(wrap, query) {
+        var q = (query || '').toLowerCase().trim();
+        var items = wrap.querySelectorAll('.mm-multiselect-option-item');
+        items.forEach(function(item) {
+            var isAny = item.classList.contains('is-any-option');
+            if (isAny || !q) {
+                item.style.display = 'flex';
+            } else {
+                var text = (item.textContent || '').toLowerCase();
+                item.style.display = (text.indexOf(q) !== -1) ? 'flex' : 'none';
+            }
+        });
+    }
+
+    // Toggle Dropdown Panel
+    document.addEventListener('click', function(e) {
+        var toggle = e.target.closest('.mm-multiselect-toggle');
+        if (toggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            var wrap = toggle.closest('.mm-multiselect-wrapper');
+            var isOpen = wrap.classList.contains('is-open');
+
+            // Close all
+            document.querySelectorAll('.mm-multiselect-wrapper.is-open').forEach(function(w) {
+                if (w !== wrap) w.classList.remove('is-open');
             });
 
-            states.forEach(function(st) {
-                var opt = document.createElement('option');
-                opt.value = st;
-                opt.textContent = st;
-                if (selectedState && selectedState.toLowerCase() === st.toLowerCase()) {
-                    opt.selected = true;
+            if (isOpen) {
+                wrap.classList.remove('is-open');
+            } else {
+                wrap.classList.add('is-open');
+                var search = wrap.querySelector('.mm-multiselect-search-input');
+                if (search) search.focus();
+            }
+            return;
+        }
+
+        // Click inside multiselect panel
+        if (e.target.closest('.mm-multiselect-panel')) {
+            return;
+        }
+
+        // Clicked outside, close all
+        document.querySelectorAll('.mm-multiselect-wrapper.is-open').forEach(function(w) {
+            w.classList.remove('is-open');
+        });
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.mm-multiselect-wrapper.is-open').forEach(function(w) {
+                w.classList.remove('is-open');
+            });
+        }
+    });
+
+    // Delegated Search Filter
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('mm-multiselect-search-input')) {
+            var wrap = e.target.closest('.mm-multiselect-wrapper');
+            if (wrap) {
+                filterOptionsList(wrap, e.target.value);
+            }
+        }
+    });
+
+    // Cascading Handlers
+    function cascadeStates() {
+        var selectedCountries = getCheckedValues('mm_f_country_wrap', true);
+        var currentlyCheckedStates = getCheckedValues('mm_f_state_wrap', true);
+        var statesMap = {};
+
+        if (selectedCountries.length > 0) {
+            selectedCountries.forEach(function(c) {
+                if (hierarchyData[c]) {
+                    Object.keys(hierarchyData[c]).forEach(function(st) {
+                        statesMap[st] = true;
+                    });
                 }
-                stateSelect.appendChild(opt);
+            });
+        } else {
+            // Collect all states from hierarchyData
+            Object.keys(hierarchyData).forEach(function(c) {
+                if (hierarchyData[c]) {
+                    Object.keys(hierarchyData[c]).forEach(function(st) {
+                        statesMap[st] = true;
+                    });
+                }
             });
         }
 
-        function populateCities(country, state, selectedCity) {
-            citySelect.innerHTML = '<option value="Any City">Any City</option>';
+        var stateList = Object.keys(statesMap).sort(function(a, b) {
+            return a.localeCompare(b, undefined, { sensitivity: 'base' });
+        });
 
-            if (!country || !state || state.toLowerCase() === 'any state' || !hierarchyData[country] || !hierarchyData[country][state]) {
-                return;
-            }
+        var stateOptions = ['Any State'].concat(stateList);
+        rebuildMultiselectOptions('mm_f_state_wrap', 'f_state', stateOptions, currentlyCheckedStates, 'Any State');
+        cascadeCities();
+    }
 
-            var cities = (hierarchyData[country][state] || []).slice().sort(function(a, b) {
-                return a.localeCompare(b, undefined, { sensitivity: 'base' });
-            });
+    function cascadeCities() {
+        var selectedCountries = getCheckedValues('mm_f_country_wrap', true);
+        var selectedStates = getCheckedValues('mm_f_state_wrap', true);
+        var currentlyCheckedCities = getCheckedValues('mm_f_city_wrap', true);
+        var citiesMap = {};
 
-            cities.forEach(function(ct) {
-                var opt = document.createElement('option');
-                opt.value = ct;
-                opt.textContent = ct;
-                if (selectedCity && selectedCity.toLowerCase() === ct.toLowerCase()) {
-                    opt.selected = true;
+        if (selectedStates.length > 0) {
+            var countriesToScan = selectedCountries.length > 0 ? selectedCountries : Object.keys(hierarchyData);
+            countriesToScan.forEach(function(c) {
+                if (hierarchyData[c]) {
+                    selectedStates.forEach(function(st) {
+                        if (hierarchyData[c][st] && Array.isArray(hierarchyData[c][st])) {
+                            if (hierarchyData[c][st].length === 0) {
+                                citiesMap[st] = true;
+                            } else {
+                                hierarchyData[c][st].forEach(function(city) {
+                                    citiesMap[city] = true;
+                                });
+                            }
+                        }
+                    });
                 }
-                citySelect.appendChild(opt);
             });
         }
 
-        countrySelect.addEventListener('change', function() {
-            populateStates(this.value, '');
+        var cityList = Object.keys(citiesMap).sort(function(a, b) {
+            return a.localeCompare(b, undefined, { sensitivity: 'base' });
         });
 
-        stateSelect.addEventListener('change', function() {
-            populateCities(countrySelect.value, this.value, '');
-        });
+        var cityOptions = ['Any City'].concat(cityList);
+        rebuildMultiselectOptions('mm_f_city_wrap', 'f_city', cityOptions, currentlyCheckedCities, 'Any City');
+    }
 
-        var modestyConfigs = {
-            female: <?php echo json_encode($fg->options_pref_modesty('female')); ?>,
-            male:   <?php echo json_encode($fg->options_pref_modesty('male')); ?>
-        };
-        var genderSelect  = document.getElementById('mm_f_gender');
-        var modestySelect = document.getElementById('mm_f_modesty');
+    // Delegated Checkbox Click Handler
+    document.addEventListener('change', function(e) {
+        var checkbox = e.target;
+        if (!checkbox || checkbox.type !== 'checkbox') return;
 
-        if (genderSelect && modestySelect) {
-            genderSelect.addEventListener('change', function() {
-                var g = (genderSelect.value || '').toLowerCase();
-                var opts = (g === 'male') ? modestyConfigs.male : modestyConfigs.female;
-                var curr = modestySelect.value;
-                modestySelect.innerHTML = '';
-                opts.forEach(function(opt) {
-                    var el = document.createElement('option');
-                    el.value = opt;
-                    el.textContent = opt;
-                    if (curr && opt.toLowerCase() === curr.toLowerCase()) {
-                        el.selected = true;
-                    }
-                    modestySelect.appendChild(el);
+        var wrap = checkbox.closest('.mm-multiselect-wrapper');
+        if (!wrap) return;
+
+        var isAny = checkbox.getAttribute('data-is-any') === '1';
+        var anyBox = wrap.querySelector('.mm-multiselect-option-item input[data-is-any="1"]');
+        var specificBoxes = wrap.querySelectorAll('.mm-multiselect-option-item input[data-is-any="0"]');
+
+        if (isAny) {
+            if (checkbox.checked) {
+                specificBoxes.forEach(function(sb) {
+                    sb.checked = false;
                 });
-            });
+            } else {
+                // Cannot uncheck "Any" unless another option is chosen
+                var anyChecked = Array.prototype.slice.call(specificBoxes).some(function(sb) { return sb.checked; });
+                if (!anyChecked) {
+                    checkbox.checked = true;
+                }
+            }
+        } else {
+            if (checkbox.checked && anyBox) {
+                anyBox.checked = false;
+            } else if (!checkbox.checked && anyBox) {
+                var anyChecked = Array.prototype.slice.call(specificBoxes).some(function(sb) { return sb.checked; });
+                if (!anyChecked) {
+                    anyBox.checked = true;
+                }
+            }
         }
+
+        updateMultiselectDisplay(wrap);
+
+        // Cascades
+        if (wrap.id === 'mm_f_country_wrap') {
+            cascadeStates();
+        } else if (wrap.id === 'mm_f_state_wrap') {
+            cascadeCities();
+        }
+    });
+
+    // Modesty Options based on Gender Select
+    var modestyConfigs = {
+        female: <?php echo json_encode($fg->options_pref_modesty('female')); ?>,
+        male:   <?php echo json_encode($fg->options_pref_modesty('male')); ?>
+    };
+    var genderSelect = document.getElementById('mm_f_gender');
+    if (genderSelect) {
+        genderSelect.addEventListener('change', function() {
+            var g = (genderSelect.value || '').toLowerCase();
+            var opts = (g === 'male') ? modestyConfigs.male : modestyConfigs.female;
+            var currentChecked = getCheckedValues('mm_f_modesty_wrap', true);
+            rebuildMultiselectOptions('mm_f_modesty_wrap', 'f_modesty', opts, currentChecked, 'Any Modesty');
+        });
     }
 
     // Tab Switching Logic

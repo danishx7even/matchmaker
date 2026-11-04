@@ -6,6 +6,31 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 151: Admin Manual Matchmaker Multi-Select Dropdowns & Religion Dropdown
+- **Objective**:
+  1. **Religion Field Conversion**:
+     - Converted the plain text input field for Religion in the Admin Manual Matchmaker tool (`manual-match.php`) into a dropdown populated with `"Any Religion"` followed by all standardized religion options (`Islam`, `Christianity`, `Judaism`, `Hinduism`, `Sikhism`, `Buddhism`, `Other`).
+  2. **Multi-Select Dropdown Support**:
+     - Transformed filter dropdowns in the Manual Matchmaking form (`f_country`, `f_state`, `f_city`, `f_citizenship`, `f_origin`, `f_religion`, `f_modesty`) into multi-select dropdown components with native checkbox inputs (`name="field[]"`), search filtering for lists with >5 options, real-time label summaries (e.g. `"Texas, California"`), and "Any ..." mutual exclusivity.
+  3. **Multi-Value Dynamic Location Cascading**:
+     - Upgraded client-side JavaScript cascading to aggregate across multiple selections:
+       - Selecting multiple Countries updates State options to include all states across the selected countries.
+       - Selecting multiple States updates City options to include all cities across the selected states.
+       - If no countries or "Any Country" is selected, allows searching and selecting across all available states.
+  4. **Repository Multi-Value SQL Filtering & Scoring**:
+     - Updated `MatchRepository::get_manual_match_candidates()` to accept both arrays and comma-separated lists for location and demographic filters.
+     - Built `OR` clause groupings so candidates matching any of the chosen states, countries, religions, or origins qualify.
+     - Synchronized multi-value preferences with `compute_flexible_score()` in `MatchingEngine`.
+  5. **Strict File Isolation**:
+     - Confined all changes strictly to admin manual matchmaker views, repository queries, and admin CSS (`admin-matchmaker.css`). Zero changes made to any frontend features.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`: Enhanced `get_manual_match_candidates()` with `$extract_terms` and multi-clause SQL queries for country, state, city, citizenship, religion, modesty, and origin.
+  - `src/Admin/AdminPortal.php`: Added `$parse_multi_param` in `render_manual_match_view()` to safely extract array or string parameters from `$_GET` without scalar type issues.
+  - `src/View/admin/pool/manual-match.php`: Added `mm_render_admin_multiselect()` helper, replaced single-select tags and religion text input with multi-select components, and updated JavaScript cascading logic for multi-selected countries and states.
+  - `assets/css/admin-matchmaker.css`: Added clean styling for `.mm-multiselect-*` components with brand accent (`#CC723F`), custom checkboxes, and responsive dropdown panels.
+  - `tests/Unit/ManualMatchmakerTest.php`: Added `test_manual_match_multiselect_filters_and_rendering` testing multi-value queries and HTML structure.
+- **Verification**: Ran full automated test suite with **248/248 tests passing (0 failures, 0 errors)**.
+
 ### Task 150: Event RSVP Button & Form Resolver Shortcodes
 - **Objective**:
   1. **Event RSVP Button Shortcode (`[event_rsvp_button]`)**:

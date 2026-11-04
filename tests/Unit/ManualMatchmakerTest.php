@@ -364,6 +364,126 @@ class ManualMatchmakerTest
             throw new \RuntimeException("Expected ajax_create_direct_match to succeed: " . json_encode($res_create));
         }
     }
+
+    public function test_manual_match_multiselect_filters_and_rendering(): void
+    {
+        global $wpdb;
+
+        $target_user_id = 10;
+        $pool = [
+            'user_id'            => 10,
+            'gender'             => 'male',
+            'birth_date'         => '1990-01-01',
+            'location'           => 'Houston',
+            'country'            => 'United States',
+            'state'              => 'Texas',
+            'city'               => 'Houston',
+            'origin'             => 'Arab',
+            'religion'           => 'Christianity',
+            'modesty'            => 'Modest',
+            'pref_gender'        => 'female',
+            'preferred_age_min'  => 20,
+            'preferred_age_max'  => 40,
+            'pref_country'       => 'United States',
+            'pref_state'         => 'Texas, California',
+            'pref_city'          => 'Houston, Los Angeles',
+            'pref_origin'        => 'Arab',
+            'pref_religion'      => 'Christianity',
+            'pref_modesty'       => 'Modest',
+            'user_type'          => 'monthly',
+        ];
+
+        // 1. Test multi-select array filter in get_manual_match_candidates
+        $filters = [
+            'f_gender'      => 'female',
+            'f_age_min'     => 25,
+            'f_age_max'     => 40,
+            'f_country'     => ['United States', 'Canada'],
+            'f_state'       => ['Texas', 'California'],
+            'f_city'        => ['Houston', 'Dallas'],
+            'f_citizenship' => ['United States', 'Canada'],
+            'f_location'    => '',
+            'f_origin'      => ['Arab', 'Lebanese'],
+            'f_religion'    => ['Christianity', 'Islam'],
+            'f_modesty'     => ['Modest', 'Conservative'],
+        ];
+
+        $wpdb->queries = [];
+        $wpdb->mock_results = [];
+
+        $results = $this->repo->get_manual_match_candidates($target_user_id, $pool, $filters);
+
+        $queries_str = implode("\n", $wpdb->queries);
+
+        // Assert query contains multiple state clauses with OR
+        if (!str_contains($queries_str, 'c.state') || !str_contains($queries_str, 'Texas') || !str_contains($queries_str, 'California')) {
+            throw new \RuntimeException("Expected multi-state filter query containing Texas and California, got:\n{$queries_str}");
+        }
+
+        // Assert query contains multiple country clauses with OR
+        if (!str_contains($queries_str, 'c.country') || !str_contains($queries_str, 'United States') || !str_contains($queries_str, 'Canada')) {
+            throw new \RuntimeException("Expected multi-country filter query containing United States and Canada, got:\n{$queries_str}");
+        }
+
+        // Assert query contains multiple religion clauses with OR
+        if (!str_contains($queries_str, 'c.religion') || !str_contains($queries_str, 'Christianity') || !str_contains($queries_str, 'Islam')) {
+            throw new \RuntimeException("Expected multi-religion filter query containing Christianity and Islam, got:\n{$queries_str}");
+        }
+
+        // 2. Test manual-match.php template rendering contains multi-select dropdowns
+        $user_id       = $target_user_id;
+        $user_obj      = (object) ['ID' => 10, 'display_name' => 'Test User', 'user_email' => 'test@example.com'];
+        $meta          = ['pref_citizenship' => 'United States'];
+        $user_age      = '34';
+        $quota_used    = 1;
+        $f_gender      = 'female';
+        $f_age_min     = 25;
+        $f_age_max     = 40;
+        $f_country     = 'United States';
+        $f_state       = 'Texas, California';
+        $f_city        = 'Houston';
+        $f_citizenship = 'United States';
+        $f_location    = '';
+        $f_origin      = 'Arab';
+        $f_religion    = 'Christianity';
+        $f_modesty     = 'Modest';
+        $f_country_arr = ['United States'];
+        $f_state_arr   = ['Texas', 'California'];
+        $f_city_arr    = ['Houston'];
+        $f_citizenship_arr = ['United States'];
+        $f_origin_arr  = ['Arab'];
+        $f_religion_arr= ['Christianity'];
+        $f_modesty_arr = ['Modest'];
+        $candidates    = [];
+        $back_url      = 'admin.php?page=matchmaking-pool&view_user=10';
+        $reset_url     = 'admin.php?page=matchmaking-pool&manual_match=10';
+
+        ob_start();
+        include dirname(__DIR__, 2) . '/src/View/admin/pool/manual-match.php';
+        $html = ob_get_clean();
+
+        // Verify religion is rendered as a multi-select dropdown, NOT a text input
+        if (str_contains($html, '<input type="text" name="f_religion"')) {
+            throw new \RuntimeException("f_religion should not be rendered as a text input.");
+        }
+        if (!str_contains($html, 'mm_f_religion_wrap') || !str_contains($html, 'name="f_religion[]"')) {
+            throw new \RuntimeException("f_religion should be rendered as a multi-select dropdown with checkboxes.");
+        }
+        if (!str_contains($html, 'Any Religion') || !str_contains($html, 'Christianity')) {
+            throw new \RuntimeException("f_religion options should include Any Religion and Christianity.");
+        }
+
+        // Verify state is rendered as multi-select with Texas and California checked
+        if (!str_contains($html, 'mm_f_state_wrap') || !str_contains($html, 'name="f_state[]"')) {
+            throw new \RuntimeException("f_state should be rendered as a multi-select dropdown.");
+        }
+        if (!str_contains($html, 'value="Texas"') || !str_contains($html, 'value="California"')) {
+            throw new \RuntimeException("f_state should contain Texas and California options.");
+        }
+        if (!str_contains($html, 'mm-multiselect-wrapper') || !str_contains($html, 'mm-multiselect-toggle')) {
+            throw new \RuntimeException("HTML should contain mm-multiselect-wrapper and toggle elements.");
+        }
+    }
 }
 
 
