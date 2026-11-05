@@ -35,6 +35,8 @@ $pmpro_sync = \Matchmaker\Core\PMProSync::instance();
 $photo1_1 = !empty($m1['user_photo1']) ? $m1['user_photo1'] : (!empty($p1['user_photo1']) ? $p1['user_photo1'] : (string) get_user_meta($u1_id, 'user_photo1', true));
 $photo1_2 = !empty($m1['user_photo2']) ? $m1['user_photo2'] : (!empty($p1['user_photo2']) ? $p1['user_photo2'] : (string) get_user_meta($u1_id, 'user_photo2', true));
 $photo1_3 = !empty($m1['user_photo3']) ? $m1['user_photo3'] : (!empty($p1['user_photo3']) ? $p1['user_photo3'] : (string) get_user_meta($u1_id, 'user_photo3', true));
+$u1_photos = array_values(array_filter([$photo1_1, $photo1_2, $photo1_3]));
+$u1_photos_attr = !empty($u1_photos) ? esc_attr(implode(',', $u1_photos)) : '';
 $age1     = is_array($p1) ? $repo->calc_age($p1['birth_date'] ?? '') : '—';
 $height1  = is_array($p1) ? $repo->cm_to_feet(!empty($p1['height_cm']) ? (int) $p1['height_cm'] : null) : '—';
 $type1    = is_array($p1) ? ($p1['user_type'] ?? 'free') : 'free';
@@ -45,6 +47,8 @@ $cancel1  = $pmpro_sync->get_user_cancellation_info($u1_id);
 $photo2_1 = !empty($m2['user_photo1']) ? $m2['user_photo1'] : (!empty($p2['user_photo1']) ? $p2['user_photo1'] : (string) get_user_meta($u2_id, 'user_photo1', true));
 $photo2_2 = !empty($m2['user_photo2']) ? $m2['user_photo2'] : (!empty($p2['user_photo2']) ? $p2['user_photo2'] : (string) get_user_meta($u2_id, 'user_photo2', true));
 $photo2_3 = !empty($m2['user_photo3']) ? $m2['user_photo3'] : (!empty($p2['user_photo3']) ? $p2['user_photo3'] : (string) get_user_meta($u2_id, 'user_photo3', true));
+$u2_photos = array_values(array_filter([$photo2_1, $photo2_2, $photo2_3]));
+$u2_photos_attr = !empty($u2_photos) ? esc_attr(implode(',', $u2_photos)) : '';
 $age2     = is_array($p2) ? $repo->calc_age($p2['birth_date'] ?? '') : '—';
 $height2  = is_array($p2) ? $repo->cm_to_feet(!empty($p2['height_cm']) ? (int) $p2['height_cm'] : null) : '—';
 $type2    = is_array($p2) ? ($p2['user_type'] ?? 'free') : 'free';
@@ -138,9 +142,9 @@ $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str
             <!-- User 1 Photos Grid -->
             <?php if (!empty($photo1_1) || !empty($photo1_2) || !empty($photo1_3)) : ?>
                 <div class="mm-photos-grid" style="margin-bottom:15px;">
-                    <?php if (!empty($photo1_1)) : ?><img src="<?php echo esc_url($photo1_1); ?>" alt="Photo 1" data-mm-lightbox="u1-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
-                    <?php if (!empty($photo1_2)) : ?><img src="<?php echo esc_url($photo1_2); ?>" alt="Photo 2" data-mm-lightbox="u1-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
-                    <?php if (!empty($photo1_3)) : ?><img src="<?php echo esc_url($photo1_3); ?>" alt="Photo 3" data-mm-lightbox="u1-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                    <?php if (!empty($photo1_1)) : ?><img src="<?php echo esc_url($photo1_1); ?>" alt="Photo 1" data-mm-lightbox="u1-gallery" data-mm-photos="<?php echo $u1_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                    <?php if (!empty($photo1_2)) : ?><img src="<?php echo esc_url($photo1_2); ?>" alt="Photo 2" data-mm-lightbox="u1-gallery" data-mm-photos="<?php echo $u1_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                    <?php if (!empty($photo1_3)) : ?><img src="<?php echo esc_url($photo1_3); ?>" alt="Photo 3" data-mm-lightbox="u1-gallery" data-mm-photos="<?php echo $u1_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
                 </div>
             <?php endif; ?>
 
@@ -289,9 +293,9 @@ $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str
             <!-- User 2 Photos Grid -->
             <?php if (!empty($photo2_1) || !empty($photo2_2) || !empty($photo2_3)) : ?>
                 <div class="mm-photos-grid" style="margin-bottom:15px;">
-                    <?php if (!empty($photo2_1)) : ?><img src="<?php echo esc_url($photo2_1); ?>" alt="Photo 1" data-mm-lightbox="u2-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
-                    <?php if (!empty($photo2_2)) : ?><img src="<?php echo esc_url($photo2_2); ?>" alt="Photo 2" data-mm-lightbox="u2-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
-                    <?php if (!empty($photo2_3)) : ?><img src="<?php echo esc_url($photo2_3); ?>" alt="Photo 3" data-mm-lightbox="u2-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                    <?php if (!empty($photo2_1)) : ?><img src="<?php echo esc_url($photo2_1); ?>" alt="Photo 1" data-mm-lightbox="u2-gallery" data-mm-photos="<?php echo $u2_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                    <?php if (!empty($photo2_2)) : ?><img src="<?php echo esc_url($photo2_2); ?>" alt="Photo 2" data-mm-lightbox="u2-gallery" data-mm-photos="<?php echo $u2_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                    <?php if (!empty($photo2_3)) : ?><img src="<?php echo esc_url($photo2_3); ?>" alt="Photo 3" data-mm-lightbox="u2-gallery" data-mm-photos="<?php echo $u2_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
                 </div>
             <?php endif; ?>
 

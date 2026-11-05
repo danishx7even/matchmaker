@@ -25,7 +25,11 @@ if (!defined('ABSPATH')) {
             <div class="new-match-card">
                 <div>
                     <div class="candidate-hero-block">
-                        <img src="<?php echo esc_url(!empty($active_match['photo']) ? $active_match['photo'] : (function_exists('get_avatar_url') ? get_avatar_url(0, ['size' => 150]) : '')); ?>" alt="<?php echo esc_attr($active_match['name'] ?? ''); ?>" class="candidate-square-thumb mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}">
+                        <?php
+                        $candidate_photos = !empty($active_match['photos']) ? $active_match['photos'] : (!empty($active_match['photo']) ? [$active_match['photo']] : []);
+                        $photos_attr = !empty($candidate_photos) ? esc_attr(implode(',', $candidate_photos)) : '';
+                        ?>
+                        <img src="<?php echo esc_url(!empty($active_match['photo']) ? $active_match['photo'] : (function_exists('get_avatar_url') ? get_avatar_url(0, ['size' => 150]) : '')); ?>" alt="<?php echo esc_attr($active_match['name'] ?? ''); ?>" class="candidate-square-thumb mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" data-mm-photos="<?php echo $photos_attr; ?>" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}">
                         <div class="candidate-meta">
                             <h2 class="font-cormorant"><?php echo esc_html($active_match['name']); ?>, <?php echo esc_html($active_match['age']); ?></h2>
                             <div class="meta-loc">

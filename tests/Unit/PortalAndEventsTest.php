@@ -822,9 +822,117 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringNotContainsString('mm-action="view-match"', $history_chunk);
         $this->assertStringNotContainsString('View Details', $history_chunk);
     }
+
+    public function test_find_approved_matches_enriches_all_photos_and_renders_data_mm_photos(): void
+    {
+        $repo = MatchRepository::instance();
+        global $wpdb;
+
+        $user_id = 910;
+        $candidate_id = 911;
+
+        // Mock photos in usermeta
+        update_user_meta($candidate_id, 'user_photo1', 'https://example.com/p1.jpg');
+        update_user_meta($candidate_id, 'user_photo2', 'https://example.com/p2.jpg');
+        update_user_meta($candidate_id, 'user_photo3', 'https://example.com/p3.jpg');
+
+        $match_row = [
+            'id' => 881,
+            'user_one_id' => $user_id,
+            'user_two_id' => $candidate_id,
+            'status' => 'approved',
+            'score' => 6,
+            'contact_revealed' => 0,
+            'user_one_response' => 'pending',
+            'user_two_response' => 'pending',
+            'created_at' => current_time('mysql'),
+            'approved_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql'),
+        ];
+
+        $wpdb->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = {$user_id} OR user_two_id = {$user_id})\n                   AND status IN ('approved', 'matched')\n                 ORDER BY created_at DESC"] = [$match_row];
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = {$candidate_id}"] = [
+            'user_id' => $candidate_id,
+            'city' => 'Dubai',
+            'country' => 'UAE',
+            'birth_date' => '1996-06-20',
+        ];
+
+        $matches = $repo->find_approved_matches_for_user($user_id);
+        $this->assertNotEmpty($matches);
+        $active_match = $matches[0];
+
+        $this->assertEquals('https://example.com/p1.jpg', $active_match['photo']);
+        $this->assertEquals('https://example.com/p1.jpg', $active_match['user_photo1']);
+        $this->assertEquals('https://example.com/p2.jpg', $active_match['user_photo2']);
+        $this->assertEquals('https://example.com/p3.jpg', $active_match['user_photo3']);
+        $this->assertEquals(['https://example.com/p1.jpg', 'https://example.com/p2.jpg', 'https://example.com/p3.jpg'], $active_match['photos']);
+
+        // Test Step 1 render
+        $default_step = 1;
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-1-discovery.php';
+        $step1_html = (string) ob_get_clean();
+        $this->assertStringContainsString('data-mm-photos="https://example.com/p1.jpg,https://example.com/p2.jpg,https://example.com/p3.jpg"', $step1_html);
+
+        // Test Step 2 render
+        $my_resp = 'pending';
+        $their_resp = 'pending';
+        $is_mutual = false;
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-2-profile.php';
+        $step2_html = (string) ob_get_clean();
+        $this->assertStringContainsString('data-mm-photos="https://example.com/p1.jpg,https://example.com/p2.jpg,https://example.com/p3.jpg"', $step2_html);
+
+        // Test Step 5 render
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-5-contact.php';
+        $step5_html = (string) ob_get_clean();
+        $this->assertStringContainsString('data-mm-photos="https://example.com/p1.jpg,https://example.com/p2.jpg,https://example.com/p3.jpg"', $step5_html);
+    }
+
+    public function test_match_single_and_user_single_views_render_data_mm_photos_attributes(): void
+    {
+        $u1_id = 920;
+        $u2_id = 921;
+
+        update_user_meta($u1_id, 'user_photo1', 'https://example.com/u1_p1.jpg');
+        update_user_meta($u1_id, 'user_photo2', 'https://example.com/u1_p2.jpg');
+        update_user_meta($u2_id, 'user_photo1', 'https://example.com/u2_p1.jpg');
+
+        $m1 = ['user_photo1' => 'https://example.com/u1_p1.jpg', 'user_photo2' => 'https://example.com/u1_p2.jpg'];
+        $m2 = ['user_photo1' => 'https://example.com/u2_p1.jpg'];
+        $p1 = ['user_id' => $u1_id, 'user_type' => 'monthly', 'birth_date' => '1995-01-01', 'gender' => 'male'];
+        $p2 = ['user_id' => $u2_id, 'user_type' => 'free', 'birth_date' => '1998-05-15', 'gender' => 'female'];
+        $match = [
+            'id' => 450,
+            'user_one_id' => $u1_id,
+            'user_two_id' => $u2_id,
+            'status' => 'pending_review',
+            'score' => 5,
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql'),
+        ];
+        $st = 'pending_review';
+        $back_url = admin_url('admin.php?page=matchmaking-matches');
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/matches/match-single.php';
+        $match_html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-mm-photos="https://example.com/u1_p1.jpg,https://example.com/u1_p2.jpg"', $match_html);
+        $this->assertStringContainsString('data-mm-photos="https://example.com/u2_p1.jpg"', $match_html);
+
+        // Test user-single.php
+        $user_id = $u1_id;
+        $meta = $m1;
+        $pool = $p1;
+        $matches = [];
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/admin/pool/user-single.php';
+        $user_html = (string) ob_get_clean();
+
+        $this->assertStringContainsString('data-mm-photos="https://example.com/u1_p1.jpg,https://example.com/u1_p2.jpg"', $user_html);
+        $this->assertStringContainsString('data-mm-lightbox="profile-gallery"', $user_html);
+    }
 }
-
-
-
-
-

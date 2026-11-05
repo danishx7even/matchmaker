@@ -111,8 +111,11 @@ if ($is_mutual) {
                     <?php foreach ($match_history as $hist_item) : ?>
                         <div class="mm-history-item">
                             <div class="mm-history-avatar">
-                                <?php if (!empty($hist_item['photo'])) : ?>
-                                    <img src="<?php echo esc_url($hist_item['photo']); ?>" alt="<?php echo esc_attr($hist_item['name']); ?>" class="mm-history-photo" />
+                                <?php if (!empty($hist_item['photo'])) :
+                                    $hist_photos = !empty($hist_item['photos']) ? $hist_item['photos'] : (!empty($hist_item['photo']) ? [$hist_item['photo']] : []);
+                                    $hist_photos_attr = !empty($hist_photos) ? esc_attr(implode(',', $hist_photos)) : '';
+                                ?>
+                                    <img src="<?php echo esc_url($hist_item['photo']); ?>" alt="<?php echo esc_attr($hist_item['name']); ?>" class="mm-history-photo mm-lightbox-trigger" data-mm-photos="<?php echo $hist_photos_attr; ?>" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}" />
                                 <?php else : ?>
                                     <div class="mm-history-photo-placeholder">
                                         <?php echo esc_html(strtoupper(substr($hist_item['name'] ?: 'M', 0, 1))); ?>

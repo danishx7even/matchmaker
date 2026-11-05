@@ -944,7 +944,8 @@ if (!function_exists('mm_render_admin_multiselect')) {
         // Target Member Card
         html += '  <div class="mm-compare-user-card" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; display:flex; gap:14px; align-items:center;">';
         if (t.photo) {
-            html += '    <img src="' + escapeHtml(t.photo) + '" style="width:52px; height:52px; border-radius:6px; object-fit:cover;" alt="">';
+            var tPhotos = (t.photos && t.photos.length) ? t.photos : [t.photo];
+            html += '    <img src="' + escapeHtml(t.photo) + '" class="mm-lightbox-trigger" data-mm-photos="' + escapeHtml(tPhotos.join(',')) + '" style="width:52px; height:52px; border-radius:6px; object-fit:cover; cursor:zoom-in;" title="<?php echo esc_js(__('Click to view full photo', 'matchmaker')); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}" alt="">';
         } else {
             html += '    <div class="mm-avatar-thumb" style="width:52px; height:52px; font-size:18px; font-weight:bold;">' + escapeHtml((t.name || 'U').charAt(0).toUpperCase()) + '</div>';
         }
@@ -963,7 +964,8 @@ if (!function_exists('mm_render_admin_multiselect')) {
         // Candidate Member Card
         html += '  <div class="mm-compare-user-card" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; display:flex; gap:14px; align-items:center;">';
         if (c.photo) {
-            html += '    <img src="' + escapeHtml(c.photo) + '" style="width:52px; height:52px; border-radius:6px; object-fit:cover;" alt="">';
+            var cPhotos = (c.photos && c.photos.length) ? c.photos : [c.photo];
+            html += '    <img src="' + escapeHtml(c.photo) + '" class="mm-lightbox-trigger" data-mm-photos="' + escapeHtml(cPhotos.join(',')) + '" style="width:52px; height:52px; border-radius:6px; object-fit:cover; cursor:zoom-in;" title="<?php echo esc_js(__('Click to view full photo', 'matchmaker')); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}" alt="">';
         } else {
             html += '    <div class="mm-avatar-thumb" style="width:52px; height:52px; font-size:18px; font-weight:bold;">' + escapeHtml((c.name || 'U').charAt(0).toUpperCase()) + '</div>';
         }

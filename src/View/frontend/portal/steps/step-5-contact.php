@@ -33,7 +33,11 @@ if (!defined('ABSPATH')) {
         <p class="state-main-desc"><?php esc_html_e('You both accepted the match. Now you can connect directly outside Arab Zawaj.', 'matchmaker'); ?></p>
 
         <div class="matched-profile-summary-box">
-            <img src="<?php echo esc_url($active_match['photo'] ?: get_avatar_url(0, ['size' => 150])); ?>" alt="<?php echo esc_attr($active_match['name']); ?>" class="mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}">
+            <?php
+            $candidate_photos = !empty($active_match['photos']) ? $active_match['photos'] : (!empty($active_match['photo']) ? [$active_match['photo']] : []);
+            $photos_attr = !empty($candidate_photos) ? esc_attr(implode(',', $candidate_photos)) : '';
+            ?>
+            <img src="<?php echo esc_url($active_match['photo'] ?: get_avatar_url(0, ['size' => 150])); ?>" alt="<?php echo esc_attr($active_match['name']); ?>" class="mm-lightbox-trigger" data-mm-lightbox="potential-match-photo" data-mm-photos="<?php echo $photos_attr; ?>" style="cursor:zoom-in;" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}">
             <div>
                 <h2 class="font-cormorant"><?php echo esc_html($active_match['name']); ?></h2>
                 <div class="meta-sub"><?php echo esc_html($active_match['age']); ?> • <?php echo esc_html($active_match['location']); ?></div>

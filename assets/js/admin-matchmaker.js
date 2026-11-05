@@ -618,27 +618,56 @@
             }
             var src = $el.attr('src') || $el.data('src') || $el.prop('src') || '';
             var gallery = $el.attr('data-mm-lightbox') || '';
+            var rawPhotos = $el.attr('data-mm-photos') || $el.closest('[data-mm-photos]').attr('data-mm-photos') || '';
 
-            var $container = $el.closest('.mm-photos-grid, .az-about-photo, .main-photo-frame, .candidate-hero-block, .matched-profile-summary-box, .mm-card');
-            var $siblings;
-
-            if (gallery) {
-                $siblings = $('[data-mm-lightbox="' + gallery + '"]');
-            } else if ($container.length) {
-                $siblings = $container.find('img');
-            } else {
-                $siblings = $el;
+            if (rawPhotos) {
+                var photoUrls = [];
+                try {
+                    if (rawPhotos.trim().charAt(0) === '[') {
+                        photoUrls = JSON.parse(rawPhotos);
+                    } else {
+                        photoUrls = rawPhotos.split(',');
+                    }
+                } catch (e) {
+                    photoUrls = rawPhotos.split(',');
+                }
+                var seenUrls = {};
+                for (var p = 0; p < photoUrls.length; p++) {
+                    var u = (photoUrls[p] || '').trim();
+                    if (u && !seenUrls[u]) {
+                        seenUrls[u] = true;
+                        lightboxGallery.push({
+                            src: u,
+                            alt: $el.attr('alt') || ('Photo ' + (lightboxGallery.length + 1))
+                        });
+                    }
+                }
             }
 
-            $siblings.each(function () {
-                var s = $(this).attr('src') || $(this).data('src') || $(this).prop('src') || '';
-                if (s) {
-                    lightboxGallery.push({
-                        src: s,
-                        alt: $(this).attr('alt') || 'Photo'
-                    });
+            if (lightboxGallery.length === 0) {
+                var $container = $el.closest('.mm-photos-grid, .az-about-photo, .main-photo-frame, .candidate-hero-block, .matched-profile-summary-box, .mm-card');
+                var $siblings;
+
+                if (gallery) {
+                    $siblings = $('[data-mm-lightbox="' + gallery + '"]');
+                } else if ($container.length) {
+                    $siblings = $container.find('img');
+                } else {
+                    $siblings = $el;
                 }
-            });
+
+                var seenUrls = {};
+                $siblings.each(function () {
+                    var s = $(this).attr('src') || $(this).data('src') || $(this).prop('src') || '';
+                    if (s && !seenUrls[s]) {
+                        seenUrls[s] = true;
+                        lightboxGallery.push({
+                            src: s,
+                            alt: $(this).attr('alt') || 'Photo'
+                        });
+                    }
+                });
+            }
 
             if (lightboxGallery.length === 0 && src) {
                 lightboxGallery.push({ src: src, alt: 'Photo' });

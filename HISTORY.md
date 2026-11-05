@@ -6,6 +6,49 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 152: Lightbox Multi-Photo Gallery for Matches (Admin & Frontend)
+- **Objective**:
+  1. **Resolve Lightbox Duplicate Photo Navigation Bug**:
+     - Fixed issue where clicking next arrow inside the lightbox modal caused the counter to increase (`1 / 3` -> `2 / 3` -> `3 / 3`) while the displayed image remained identical.
+     - Root cause: In `tab-matches.php`, Steps 1, 2, and 5 all exist simultaneously in the DOM, each holding an image tag with `data-mm-lightbox="potential-match-photo"`. Previously, `openLightbox()` queried all elements with `data-mm-lightbox="potential-match-photo"`, finding 3 duplicate elements with the same `photo1` URL and no distinct photos 2 or 3.
+  2. **Multi-Photo Resolution (`user_photo1`, `user_photo2`, `user_photo3`)**:
+     - Upgraded `MatchRepository::find_approved_matches_for_user()` and `MatchRepository::find_match_history_for_user()` to load all uploaded photos (`user_photo1`, `user_photo2`, `user_photo3`) for candidates from both user meta and pool records, assembling a unified `photos` array.
+     - Attached `data-mm-photos` containing comma-separated distinct URLs to candidate photo elements in:
+       - Frontend Step 1 (`step-1-discovery.php`)
+       - Frontend Step 2 (`step-2-profile.php`)
+       - Frontend Step 5 (`step-5-contact.php`)
+       - Frontend Member Profile (`tab-profile.php`)
+       - Frontend Match History (`tab-matches.php`)
+     - Attached `data-mm-photos` on Admin match and profile views:
+       - Admin Match Queue (`match-single.php` for User 1 and User 2)
+       - Admin Candidate Profile (`user-single.php` for candidate photos)
+       - Admin Manual Matchmaker comparison modal (`manual-match.php` and `AdminPortal::ajax_get_candidate_breakdown()`)
+  3. **Client-Side Lightbox Multi-Image Engine**:
+     - Updated `openLightbox(el)` in both `assets/js/member-portal.js` and `assets/js/admin-matchmaker.js`:
+       - Prioritizes `data-mm-photos` attribute (JSON array or comma-delimited strings), adding each distinct uploaded photo to `lightboxGallery`.
+       - Implemented URL deduplication (`seenUrls` hash map) so that identical image URLs across DOM containers never create duplicate gallery items.
+       - Correctly positions the initial `lightboxIndex` matching the clicked image URL.
+  4. **Plugin Version Bump**:
+     - Bumped `MM_VERSION` in `matchmaker.php` to `2.15.0` to bust browser script/style caches.
+  5. **Strict Invariant Adherence**:
+     - Zero changes made to any other features or frontend styling.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`: Loaded `user_photo1`, `user_photo2`, `user_photo3` and `photos` list in `find_approved_matches_for_user()` and `find_match_history_for_user()`.
+  - `src/Admin/AdminPortal.php`: Passed `photos` array in `ajax_get_candidate_breakdown()`.
+  - `src/View/frontend/portal/steps/step-1-discovery.php`: Added `data-mm-photos` to candidate thumbnail.
+  - `src/View/frontend/portal/steps/step-2-profile.php`: Added `data-mm-photos` to candidate photo frame.
+  - `src/View/frontend/portal/steps/step-5-contact.php`: Added `data-mm-photos` to candidate match box.
+  - `src/View/frontend/portal/tab-profile.php`: Added `data-mm-photos` to member profile photo.
+  - `src/View/frontend/portal/tab-matches.php`: Added `data-mm-photos` and lightbox trigger to past matches.
+  - `src/View/admin/matches/match-single.php`: Added `data-mm-photos` to User 1 and User 2 photos grids.
+  - `src/View/admin/pool/user-single.php`: Added `data-mm-photos` to candidate profile photo grid.
+  - `src/View/admin/pool/manual-match.php`: Added `data-mm-photos` and lightbox triggers to candidate preview cards.
+  - `assets/js/member-portal.js`: Upgraded `openLightbox` to parse `data-mm-photos` and deduplicate URLs.
+  - `assets/js/admin-matchmaker.js`: Upgraded `openLightbox` to parse `data-mm-photos` and deduplicate URLs.
+  - `matchmaker.php`: Bumped `MM_VERSION` to `2.15.0`.
+  - `tests/Unit/PortalAndEventsTest.php`: Added automated tests verifying multi-photo enrichment and `data-mm-photos` attribute rendering.
+- **Verification**: Ran automated test suite with **250/250 tests passing (0 failures, 0 errors)**.
+
 ### Task 151: Admin Manual Matchmaker Multi-Select Dropdowns & Religion Dropdown
 - **Objective**:
   1. **Religion Field Conversion**:

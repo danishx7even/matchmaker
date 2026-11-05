@@ -2024,8 +2024,19 @@ class AdminPortal
         $target_meta    = $repo->get_meta_block($target_id);
         $candidate_meta = $repo->get_meta_block($candidate_id);
 
-        $target_photo    = !empty($target_meta['user_photo1']) ? $target_meta['user_photo1'] : (!empty($target_pool['user_photo1']) ? $target_pool['user_photo1'] : '');
-        $candidate_photo = !empty($candidate_meta['user_photo1']) ? $candidate_meta['user_photo1'] : (!empty($candidate_pool['user_photo1']) ? $candidate_pool['user_photo1'] : '');
+        $target_photos = array_values(array_filter([
+            !empty($target_meta['user_photo1']) ? $target_meta['user_photo1'] : (!empty($target_pool['user_photo1']) ? $target_pool['user_photo1'] : ''),
+            !empty($target_meta['user_photo2']) ? $target_meta['user_photo2'] : (!empty($target_pool['user_photo2']) ? $target_pool['user_photo2'] : ''),
+            !empty($target_meta['user_photo3']) ? $target_meta['user_photo3'] : (!empty($target_pool['user_photo3']) ? $target_pool['user_photo3'] : ''),
+        ]));
+        $target_photo = $target_photos[0] ?? '';
+
+        $candidate_photos = array_values(array_filter([
+            !empty($candidate_meta['user_photo1']) ? $candidate_meta['user_photo1'] : (!empty($candidate_pool['user_photo1']) ? $candidate_pool['user_photo1'] : ''),
+            !empty($candidate_meta['user_photo2']) ? $candidate_meta['user_photo2'] : (!empty($candidate_pool['user_photo2']) ? $candidate_pool['user_photo2'] : ''),
+            !empty($candidate_meta['user_photo3']) ? $candidate_meta['user_photo3'] : (!empty($candidate_pool['user_photo3']) ? $candidate_pool['user_photo3'] : ''),
+        ]));
+        $candidate_photo = $candidate_photos[0] ?? '';
 
         // Check existing match
         global $wpdb;
@@ -2045,6 +2056,7 @@ class AdminPortal
                 'name'         => $target_user ? $target_user->display_name : ('User #' . $target_id),
                 'email'        => $target_user ? $target_user->user_email : '',
                 'photo'        => $target_photo,
+                'photos'       => $target_photos,
                 'user_type'    => $target_pool['user_type'] ?? 'free',
                 'tier_label'   => $repo->format_tier_label($target_pool['user_type'] ?? 'free'),
                 'gender'       => ucfirst((string) ($target_pool['gender'] ?? '')),
@@ -2055,6 +2067,7 @@ class AdminPortal
                 'name'         => $candidate_user ? $candidate_user->display_name : ('User #' . $candidate_id),
                 'email'        => $candidate_user ? $candidate_user->user_email : '',
                 'photo'        => $candidate_photo,
+                'photos'       => $candidate_photos,
                 'user_type'    => $candidate_pool['user_type'] ?? 'free',
                 'tier_label'   => $repo->format_tier_label($candidate_pool['user_type'] ?? 'free'),
                 'gender'       => ucfirst((string) ($candidate_pool['gender'] ?? '')),

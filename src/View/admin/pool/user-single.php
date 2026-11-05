@@ -27,6 +27,8 @@ $repo   = \Matchmaker\Repository\MatchRepository::instance();
 $photo1 = !empty($meta['user_photo1']) ? $meta['user_photo1'] : (!empty($pool['user_photo1']) ? $pool['user_photo1'] : (string) get_user_meta($user_id, 'user_photo1', true));
 $photo2 = !empty($meta['user_photo2']) ? $meta['user_photo2'] : (!empty($pool['user_photo2']) ? $pool['user_photo2'] : (string) get_user_meta($user_id, 'user_photo2', true));
 $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['user_photo3']) ? $pool['user_photo3'] : (string) get_user_meta($user_id, 'user_photo3', true));
+$user_photos = array_values(array_filter([$photo1, $photo2, $photo3]));
+$user_photos_attr = !empty($user_photos) ? esc_attr(implode(',', $user_photos)) : '';
 ?>
 
 <!-- Header Card -->
@@ -124,9 +126,9 @@ $photo3 = !empty($meta['user_photo3']) ? $meta['user_photo3'] : (!empty($pool['u
         
         <?php if (!empty($photo1) || !empty($photo2) || !empty($photo3)) : ?>
             <div class="mm-photos-grid">
-                <?php if (!empty($photo1)) : ?><img src="<?php echo esc_url($photo1); ?>" alt="Photo 1" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
-                <?php if (!empty($photo2)) : ?><img src="<?php echo esc_url($photo2); ?>" alt="Photo 2" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
-                <?php if (!empty($photo3)) : ?><img src="<?php echo esc_url($photo3); ?>" alt="Photo 3" data-mm-lightbox="profile-gallery" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                <?php if (!empty($photo1)) : ?><img src="<?php echo esc_url($photo1); ?>" alt="Photo 1" data-mm-lightbox="profile-gallery" data-mm-photos="<?php echo $user_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                <?php if (!empty($photo2)) : ?><img src="<?php echo esc_url($photo2); ?>" alt="Photo 2" data-mm-lightbox="profile-gallery" data-mm-photos="<?php echo $user_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
+                <?php if (!empty($photo3)) : ?><img src="<?php echo esc_url($photo3); ?>" alt="Photo 3" data-mm-lightbox="profile-gallery" data-mm-photos="<?php echo $user_photos_attr; ?>" class="mm-lightbox-trigger" title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"><?php endif; ?>
             </div>
             <hr style="margin:15px 0 10px; border:0; border-top:1px solid #eee;">
         <?php endif; ?>

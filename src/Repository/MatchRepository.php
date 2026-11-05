@@ -1475,12 +1475,20 @@ class MatchRepository
                 $days_remaining = max(0, (int) ceil(($deadline - current_time('timestamp')) / DAY_IN_SECONDS));
             }
 
+            $other_photos = $this->get_user_photos($other_id);
+            $other_p1 = !empty($other_photos['user_photo1']) ? $other_photos['user_photo1'] : (!empty($other_pool['user_photo1']) ? $other_pool['user_photo1'] : '');
+            $other_p2 = !empty($other_photos['user_photo2']) ? $other_photos['user_photo2'] : (!empty($other_pool['user_photo2']) ? $other_pool['user_photo2'] : '');
+            $other_p3 = !empty($other_photos['user_photo3']) ? $other_photos['user_photo3'] : (!empty($other_pool['user_photo3']) ? $other_pool['user_photo3'] : '');
+            $photos_list = array_values(array_filter([$other_p1, $other_p2, $other_p3]));
+
             $other_meta = [
                 'phone_number'         => (string) get_user_meta($other_id, 'phone_number', true),
                 'user_social_links'    => (string) get_user_meta($other_id, 'user_social_links', true),
                 'user_marital_status'  => (string) get_user_meta($other_id, 'user_marital_status', true),
                 'user_education'       => (string) get_user_meta($other_id, 'user_education', true),
-                'user_photo1'          => (string) get_user_meta($other_id, 'user_photo1', true),
+                'user_photo1'          => $other_p1,
+                'user_photo2'          => $other_p2,
+                'user_photo3'          => $other_p3,
                 'user_about_me'        => (string) get_user_meta($other_id, 'user_about_me', true),
                 'pref_additional_info' => (string) get_user_meta($other_id, 'pref_additional_info', true),
             ];
@@ -1497,7 +1505,11 @@ class MatchRepository
                 'social_links'         => $other_meta['user_social_links'],
                 'marital_status'       => $other_meta['user_marital_status'],
                 'education'            => $other_meta['user_education'],
-                'photo'                => $other_meta['user_photo1'],
+                'photo'                => $other_p1,
+                'user_photo1'          => $other_p1,
+                'user_photo2'          => $other_p2,
+                'user_photo3'          => $other_p3,
+                'photos'               => $photos_list,
                 'user_about_me'        => $other_meta['user_about_me'],
                 'pref_additional_info' => $other_meta['pref_additional_info'],
                 'age'                  => $this->calc_age($other_pool['birth_date'] ?? ''),
@@ -1645,13 +1657,21 @@ class MatchRepository
             $my_fmt    = $format_response($my_response, $status);
             $their_fmt = $format_response($their_response, $status);
 
-            $photo = (string) get_user_meta($other_id, 'user_photo1', true);
+            $hist_photos = $this->get_user_photos($other_id);
+            $p1 = !empty($hist_photos['user_photo1']) ? $hist_photos['user_photo1'] : (!empty($other_pool['user_photo1']) ? $other_pool['user_photo1'] : '');
+            $p2 = !empty($hist_photos['user_photo2']) ? $hist_photos['user_photo2'] : (!empty($other_pool['user_photo2']) ? $other_pool['user_photo2'] : '');
+            $p3 = !empty($hist_photos['user_photo3']) ? $hist_photos['user_photo3'] : (!empty($other_pool['user_photo3']) ? $other_pool['user_photo3'] : '');
+            $photos_list = array_values(array_filter([$p1, $p2, $p3]));
 
             $out[] = [
                 'match_id'             => (int) $row['id'],
                 'candidate_id'         => $other_id,
                 'name'                 => $other_user ? $other_user->display_name : ('User #' . $other_id),
-                'photo'                => $photo,
+                'photo'                => $p1,
+                'user_photo1'          => $p1,
+                'user_photo2'          => $p2,
+                'user_photo3'          => $p3,
+                'photos'               => $photos_list,
                 'location'             => $candidate_loc,
                 'age'                  => $this->calc_age($other_pool['birth_date'] ?? ''),
                 'date_formatted'       => $formatted_date,

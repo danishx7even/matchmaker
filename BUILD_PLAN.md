@@ -7,7 +7,3 @@
 ---
 
 *No active task in progress. Standing by for instructions.*
-
-
-
-
