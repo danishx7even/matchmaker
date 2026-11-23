@@ -80,7 +80,6 @@ class PMProSync {
         add_filter('pmpro_account_membership_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_filter('pmpro_account_action_links', [$this, 'filter_pmpro_member_action_links'], 10, 3);
         add_action('init', [$this, 'handle_special_link_sync_trigger'], 5);
-        add_action('init', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
         add_action('template_redirect', [$this, 'maybe_block_cancel_page_for_active_services'], 1);
         add_action('wp_enqueue_scripts', [$this, 'enqueue_cancellation_assets']);
         add_action('wp_footer', [$this, 'render_account_cancel_blockade_script']);
@@ -1085,12 +1084,31 @@ class PMProSync {
      */
     public function maybe_block_cancel_page_for_active_services(): void
     {
+        // 1. Never redirect during admin, ajax, cron, or CLI requests
+        if (is_admin() || wp_doing_ajax() || wp_doing_cron() || (defined('WP_CLI') && WP_CLI)) {
+            return;
+        }
+
         if (!is_user_logged_in()) {
+            return;
+        }
+
+        // 2. Loop breaker: If message query arg is present, stop immediately
+        if (isset($_GET['msg']) && $_GET['msg'] === 'cannot_cancel_base_with_services') {
             return;
         }
 
         $user_id = get_current_user_id();
         if ($user_id <= 0 || !$this->has_active_one_on_one_service($user_id)) {
+            return;
+        }
+
+        // 3. Loop breaker: If current page is already the account page, do not redirect to account page
+        $account_url  = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
+        $account_path = !empty($account_url) ? trim((string) wp_parse_url($account_url, PHP_URL_PATH), '/') : 'membership-account';
+        $current_uri  = $_SERVER['REQUEST_URI'] ?? '';
+
+        if (!empty($account_path) && str_contains($current_uri, $account_path) && !str_contains($current_uri, 'cancel')) {
             return;
         }
 
@@ -1101,7 +1119,7 @@ class PMProSync {
             $is_cancel_page = true;
         } elseif (is_page('cancel') || is_page('membership-cancel') || is_page('pmpro-cancel') || is_page('cancel-membership')) {
             $is_cancel_page = true;
-        } elseif (is_a($post, 'WP_Post') && (has_shortcode($post->post_content, 'pmpro_cancel') || str_contains($post->post_content, 'membership_cancel') || str_contains($post->post_content, 'membership-cancel'))) {
+        } elseif (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'pmpro_cancel')) {
             $is_cancel_page = true;
         } elseif (isset($_REQUEST['membership_cancel']) || isset($_REQUEST['pmpro_cancel']) || (isset($_REQUEST['action']) && $_REQUEST['action'] === 'cancel')) {
             $is_cancel_page = true;
@@ -1121,9 +1139,12 @@ class PMProSync {
         }
 
         if ($cancel_level === 0 || !$this->is_service_level($cancel_level)) {
-            $account_url  = \Matchmaker\Service\ProfileService::instance()->get_membership_account_url();
             $redirect_url = add_query_arg('msg', 'cannot_cancel_base_with_services', $account_url);
-            
+
+            if (!empty($current_uri) && str_contains($current_uri, 'cannot_cancel_base_with_services')) {
+                return;
+            }
+
             if (function_exists('pmpro_setMessage')) {
                 pmpro_setMessage(__('You cannot cancel your base membership while you have active add-on services. Please contact support.', 'matchmaker'), 'pmpro_error');
             }

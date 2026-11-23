@@ -6,6 +6,36 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 162: Fix Circular Redirect Loops & 500/503 Errors in PMProSync and AuthController
+- **Objective**:
+  1. **Fix Infinite Redirect Loop on Account Page in `PMProSync::maybe_block_cancel_page_for_active_services()`**:
+     - The function was hooked redundantly to both `init` (priority 1) and `template_redirect` (priority 1). On `init`, WordPress query and `$post` context are not yet established.
+     - The function used a broad `str_contains($post->post_content, 'membership-cancel')` check. Because standard PMPro membership account pages render links/shortcodes containing `membership-cancel`, this matched the account page itself (`/membership-account/`), continuously redirecting users with active services to `/membership-account/?msg=cannot_cancel_base_with_services` with zero loop breaker, crashing browsers with `ERR_TOO_MANY_REDIRECTS` and generating 500/503 server errors.
+     - Removed the premature `init` hook, retaining execution strictly on `template_redirect`.
+     - Added loop breaker guards:
+       - Instantly exit if `is_admin()`, `wp_doing_ajax()`, `wp_doing_cron()`, or `WP_CLI`.
+       - Instantly exit if `$_GET['msg'] === 'cannot_cancel_base_with_services'`.
+       - Instantly exit if the current URI is already the membership account page without explicit cancellation parameters.
+     - Tightened cancellation detection to `pmpro_is_cancel_page()`, explicit cancel page slugs, `has_shortcode($post->post_content, 'pmpro_cancel')`, or explicit cancel requests (`action=cancel`).
+  2. **Fix Circular `wp-login.php` Redirect Loop in `AuthController::custom_pmpro_redirect_wp_login()`**:
+     - When PMPro has no dedicated custom login page configured, `pmpro_url('login')` falls back to `wp_login_url()` (`wp-login.php`).
+     - `custom_pmpro_redirect_wp_login()` redirected `wp-login.php` to `pmpro_url('login')` without checking if it pointed back to `wp-login.php`, causing an infinite circular redirect on login requests.
+     - Added `!str_contains($pmpro_login, 'wp-login.php')` guard to both `custom_pmpro_redirect_wp_login()` and the `custom_pmpro_login_url()` filter.
+     - Wrapped all `exit;` invocations in `if (!defined('MM_UNIT_TESTS')) { exit; }`.
+  3. **Fix Logged-in Frontend Login Redirect Protection in `AuthController::custom_redirect_logged_in_user_from_login()`**:
+     - Added guards against executing on `is_front_page()` or `is_home()` to prevent homepage redirect cascades.
+     - Redirected logged-in visitors to `ProfileService::instance()->get_dashboard_url()` rather than blindly redirecting to `home_url('/')`.
+  4. **Automated Unit Testing & Verification**:
+     - Added unit tests in `tests/Unit/AuthAndRedirectsTest.php` verifying that `wp-login.php` never redirects to itself and that home/front pages never redirect logged-in users.
+     - Added unit tests in `tests/Unit/CancellationAndRejectionReasonTest.php` verifying that visiting the membership account page directly or with query msg flags never causes redirect loops while base cancellation blockade remains active.
+- **Implemented**:
+  - `src/Core/PMProSync.php`: Removed `init` hook, added loop breakers and URL path comparison to `maybe_block_cancel_page_for_active_services()`.
+  - `src/Frontend/AuthController.php`: Guarded against circular `wp-login.php` redirects and protected homepage redirects.
+  - `tests/bootstrap.php`: Added stubs for `is_front_page()`, `is_home()`, `is_page()`, and `wp_doing_cron()`.
+  - `tests/Unit/AuthAndRedirectsTest.php`: Added `test_custom_pmpro_redirect_wp_login_prevents_circular_loop()` and `test_custom_redirect_logged_in_user_from_login_skips_front_page()`.
+  - `tests/Unit/CancellationAndRejectionReasonTest.php`: Added `test_maybe_block_cancel_page_prevents_redirect_loop_and_protects_services()`.
+- **Verification**: Complete automated test suite passed with **271/271 tests passing (0 failures, 0 errors)**.
+
 ### Task 160: Show "Application Rejected" Status for Rejected Featured Profile Applications
 - **Objective**:
   1. **Handle Admin & Candidate Rejections in Apply Button**:

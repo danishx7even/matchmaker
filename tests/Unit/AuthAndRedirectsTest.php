@@ -496,6 +496,67 @@ class AuthAndRedirectsTest
 
         unset($_POST['submit-checkout'], $_POST['user_dob'], $_POST['mm_age_confirmed'], $_POST['privacy_policy_consent'], $_POST['mm_aup_consent']);
     }
+
+    public function test_custom_pmpro_redirect_wp_login_prevents_circular_loop(): void
+    {
+        global $pagenow;
+        $prev_pagenow = $pagenow;
+        $pagenow = 'wp-login.php';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $GLOBALS['__mm_current_user_id'] = 0; // Guest
+
+        // 1. pmpro_url('login') returns wp-login.php -> MUST NOT redirect
+        $GLOBALS['__mm_mock_pmpro_url_login'] = 'https://arabzawaj.local/wp-login.php';
+        $redirected = false;
+        try {
+            $this->auth->custom_pmpro_redirect_wp_login();
+        } catch (\Throwable $e) {
+            $redirected = true;
+        }
+        if ($redirected) {
+            throw new \RuntimeException("custom_pmpro_redirect_wp_login must not redirect when pmpro_url('login') points to wp-login.php");
+        }
+
+        // 2. custom_pmpro_login_url filter must also avoid returning wp-login.php with redirect_to loop
+        $custom_url = $this->auth->custom_pmpro_login_url('https://arabzawaj.local/wp-login.php', '', false);
+        if ($custom_url !== 'https://arabzawaj.local/wp-login.php') {
+            throw new \RuntimeException("custom_pmpro_login_url must return original login_url when pmpro_url points to wp-login.php");
+        }
+
+        $pagenow = $prev_pagenow;
+        unset($GLOBALS['__mm_mock_pmpro_url_login']);
+    }
+
+    public function test_custom_redirect_logged_in_user_from_login_skips_front_page(): void
+    {
+        $GLOBALS['__mm_current_user_id'] = 101; // Logged in
+        $GLOBALS['__mm_is_front_page'] = true;
+        $GLOBALS['__mm_last_redirect'] = null;
+        unset($GLOBALS['__mm_is_admin']);
+
+        $this->auth->custom_redirect_logged_in_user_from_login();
+
+        if ($GLOBALS['__mm_last_redirect'] !== null) {
+            throw new \RuntimeException("custom_redirect_logged_in_user_from_login must never redirect from front page or home.");
+        }
+
+        // When not on front page and visiting login page: must redirect to dashboard
+        unset($GLOBALS['__mm_is_front_page']);
+        $GLOBALS['__mm_is_page'] = 'login';
+        $GLOBALS['__mm_pmpro_is_login_page'] = true;
+        $this->auth->custom_redirect_logged_in_user_from_login();
+
+        if (empty($GLOBALS['__mm_last_redirect']) || !str_contains($GLOBALS['__mm_last_redirect'], 'dashboard')) {
+            throw new \RuntimeException("custom_redirect_logged_in_user_from_login must redirect logged-in user to dashboard, got: " . var_export($GLOBALS['__mm_last_redirect'], true));
+        }
+
+        unset(
+            $GLOBALS['__mm_is_page'],
+            $GLOBALS['__mm_pmpro_is_login_page'],
+            $GLOBALS['__mm_current_user_id'],
+            $GLOBALS['__mm_last_redirect']
+        );
+    }
 }
 
 

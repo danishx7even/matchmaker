@@ -20,7 +20,7 @@ final class CancellationAndRejectionReasonTest extends TestCase
         $GLOBALS['__mm_actions']   = [];
         $GLOBALS['__mm_filters']   = [];
         $GLOBALS['wpdb']           = new \Fakewpdb();
-        unset($_POST, $_GET, $_REQUEST);
+        unset($_POST, $_GET, $_REQUEST, $GLOBALS['__mm_is_admin']);
     }
 
     public function test_match_decline_with_reason_stores_rejection_reason_and_logs(): void
@@ -391,6 +391,59 @@ final class CancellationAndRejectionReasonTest extends TestCase
         $this->assertEquals('rejected', $last_update['data']['status']);
         $this->assertEquals('rejected', $last_update['data']['user_one_response']);
         $this->assertEquals('Lifestyle incompatibility and location distance.', $last_update['data']['user_one_rejection_reason']);
+    }
+
+    public function test_maybe_block_cancel_page_prevents_redirect_loop_and_protects_services(): void
+    {
+        $sync = PMProSync::instance();
+        $user_id = 999;
+        $GLOBALS['__mm_current_user_id'] = $user_id;
+
+        update_option('mm_services_group_id', 3);
+        update_option('pmprommpu_groups', [3 => [4]]);
+
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [
+            new \FakePMProLevel(1, 'Standard Monthly'),
+            new \FakePMProLevel(4, 'VIP Service Addon'),
+        ];
+
+        // 1. Visiting membership account page directly: MUST NOT REDIRECT
+        $_SERVER['REQUEST_URI'] = '/membership-account/';
+        $redirect_called = false;
+        $GLOBALS['__mm_last_redirect'] = null;
+        $sync->maybe_block_cancel_page_for_active_services();
+        $this->assertNull($GLOBALS['__mm_last_redirect'], 'Visiting account page must never trigger redirect loop.');
+
+        // 2. Loop breaker: query param msg=cannot_cancel_base_with_services present: MUST NOT REDIRECT
+        $_GET['msg'] = 'cannot_cancel_base_with_services';
+        $_REQUEST['membership_cancel'] = '1';
+        $sync->maybe_block_cancel_page_for_active_services();
+        $this->assertNull($GLOBALS['__mm_last_redirect'], 'When msg query param is set, must terminate to break loop.');
+        unset($_GET['msg'], $_REQUEST['membership_cancel']);
+
+        // 3. User cancels a service level (level 4): MUST NOT REDIRECT (allowed)
+        $_SERVER['REQUEST_URI'] = '/membership-account/membership-cancel/';
+        $GLOBALS['__mm_is_page'] = 'membership-cancel';
+        $_REQUEST['action'] = 'cancel';
+        $_REQUEST['level'] = 4;
+        $sync->maybe_block_cancel_page_for_active_services();
+        $this->assertNull($GLOBALS['__mm_last_redirect'], 'Cancelling add-on service must not be blocked.');
+
+        // 4. User attempts to cancel base tier (level 1): MUST REDIRECT TO ACCOUNT PAGE
+        $_REQUEST['level'] = 1;
+        $sync->maybe_block_cancel_page_for_active_services();
+        $this->assertNotNull($GLOBALS['__mm_last_redirect']);
+        $this->assertStringContainsString('cannot_cancel_base_with_services', $GLOBALS['__mm_last_redirect']);
+
+        unset(
+            $GLOBALS['__mm_current_user_id'],
+            $GLOBALS['__mm_user_pmpro_levels'][$user_id],
+            $GLOBALS['__mm_is_page'],
+            $GLOBALS['__mm_last_redirect'],
+            $_SERVER['REQUEST_URI'],
+            $_REQUEST['action'],
+            $_REQUEST['level']
+        );
     }
 }
 

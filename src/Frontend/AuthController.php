@@ -81,7 +81,7 @@ class AuthController
     {
         if (function_exists('pmpro_url')) {
             $pmpro_login = pmpro_url('login');
-            if (!empty($pmpro_login)) {
+            if (!empty($pmpro_login) && !str_contains($pmpro_login, 'wp-login.php')) {
                 if (!empty($redirect)) {
                     $pmpro_login = add_query_arg('redirect_to', $redirect, $pmpro_login);
                 }
@@ -93,14 +93,7 @@ class AuthController
 
     /**
      * Redirect GET requests to wp-login.php to the PMPro login page.
-     *
-     * Allows pass-through for logout, password reset, and registration actions.
-     *
-     * @return void
-     */
-    /**
-     * Redirect GET requests to wp-login.php to the PMPro login page.
-     * Redirects already logged-in users visiting wp-login.php to the home page.
+     * Redirects already logged-in users visiting wp-login.php to the dashboard or home page.
      *
      * Allows pass-through for logout, password reset, and registration actions.
      *
@@ -122,8 +115,11 @@ class AuthController
         }
 
         if (is_user_logged_in()) {
-            wp_safe_redirect(home_url('/'));
-            exit;
+            $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
+            wp_safe_redirect(!empty($dashboard_url) ? $dashboard_url : home_url('/'));
+            if (!defined('MM_UNIT_TESTS')) {
+                exit;
+            }
         }
 
         if ('GET' !== $_SERVER['REQUEST_METHOD']) {
@@ -137,7 +133,7 @@ class AuthController
 
         if (function_exists('pmpro_url')) {
             $pmpro_login = pmpro_url('login');
-            if (!empty($pmpro_login)) {
+            if (!empty($pmpro_login) && !str_contains($pmpro_login, 'wp-login.php')) {
                 $redirect_to = !empty($_REQUEST['redirect_to'])
                     ? esc_url_raw(wp_unslash($_REQUEST['redirect_to']))
                     : '';
@@ -147,19 +143,29 @@ class AuthController
                 }
 
                 wp_safe_redirect($pmpro_login);
-                exit;
+                if (!defined('MM_UNIT_TESTS')) {
+                    exit;
+                }
             }
         }
     }
 
     /**
-     * Redirect already logged-in users visiting frontend login pages to the home page.
+     * Redirect already logged-in users visiting frontend login pages to the member dashboard.
      *
      * @return void
      */
     public function custom_redirect_logged_in_user_from_login(): void
     {
+        if (is_admin() || wp_doing_ajax() || wp_doing_cron() || (defined('WP_CLI') && WP_CLI)) {
+            return;
+        }
+
         if (!is_user_logged_in()) {
+            return;
+        }
+
+        if (is_front_page() || is_home()) {
             return;
         }
 
@@ -171,8 +177,11 @@ class AuthController
         }
 
         if ($is_login_page) {
-            wp_safe_redirect(home_url('/'));
-            exit;
+            $dashboard_url = \Matchmaker\Service\ProfileService::instance()->get_dashboard_url();
+            wp_safe_redirect(!empty($dashboard_url) ? $dashboard_url : home_url('/'));
+            if (!defined('MM_UNIT_TESTS')) {
+                exit;
+            }
         }
     }
 

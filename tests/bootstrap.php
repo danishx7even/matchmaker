@@ -115,6 +115,31 @@ function is_admin(): bool {
     return !empty($GLOBALS['__mm_is_admin']);
 }
 
+function is_front_page(): bool {
+    return !empty($GLOBALS['__mm_is_front_page']);
+}
+
+function is_home(): bool {
+    return !empty($GLOBALS['__mm_is_home']);
+}
+
+function wp_doing_cron(): bool {
+    return !empty($GLOBALS['__mm_doing_cron']);
+}
+
+function is_page($page = ''): bool {
+    if (isset($GLOBALS['__mm_is_page'])) {
+        if (is_bool($GLOBALS['__mm_is_page'])) {
+            return $GLOBALS['__mm_is_page'];
+        }
+        if (is_array($GLOBALS['__mm_is_page'])) {
+            return in_array($page, $GLOBALS['__mm_is_page'], true);
+        }
+        return $GLOBALS['__mm_is_page'] === $page;
+    }
+    return false;
+}
+
 // -----------------------------------------------------------------------------
 // User & Auth Stubs
 // -----------------------------------------------------------------------------
@@ -1216,6 +1241,9 @@ function pmpro_cancelMembershipLevel(int $level_id, int $user_id): bool {
 }
 
 function pmpro_url($page = '') {
+    if (isset($GLOBALS['__mm_mock_pmpro_url_' . $page])) {
+        return $GLOBALS['__mm_mock_pmpro_url_' . $page];
+    }
     return "https://example.com/{$page}/";
 }
 
