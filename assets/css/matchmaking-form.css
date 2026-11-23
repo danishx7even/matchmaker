@@ -106,11 +106,45 @@
 #matchmaking_form .custom-select-checkbox-option input{margin:0;pointer-events:auto;}
 #matchmaking_form .custom-select-wrapper.has-error .custom-select-display{border-bottom: 2px solid #e11d48 !important; color: #991B1B;}
 
-/* Top Notification & Error Message Box */
-#matchmaking_form .mmf-form-message{margin:0 0 24px 0;font-size:15px;padding:14px 20px;border-radius:10px;display:none;font-weight:500;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,0.04);}
-#matchmaking_form .mmf-form-message.success{display:block;background:#F0FDF4;color:#166534;border:1.5px solid #86EFAC;}
-#matchmaking_form .mmf-alert-text{flex:1 1 auto;}
+/* Field Error & Upload Error States */
+#matchmaking_form .upload-section .elementor-field-group.has-error,
+#matchmaking_form .elementor-field-type-upload.has-error {
+    border-color: #e11d48 !important;
+    background: #fff5f5 !important;
+}
+#matchmaking_form .elementor-field-group.has-error input.elementor-field-textual:not([type="file"]),
+#matchmaking_form .elementor-field-group.has-error select.elementor-field-textual,
+#matchmaking_form .elementor-field-group.has-error textarea.elementor-field-textual {
+    border-color: #e11d48 !important;
+    background: #fff1f2 !important;
+}
+#matchmaking_form .mmf-upload-error,
+#matchmaking_form .upload-section .mmf-upload-error,
+#matchmaking_form .elementor-field-type-upload .mmf-upload-error,
+#matchmaking_form .upload-section .mmf-field-error,
+#matchmaking_form .elementor-field-type-upload .mmf-field-error {
+    display: none !important;
+}
+#matchmaking_form .mmf-field-error {
+    color: #e11d48;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 6px;
+    display: block;
+    line-height: 1.4;
+}
+
+/* Top Notification & Error Message Box directly beneath Step Indicators */
+#matchmaking_form .mmf-form-message{margin:8px auto 26px auto;font-size:15px;padding:14px 20px;border-radius:12px;display:none;font-weight:500;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,0.05);max-width:100%;box-sizing:border-box;}
+#matchmaking_form .mmf-form-message.success{display:block !important;background:#F0FDF4 !important;color:#166534 !important;border:1.5px solid #86EFAC !important;}
+#matchmaking_form .mmf-form-message.error{display:block !important;background:#FEF2F2 !important;color:#991B1B !important;border:1.5px solid #FCA5A5 !important;animation:mmf-fade-slide-in 0.25s ease-out;}
+#matchmaking_form .mmf-alert-content{display:flex;align-items:center;gap:12px;}
+#matchmaking_form .mmf-alert-icon{font-size:18px;line-height:1;flex-shrink:0;}
+#matchmaking_form .mmf-alert-text{flex:1 1 auto;font-weight:600;}
+
+@keyframes mmf-fade-slide-in{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
 
 /* Readonly Inputs (e.g. Email) */
 #matchmaking_form input.is-readonly{background-color:#f8fafc !important;color:#64748b !important;cursor:not-allowed !important;border-bottom:1px dashed #cbd5e1 !important;user-select:none;}
+
 

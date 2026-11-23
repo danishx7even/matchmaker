@@ -24,6 +24,7 @@ require_once __DIR__ . '/Unit/EventClickTrackingTest.php';
 require_once __DIR__ . '/Unit/EventRegistrationShortcodeTest.php';
 require_once __DIR__ . '/Unit/FileLoggerTest.php';
 require_once __DIR__ . '/Unit/CancellationAndRejectionReasonTest.php';
+require_once __DIR__ . '/Unit/FeaturedProfileTest.php';
 require_once __DIR__ . '/Integration/EndToEndFlowTest.php';
 require_once __DIR__ . '/Integration/FullMemberLifecycleFlowTest.php';
 require_once __DIR__ . '/Integration/ComprehensiveRegressionAndEdgeCaseTest.php';
@@ -51,6 +52,7 @@ $test_classes = [
     \Matchmaker\Tests\Unit\EventClickTrackingTest::class,
     \Matchmaker\Tests\Unit\EventRegistrationShortcodeTest::class,
     \Matchmaker\Tests\Unit\CancellationAndRejectionReasonTest::class,
+    \Matchmaker\Tests\Unit\FeaturedProfileTest::class,
     \Matchmaker\Tests\Integration\EndToEndFlowTest::class,
     \Matchmaker\Tests\Integration\FullMemberLifecycleFlowTest::class,
     \Matchmaker\Tests\Integration\ComprehensiveRegressionAndEdgeCaseTest::class,

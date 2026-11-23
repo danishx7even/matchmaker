@@ -2533,6 +2533,103 @@ body.mm-lightbox-open .entry-content {
     }
 }
 
+/* =============================================================
+   Pending Match Banner & History Open CTAs
+   ============================================================= */
+.mm-pending-match-banner {
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    border-left: 4px solid #CC723F;
+    padding: 14px 20px;
+    border-radius: 10px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(204, 114, 63, 0.08);
+}
+
+.mm-pending-banner-text {
+    font-size: 14.5px;
+    color: #92400e;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.4;
+}
+
+.mm-pending-banner-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.mm-history-open-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    margin-top: 6px;
+    font-family: inherit;
+}
+
+.mm-history-open-btn.mm-btn-review {
+    background: #CC723F;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(204, 114, 63, 0.25);
+}
+
+.mm-history-open-btn.mm-btn-review:hover {
+    background: #b55d2c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(204, 114, 63, 0.35);
+}
+
+.mm-history-open-btn.mm-btn-view-status {
+    background: #f1f5f9;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1;
+}
+
+.mm-history-open-btn.mm-btn-view-status:hover {
+    background: #e2e8f0;
+    color: #1e293b !important;
+}
+
+.mm-history-open-btn.mm-btn-view-mutual {
+    background: #ecfdf5;
+    color: #047857 !important;
+    border: 1px solid #a7f3d0;
+}
+
+.mm-history-open-btn.mm-btn-view-mutual:hover {
+    background: #d1fae5;
+    color: #065f46 !important;
+}
+
+@media (max-width: 640px) {
+    .mm-pending-match-banner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .mm-pending-match-banner .mm-history-open-btn {
+        width: 100%;
+        text-align: center;
+        padding: 10px 16px;
+    }
+}
+
+
 
 
 

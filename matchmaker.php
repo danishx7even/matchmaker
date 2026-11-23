@@ -130,6 +130,9 @@ add_action('plugins_loaded', static function (): void {
     // 6b. Event RSVP Button & Registration Page Form shortcodes [event_rsvp_button] / [event_reg_form]
     \Matchmaker\Frontend\EventRegistrationController::instance();
 
+    // 6c. Featured Profiles controller & shortcodes [featured_profile_details] / [featured_profile_apply_button]
+    \Matchmaker\Frontend\FeaturedProfileController::instance();
+
     // 7. Notification service (Heartbeat API polling + email dispatch)
     \Matchmaker\Service\NotificationService::instance();
 

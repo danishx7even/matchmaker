@@ -715,7 +715,26 @@
     ------------------------------------------------------- */
     var ALLOWED_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
     var ALLOWED_IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'image/pjpeg'];
-    var MAX_IMAGE_SIZE_BYTES = 200 * 1024; // 200KB limit (204,800 bytes)
+    var MAX_IMAGE_SIZE_BYTES = 500 * 1024; // 500KB limit (512,000 bytes)
+
+    function setPhotoError(box) {
+        if (!box) return;
+        box.classList.add('has-error');
+        // Errors must be shown at the top beneath the steps, not inside the photo slot
+        var errEl = box.querySelector('.mmf-upload-error, .mmf-field-error');
+        if (errEl) {
+            errEl.remove();
+        }
+    }
+
+    function clearPhotoError(box) {
+        if (!box) return;
+        box.classList.remove('has-error');
+        var errEl = box.querySelector('.mmf-upload-error, .mmf-field-error');
+        if (errEl) {
+            errEl.remove();
+        }
+    }
 
     function isValidImageFile(file) {
         if (!file || !file.name) return false;
@@ -737,7 +756,10 @@
             var file = input.files && input.files[0];
             if (!box) return;
 
-            if (!file) return;
+            if (!file) {
+                clearPhotoError(box);
+                return;
+            }
 
             var label = box.querySelector('.elementor-field-label');
             var photoName = label ? label.textContent.replace('*', '').trim() : 'Photo';
@@ -748,7 +770,9 @@
                 if (oldImg) oldImg.remove();
                 box.classList.remove('has-preview');
 
-                showMessage('Invalid file format for ' + photoName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'error');
+                var formatMsg = 'Invalid file format for ' + photoName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.';
+                setPhotoError(box);
+                showMessage(formatMsg, 'error');
                 return;
             }
 
@@ -758,9 +782,14 @@
                 if (oldImgSize) oldImgSize.remove();
                 box.classList.remove('has-preview');
 
-                showMessage('File size exceeds the 200KB limit for ' + photoName + '. Please upload an image under 200KB.', 'error');
+                var sizeMsg = 'File size exceeds the 500KB limit for ' + photoName + '. Please upload an image under 500KB.';
+                setPhotoError(box);
+                showMessage(sizeMsg, 'error');
                 return;
             }
+
+            clearPhotoError(box);
+            showMessage('', '');
 
             var old = box.querySelector('.upload-preview-img');
             if (old) old.remove();
@@ -774,6 +803,26 @@
             };
             reader.readAsDataURL(file);
         });
+    });
+
+    /* Clear has-error state dynamically when user inputs or changes a value */
+    form.addEventListener('input', function (e) {
+        if (e.target.type === 'file') return;
+        var group = e.target.closest('.elementor-field-group');
+        if (group && group.classList.contains('has-error')) {
+            group.classList.remove('has-error');
+            var fieldErr = group.querySelector('.mmf-field-error');
+            if (fieldErr) fieldErr.remove();
+        }
+    });
+    form.addEventListener('change', function (e) {
+        if (e.target.type === 'file') return;
+        var group = e.target.closest('.elementor-field-group');
+        if (group && group.classList.contains('has-error')) {
+            group.classList.remove('has-error');
+            var fieldErr = group.querySelector('.mmf-field-error');
+            if (fieldErr) fieldErr.remove();
+        }
     });
 
     /* -------------------------------------------------------
@@ -793,6 +842,7 @@
         });
         if (heading1) heading1.style.display = (stepNumber == 1) ? '' : 'none';
         if (heading2) heading2.style.display = (stepNumber == 2) ? '' : 'none';
+        showMessage('', '');
         form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -811,10 +861,13 @@
             if (input.type === 'file' || input.classList.contains('custom-select-search-input') || input.hasAttribute('data-ignore-validation') || !input.name || input.disabled) {
                 continue;
             }
+            var fieldGroup = input.closest('.elementor-field-group');
             if (input.tagName && input.tagName.toLowerCase() === 'select' && input.multiple) {
                 if ((!input.selectedOptions || input.selectedOptions.length === 0) && !input.value) {
-                    input.focus();
-                    var label = input.closest('.elementor-field-group') ? input.closest('.elementor-field-group').querySelector('.elementor-field-label') : null;
+                    if (fieldGroup) {
+                        fieldGroup.classList.add('has-error');
+                    }
+                    var label = fieldGroup ? fieldGroup.querySelector('.elementor-field-label') : null;
                     var fieldName = label ? label.textContent.replace('*', '').trim() : 'field';
                     showMessage('Please provide your ' + fieldName + ' before proceeding.', 'error');
                     return false;
@@ -823,8 +876,10 @@
             }
             var val = input.value ? input.value.trim() : '';
             if (!val || val === '' || /^select\b/i.test(val)) {
-                input.focus();
-                var label = input.closest('.elementor-field-group') ? input.closest('.elementor-field-group').querySelector('.elementor-field-label') : null;
+                if (fieldGroup) {
+                    fieldGroup.classList.add('has-error');
+                }
+                var label = fieldGroup ? fieldGroup.querySelector('.elementor-field-label') : null;
                 var fieldName = label ? label.textContent.replace('*', '').trim() : 'field';
                 showMessage('Please provide your ' + fieldName + ' before proceeding.', 'error');
                 return false;
@@ -836,7 +891,11 @@
         for (var r = 0; r < radioGroups.length; r++) {
             var checked = radioGroups[r].querySelector('input[type="radio"]:checked');
             if (!checked) {
-                var rLabel = radioGroups[r].closest('.elementor-field-group').querySelector('.elementor-field-label');
+                var rGroup = radioGroups[r].closest('.elementor-field-group');
+                if (rGroup) {
+                    rGroup.classList.add('has-error');
+                }
+                var rLabel = rGroup ? rGroup.querySelector('.elementor-field-label') : null;
                 var rName = rLabel ? rLabel.textContent.replace('*', '').trim() : 'required option';
                 showMessage('Please select your ' + rName + '.', 'error');
                 return false;
@@ -850,31 +909,40 @@
             var hasFile = pInput && pInput.files && pInput.files.length > 0;
             var hasPreview = pBox && pBox.classList.contains('has-preview');
             if (!hasFile && !hasPreview) {
-                showMessage('Photo 1 is mandatory. Please provide your main profile photo.', 'error');
+                var pMsg = 'Photo 1 is mandatory. Please provide your main profile photo.';
+                if (pBox) {
+                    setPhotoError(pBox);
+                }
+                showMessage(pMsg, 'error');
                 return false;
             }
 
             var fileInputs = form.querySelectorAll('.upload-section input[type="file"], .elementor-field-type-upload input[type="file"]');
             for (var fIdx = 0; fIdx < fileInputs.length; fIdx++) {
                 var fIn = fileInputs[fIdx];
+                var fBox = fIn.closest('.elementor-field-group');
                 if (fIn.files && fIn.files.length > 0) {
                     var fFile = fIn.files[0];
-                    var fBox = fIn.closest('.elementor-field-group');
                     var fLabel = fBox ? fBox.querySelector('.elementor-field-label') : null;
                     var fName = fLabel ? fLabel.textContent.replace('*', '').trim() : 'Photo';
 
                     if (!isValidImageFile(fFile)) {
-                        showMessage('Invalid file format for ' + fName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.', 'error');
+                        var errFormat = 'Invalid file format for ' + fName + '. Only PNG, JPG, JPEG, and WEBP formats are allowed.';
+                        if (fBox) setPhotoError(fBox);
+                        showMessage(errFormat, 'error');
                         return false;
                     }
 
                     if (fFile.size > MAX_IMAGE_SIZE_BYTES) {
-                        showMessage('File size exceeds the 200KB limit for ' + fName + '. Please upload an image under 200KB.', 'error');
+                        var errSize = 'File size exceeds the 500KB limit for ' + fName + '. Please upload an image under 500KB.';
+                        if (fBox) setPhotoError(fBox);
+                        showMessage(errSize, 'error');
                         return false;
                     }
                 }
             }
         }
+
 
         // Step 2: Validate Age & Height Range min < max
         if (stepNumber == 2) {
@@ -978,7 +1046,7 @@
     /* -------------------------------------------------------
        Real-Time Error Dismissal on Field Input / Selection
     ------------------------------------------------------- */
-    form.querySelectorAll('input, select, textarea').forEach(function (el) {
+    form.querySelectorAll('input:not([type="file"]), select, textarea').forEach(function (el) {
         function handleFieldInput() {
             var val = el.value ? el.value.trim() : '';
             var isPlaceholder = (!val || /^select\b/i.test(val));
@@ -991,7 +1059,7 @@
                     wrap.classList.remove('has-error');
                 }
 
-                // If this field was causing the error message, clear it immediately
+                // If this text/select field was causing the error message, clear it immediately
                 if (msgBox && msgBox.style.display !== 'none') {
                     var label = group ? group.querySelector('.elementor-field-label') : null;
                     var fieldName = label ? label.textContent.replace('*', '').trim() : '';
@@ -1006,20 +1074,18 @@
         el.addEventListener('change', handleFieldInput);
     });
 
-    // Clear photo error on upload
-    form.querySelectorAll('input[type="file"]').forEach(function (input) {
-        input.addEventListener('change', function () {
-            if (msgBox && msgBox.style.display !== 'none' && msgBox.textContent.indexOf('Photo') !== -1) {
-                var pInput = form.querySelector('[name="form_fields[user_photo1]"]');
-                var pBox = pInput ? pInput.closest('.elementor-field-group') : null;
-                var hasFile = pInput && pInput.files && pInput.files.length > 0;
-                var hasPreview = pBox && pBox.classList.contains('has-preview');
-                if (hasFile || hasPreview) {
+    // Dismiss "Photo 1 is mandatory" message only when user selects a valid file for Photo 1
+    var photo1Input = form.querySelector('[name="form_fields[user_photo1]"]');
+    if (photo1Input) {
+        photo1Input.addEventListener('change', function () {
+            if (msgBox && msgBox.style.display !== 'none' && msgBox.textContent.indexOf('Photo 1 is mandatory') !== -1) {
+                var f = photo1Input.files && photo1Input.files[0];
+                if (f && isValidImageFile(f) && f.size <= MAX_IMAGE_SIZE_BYTES) {
                     showMessage('', '');
                 }
             }
         });
-    });
+    }
 
     if (nextBtn) {
         nextBtn.addEventListener('click', function () {
@@ -1042,11 +1108,14 @@
     ------------------------------------------------------- */
     var msgBox = form.querySelector('.mmf-form-message');
     function showMessage(text, type) {
+        if (!msgBox) {
+            msgBox = form.querySelector('.mmf-form-message');
+        }
         if (!msgBox) return;
         if (!text) {
-            msgBox.style.display = 'none';
-            msgBox.innerHTML     = '';
-            msgBox.className     = 'mmf-form-message';
+            msgBox.style.setProperty('display', 'none', 'important');
+            msgBox.innerHTML = '';
+            msgBox.className = 'mmf-form-message';
             return;
         }
         var icon = (type === 'error') ? '⚠️' : '✅';
@@ -1055,8 +1124,11 @@
             '<span class="mmf-alert-text">' + text + '</span>' +
             '</div>';
         msgBox.className = 'mmf-form-message ' + type;
-        msgBox.style.display = 'block';
-        msgBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        msgBox.style.setProperty('display', 'block', 'important');
+
+        var indicators = form.querySelector('.e-form__indicators');
+        var targetScroll = indicators || msgBox;
+        targetScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     /* -------------------------------------------------------

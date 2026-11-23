@@ -651,6 +651,19 @@ class AdminPortal
                 update_option('mm_services_group_id', max(1, (int) $_POST['mm_services_group_id']));
             }
 
+            // Featured Profile PMPro Service Level ID & Anonymous Customizations
+            if (isset($_POST['mm_featured_profile_level_id'])) {
+                update_option('mm_featured_profile_level_id', max(0, (int) $_POST['mm_featured_profile_level_id']));
+            }
+            if (isset($_POST['mm_featured_profile_anonymous_title'])) {
+                $raw_title = sanitize_text_field(wp_unslash($_POST['mm_featured_profile_anonymous_title']));
+                update_option('mm_featured_profile_anonymous_title', $raw_title !== '' ? $raw_title : 'Candidate #{id}');
+            }
+            if (isset($_POST['mm_featured_profile_default_image'])) {
+                update_option('mm_featured_profile_default_image', esc_url_raw(trim(wp_unslash($_POST['mm_featured_profile_default_image']))));
+            }
+
+
             // Quotas & Expiry Rules
             $max_matches = max(1, (int) ($_POST['mm_max_cycle_matches'] ?? 10));
             update_option('mm_max_cycle_matches', $max_matches);
@@ -730,6 +743,17 @@ class AdminPortal
             }
             if (isset($_POST['mm_email_admin_service_purchase_template'])) {
                 update_option('mm_email_admin_service_purchase_template', wp_kses_post(wp_unslash($_POST['mm_email_admin_service_purchase_template'])));
+            }
+
+            // Admin Featured Match Application Email Configuration
+            if (isset($_POST['mm_email_admin_featured_match_recipient'])) {
+                update_option('mm_email_admin_featured_match_recipient', sanitize_text_field(wp_unslash($_POST['mm_email_admin_featured_match_recipient'])));
+            }
+            if (isset($_POST['mm_email_admin_featured_match_subject'])) {
+                update_option('mm_email_admin_featured_match_subject', sanitize_text_field(wp_unslash($_POST['mm_email_admin_featured_match_subject'])));
+            }
+            if (isset($_POST['mm_email_admin_featured_match_template'])) {
+                update_option('mm_email_admin_featured_match_template', wp_kses_post(wp_unslash($_POST['mm_email_admin_featured_match_template'])));
             }
 
             \Matchmaker\Service\FileLoggerService::info(
@@ -1226,7 +1250,10 @@ class AdminPortal
         $current_mapping    = $pmpro_sync->get_tier_mapping();
         $pmpro_levels       = function_exists('pmpro_getAllLevels') ? pmpro_getAllLevels(true, true) : [];
         $pmpro_level_tags   = $pmpro_sync->get_level_tags();
-        $services_group_id  = $pmpro_sync->get_services_group_id();
+        $services_group_id              = $pmpro_sync->get_services_group_id();
+        $featured_profile_level_id      = $pmpro_sync->get_featured_profile_level_id();
+        $featured_profile_default_image = (string) get_option('mm_featured_profile_default_image', '');
+
 
         // 2. Quotas & Expiry
         $max_matches     = $repo->get_max_cycle_matches();
@@ -1301,6 +1328,20 @@ class AdminPortal
             . "Date: {purchase_date}</p>\n"
             . "<p><a href=\"{admin_profile_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;\">View Member in Candidate Pool &rarr;</a></p>";
         $admin_service_template          = (string) get_option('mm_email_admin_service_purchase_template', $default_admin_service_template);
+
+        // 6C. Admin Featured Match Application Email Settings
+        $admin_featured_recipient        = (string) get_option('mm_email_admin_featured_match_recipient', '');
+        $default_admin_featured_subject  = __('[Matchmaker] New Featured Profile Match Application (Match #{match_id})', 'matchmaker');
+        $admin_featured_subject          = (string) get_option('mm_email_admin_featured_match_subject', $default_admin_featured_subject);
+        $default_admin_featured_template = "<h2>" . esc_html__('New Featured Profile Match Application', 'matchmaker') . "</h2>\n"
+            . "<p>" . esc_html__('A member has submitted an application to match with a Featured Profile on {site_name}.', 'matchmaker') . "</p>\n"
+            . "<p><strong>" . esc_html__('Application Details:', 'matchmaker') . "</strong><br>\n"
+            . "<strong>" . esc_html__('Applicant:', 'matchmaker') . "</strong> {applicant_name} (#{applicant_id}) &lt;{applicant_email}&gt;<br>\n"
+            . "<strong>" . esc_html__('Featured Candidate:', 'matchmaker') . "</strong> {candidate_name} (#{candidate_id})<br>\n"
+            . "<strong>" . esc_html__('Match ID:', 'matchmaker') . "</strong> #{match_id}<br>\n"
+            . "<strong>" . esc_html__('Compatibility Score:', 'matchmaker') . "</strong> {score}/6</p>\n"
+            . "<p><a href=\"{admin_match_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:700;\">" . esc_html__('Review Match in Admin Queue &rarr;', 'matchmaker') . "</a></p>";
+        $admin_featured_template         = (string) get_option('mm_email_admin_featured_match_template', $default_admin_featured_template);
 
         require dirname(__DIR__) . '/View/admin/settings/settings.php';
     }

@@ -129,6 +129,13 @@ Every agent must follow this exact 4-step protocol whenever executing work:
    - Matching calculations run in background workers via **Action Scheduler** (`as_schedule_single_action()`), never blocking HTTP responses.
 7. **Strict Typing & PHP 8.1+ Standards**:
    - Every PHP file must begin with `declare(strict_types=1);` and use explicit parameter and return type hints.
+8. **Mandatory Ponytail Skill Paradigm (Lazy Senior Dev Mode)**:
+   - Every agent **MUST always apply the [`ponytail`](file:///home/dani/Local%20Sites/arabzawaj/app/public/wp-content/plugins/matchkmaker/.agents/skills/ponytail/SKILL.md) skill** across all coding tasks (writing, fixing, refactoring, reviewing, choosing dependencies).
+   - **Smallest Complete Working Change**: The best code is the code never written. Solve the whole problem with the least new code.
+   - **No Bloat or Speculative Code**: Do not create unnecessary abstractions, wrapper classes, redundant options, or boilerplate nobody asked for. Deletion beats addition. Keep existing platform structures and conventions.
+   - **Reuse Over Invention**: Always use existing services (`MatchRepository`, `ProfileService`, `PMProSync`, etc.) and helper utilities already established in the codebase.
+   - **Check Blast Radius First**: Before touching code, grep all callers and understand the full scope of impact. Fix the root cause once at the source.
+   - **Concise, High-Signal Replies**: End responses with 1-2 lines detailing what was skipped/omitted and any key risks the user must know.
 
 ---
 

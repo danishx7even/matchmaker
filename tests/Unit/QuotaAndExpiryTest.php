@@ -98,7 +98,7 @@ final class QuotaAndExpiryTest extends TestCase
             'updated_at' => $today,
         ];
 
-        $GLOBALS['wpdb']->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = 201 OR user_two_id = 201)\n                   AND status IN ('approved', 'matched')\n                 ORDER BY created_at DESC"] = [$match_row];
+        $GLOBALS['wpdb']->mock_results["WHERE (user_one_id = 201 OR user_two_id = 201)\n                   AND status IN ('approved', 'matched')"] = [$match_row];
         $GLOBALS['wpdb']->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = 202"] = [
             'user_id' => 202,
             'city' => 'Doha',

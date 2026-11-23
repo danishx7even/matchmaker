@@ -644,4 +644,119 @@ class NotificationService {
 
         return $sent;
     }
+
+    /**
+     * Send email notification to Admin when a user applies for a match via Featured Profile.
+     *
+     * @param int $match_id
+     * @param int $applicant_id
+     * @param int $target_user_id
+     * @param int $score
+     * @return bool
+     */
+    public function send_admin_featured_match_notification(int $match_id, int $applicant_id, int $target_user_id, int $score = 0): bool
+    {
+        $repo           = MatchRepository::instance();
+        $applicant_user = get_userdata($applicant_id);
+        $target_user    = get_userdata($target_user_id);
+        if (!$applicant_user || !$target_user) {
+            return false;
+        }
+
+        $recipient_setting = (string) get_option('mm_email_admin_featured_match_recipient', '');
+        $admin_email_opt   = (string) (get_option('admin_email') ?: 'admin@example.com');
+        $recipient_raw     = !empty(trim($recipient_setting)) ? trim($recipient_setting) : $admin_email_opt;
+
+        $site_name       = get_bloginfo('name') ?: 'Arab Zawaj';
+        $admin_match_url = admin_url('admin.php?page=matchmaking-matches&view_match=' . $match_id);
+
+        $default_subject  = __('[Matchmaker] New Featured Profile Match Application (Match #{match_id})', 'matchmaker');
+        $default_template = "<h2>" . esc_html__('New Featured Profile Match Application', 'matchmaker') . "</h2>\n"
+            . "<p>" . esc_html__('A member has submitted an application to match with a Featured Profile on {site_name}.', 'matchmaker') . "</p>\n"
+            . "<p><strong>" . esc_html__('Application Details:', 'matchmaker') . "</strong><br>\n"
+            . "<strong>" . esc_html__('Applicant:', 'matchmaker') . "</strong> {applicant_name} (#{applicant_id}) &lt;{applicant_email}&gt;<br>\n"
+            . "<strong>" . esc_html__('Featured Candidate:', 'matchmaker') . "</strong> {candidate_name} (#{candidate_id})<br>\n"
+            . "<strong>" . esc_html__('Match ID:', 'matchmaker') . "</strong> #{match_id}<br>\n"
+            . "<strong>" . esc_html__('Compatibility Score:', 'matchmaker') . "</strong> {score}/6</p>\n"
+            . "<p><a href=\"{admin_match_url}\" style=\"background:#CC723F;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:700;\">" . esc_html__('Review Match in Admin Queue &rarr;', 'matchmaker') . "</a></p>";
+
+        $subject  = (string) get_option('mm_email_admin_featured_match_subject', $default_subject);
+        $template = (string) get_option('mm_email_admin_featured_match_template', $default_template);
+
+        $candidate_real_name = (string) $target_user->display_name;
+        $candidate_alias     = \Matchmaker\Core\PMProSync::instance()->get_featured_profile_display_name($target_user_id);
+        $candidate_display   = ($candidate_alias !== $candidate_real_name && $candidate_alias !== '')
+            ? $candidate_real_name . ' (' . $candidate_alias . ')'
+            : $candidate_real_name;
+
+        $replacements = [
+            '{site_name}'         => $site_name,
+            '{applicant_name}'    => $applicant_user->display_name,
+            '{applicant_id}'      => (string) $applicant_id,
+            '{applicant_email}'   => $applicant_user->user_email,
+            '{candidate_name}'    => $candidate_real_name,
+            '{candidate_display}' => $candidate_display,
+            '{candidate_id}'      => (string) $target_user_id,
+            '{match_id}'          => (string) $match_id,
+            '{score}'             => (string) $score,
+            '{admin_match_url}'   => $admin_match_url,
+        ];
+
+        $body    = str_replace(array_keys($replacements), array_values($replacements), $template);
+        $subject = str_replace(array_keys($replacements), array_values($replacements), $subject);
+
+        // Parse recipients (comma/semicolon separated)
+        $recipients = array_filter(array_map('trim', preg_split('/[,;]+/', $recipient_raw) ?: []));
+        if (empty($recipients)) {
+            $recipients = [$admin_email_opt];
+        }
+
+        $html_filter = static fn() => 'text/html';
+        add_filter('wp_mail_content_type', $html_filter);
+        $sent = false;
+        foreach ($recipients as $to) {
+            if (is_email($to)) {
+                $sent = wp_mail($to, $subject, wpautop($body)) || $sent;
+            }
+        }
+        remove_filter('wp_mail_content_type', $html_filter);
+
+        if (class_exists(FileLoggerService::class)) {
+            if ($sent) {
+                FileLoggerService::info('Admin featured match notification sent to ' . implode(', ', $recipients) . ' for match #' . $match_id . '.', [
+                    'match_id'     => $match_id,
+                    'applicant_id' => $applicant_id,
+                    'target_id'    => $target_user_id,
+                    'recipients'   => $recipients,
+                ], 'email');
+            } else {
+                FileLoggerService::error('Admin featured match notification failed to send to ' . implode(', ', $recipients) . ' for match #' . $match_id . '.', [
+                    'match_id'     => $match_id,
+                    'applicant_id' => $applicant_id,
+                    'target_id'    => $target_user_id,
+                    'recipients'   => $recipients,
+                ], 'email');
+            }
+        }
+
+        $repo->log_event(
+            'email',
+            'admin_featured_match_alert',
+            sprintf(__('Admin Featured Match Alert: %s applied for %s', 'matchmaker'), $applicant_user->display_name, $candidate_display),
+            $subject,
+            [
+                'match_id'      => $match_id,
+                'applicant_id'  => $applicant_id,
+                'target_id'     => $target_user_id,
+                'recipients'    => $recipients,
+                'delivery_stat' => $sent ? 'delivered' : 'failed',
+            ],
+            $match_id,
+            $applicant_id,
+            implode(', ', $recipients),
+            $sent ? 'sent' : 'failed'
+        );
+
+        return $sent;
+    }
 }

@@ -41,7 +41,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.12.0';
+        $new_version = '2.13.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -119,12 +119,12 @@ class DBMigrator {
             user_one_id bigint(20) unsigned NOT NULL,
             user_two_id bigint(20) unsigned NOT NULL,
             initiator_user_id bigint(20) unsigned NOT NULL,
-            status enum('pending_review','approved','admin_rejected','matched','rejected','expired') NOT NULL DEFAULT 'pending_review',
+            status enum('pending_review','approved','admin_rejected','matched','rejected','expired','archived') NOT NULL DEFAULT 'pending_review',
             user_one_response enum('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
             user_two_response enum('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
             user_one_rejection_reason text DEFAULT NULL,
             user_two_rejection_reason text DEFAULT NULL,
-            match_source enum('auto','manual') NOT NULL DEFAULT 'auto',
+            match_source enum('auto','manual','featured') NOT NULL DEFAULT 'auto',
             score smallint(5) unsigned DEFAULT NULL,
             contact_revealed tinyint(1) NOT NULL DEFAULT 0,
             approved_by bigint(20) unsigned DEFAULT NULL,
@@ -198,7 +198,16 @@ class DBMigrator {
 
         // Direct schema patch: dbDelta does NOT modify existing ENUM definitions or always drop columns
         $wpdb->query(
-            "ALTER TABLE {$matches_table} MODIFY COLUMN status ENUM('pending_review','approved','admin_rejected','matched','rejected','expired') NOT NULL DEFAULT 'pending_review'"
+            "ALTER TABLE {$matches_table} MODIFY COLUMN status ENUM('pending_review','approved','admin_rejected','matched','rejected','expired','archived') NOT NULL DEFAULT 'pending_review'"
+        );
+
+        $wpdb->query(
+            "ALTER TABLE {$matches_table} MODIFY COLUMN match_source ENUM('auto','manual','featured') NOT NULL DEFAULT 'auto'"
+        );
+
+        // Self-heal any match records created with empty or null match_source
+        $wpdb->query(
+            "UPDATE {$matches_table} SET match_source = 'featured' WHERE match_source = '' OR match_source IS NULL"
         );
 
         $cols = (array) $wpdb->get_col("DESC {$pool_table}", 0);

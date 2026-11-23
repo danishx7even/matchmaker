@@ -1411,26 +1411,70 @@ class MatchRepository
     /**
      * Get all approved or matched records for a user, enriched with candidate data.
      *
-     * @param int $user_id WordPress user ID.
+     * @param int $user_id            WordPress user ID.
+     * @param int $requested_match_id Optional specific match ID to place first as active.
      * @return array<int, array<string, mixed>> Enriched match rows.
      */
-    public function find_approved_matches_for_user(int $user_id): array
+    public function find_approved_matches_for_user(int $user_id, int $requested_match_id = 0): array
     {
         global $wpdb;
         $table      = $wpdb->prefix . 'matches';
         $pool_table = $wpdb->prefix . 'matchmaking_pool';
 
-        $rows = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM {$table}
+        $this->maybe_reset_monthly_quota($user_id);
+
+        if ($requested_match_id > 0) {
+            $sql = "SELECT * FROM {$table}
                  WHERE (user_one_id = %d OR user_two_id = %d)
-                   AND status IN ('approved', 'matched')
-                 ORDER BY created_at DESC",
+                   AND (status IN ('approved', 'matched') OR (id = %d AND status = 'archived'))
+                 ORDER BY 
+                   CASE 
+                     WHEN id = %d THEN 0
+                     WHEN status = 'approved' AND (
+                       (user_one_id = %d AND user_one_response = 'pending') OR 
+                       (user_two_id = %d AND user_two_response = 'pending')
+                     ) THEN 1
+                     WHEN status = 'approved' THEN 2
+                     WHEN status = 'matched' THEN 3
+                     ELSE 4
+                   END ASC,
+                   COALESCE(approved_at, updated_at, created_at) DESC,
+                   id DESC";
+            $prepared = $wpdb->prepare(
+                $sql,
+                $user_id,
+                $user_id,
+                $requested_match_id,
+                $requested_match_id,
                 $user_id,
                 $user_id
-            ),
-            ARRAY_A
-        );
+            );
+        } else {
+            $sql = "SELECT * FROM {$table}
+                 WHERE (user_one_id = %d OR user_two_id = %d)
+                   AND status IN ('approved', 'matched')
+                 ORDER BY 
+                   CASE 
+                     WHEN status = 'approved' AND (
+                       (user_one_id = %d AND user_one_response = 'pending') OR 
+                       (user_two_id = %d AND user_two_response = 'pending')
+                     ) THEN 1
+                     WHEN status = 'approved' THEN 2
+                     WHEN status = 'matched' THEN 3
+                     ELSE 4
+                   END ASC,
+                   COALESCE(approved_at, updated_at, created_at) DESC,
+                   id DESC";
+            $prepared = $wpdb->prepare(
+                $sql,
+                $user_id,
+                $user_id,
+                $user_id,
+                $user_id
+            );
+        }
+
+        $rows = $wpdb->get_results($prepared, ARRAY_A);
 
         if (empty($rows)) {
             return [];

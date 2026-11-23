@@ -174,7 +174,8 @@ class PortalController
         // Fetch meta, stats, and approved match records
         $meta          = $repo->get_meta_block($user_id);
         $stats         = $repo->get_match_stats($user_id);
-        $matches       = $repo->find_approved_matches_for_user($user_id);
+        $requested_mid = isset($_GET['match_id']) ? (int) $_GET['match_id'] : (isset($_POST['match_id']) ? (int) $_POST['match_id'] : 0);
+        $matches       = $repo->find_approved_matches_for_user($user_id, $requested_mid);
         $active_mid    = !empty($matches[0]['match_id']) ? (int) $matches[0]['match_id'] : 0;
         $match_history = $repo->find_match_history_for_user($user_id, $active_mid);
         $unread_count  = \Matchmaker\Service\NotificationService::instance()->get_user_unread_count($user_id);
@@ -267,7 +268,8 @@ class PortalController
         $page      = isset($_POST['page']) ? max(1, (int) $_POST['page']) : 1;
 
         if ($tab === 'matches') {
-            $html = $this->render_matches_html($user_id, $user_type);
+            $requested_mid = isset($_POST['match_id']) ? (int) $_POST['match_id'] : (isset($_GET['match_id']) ? (int) $_GET['match_id'] : 0);
+            $html = $this->render_matches_html($user_id, $user_type, $requested_mid);
         } elseif ($tab === 'events') {
             if ($user_type === 'free') {
                 wp_send_json_error(['message' => __('Events are reserved for Event and Monthly members.', 'matchmaker')]);
@@ -314,12 +316,14 @@ class PortalController
      *
      * @param int    $user_id
      * @param string $user_type
+     * @param int    $requested_match_id Optional specific match ID to view.
      * @return string
      */
-    private function render_matches_html(int $user_id, string $user_type): string
+    private function render_matches_html(int $user_id, string $user_type, int $requested_match_id = 0): string
     {
         $repo = \Matchmaker\Repository\MatchRepository::instance();
-        $matches = $repo->find_approved_matches_for_user($user_id);
+        $requested_mid = $requested_match_id > 0 ? $requested_match_id : (isset($_REQUEST['match_id']) ? (int) $_REQUEST['match_id'] : 0);
+        $matches = $repo->find_approved_matches_for_user($user_id, $requested_mid);
         $active_mid = !empty($matches[0]['match_id']) ? (int) $matches[0]['match_id'] : 0;
         $match_history = $repo->find_match_history_for_user($user_id, $active_mid);
         $has_one_on_one = $repo->has_one_on_one($user_id);

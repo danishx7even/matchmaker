@@ -6,4 +6,10 @@
 
 ---
 
-*No active task in progress. Standing by for instructions.*
+## Objectives & Scope
+*No active tasks. System is idle.*
+
+---
+
+## Step-by-Step Checklist
+*No pending actions.*

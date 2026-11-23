@@ -70,7 +70,15 @@ $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str
             <p class="description" style="margin:0;">
                 <strong><?php esc_html_e('Compatibility Score:', 'matchmaker'); ?></strong> 
                 <span style="color:#0284c7; font-weight:700;"><?php echo (int) ($match['score'] ?? 0); ?> / 6</span> &nbsp;|&nbsp; 
-                <strong><?php esc_html_e('Match Source:', 'matchmaker'); ?></strong> <?php echo esc_html(ucfirst($match['match_source'] ?? 'auto')); ?> &nbsp;|&nbsp; 
+                <strong><?php esc_html_e('Match Source:', 'matchmaker'); ?></strong> 
+                <?php
+                $single_source = trim((string) ($match['match_source'] ?? ''));
+                if ($single_source === 'featured' || ($single_source === '' && (int) ($match['score'] ?? 0) === 0)) {
+                    echo '<span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:700;padding:2px 8px;border-radius:10px;font-size:11px;">⭐ ' . esc_html__('Featured Profile', 'matchmaker') . '</span>';
+                } else {
+                    echo esc_html(ucfirst($single_source ?: 'auto'));
+                }
+                ?> &nbsp;|&nbsp; 
                 <strong><?php esc_html_e('Status:', 'matchmaker'); ?></strong> <span class="mm-status mm-status-<?php echo esc_attr($st); ?>"><?php echo esc_html($st_label); ?></span>
                 <?php if (!empty($match['created_at'])) : ?>
                     &nbsp;|&nbsp; <strong><?php esc_html_e('Created:', 'matchmaker'); ?></strong> <?php echo esc_html(substr($match['created_at'], 0, 10)); ?>

@@ -22,7 +22,7 @@ $active_match    = !empty($matches) ? $matches[0] : null;
 $active_match_id = !empty($active_match['match_id']) ? (int) $active_match['match_id'] : 0;
 $my_resp         = strtolower((string) ($active_match['my_response'] ?? 'pending'));
 $their_resp      = strtolower((string) ($active_match['their_response'] ?? 'pending'));
-$is_mutual       = ($my_resp === 'accepted' && $their_resp === 'accepted') || (($active_match['status'] ?? '') === 'matched');
+$is_mutual       = ($my_resp === 'accepted' && $their_resp === 'accepted') || in_array(($active_match['status'] ?? ''), ['matched', 'archived'], true);
 
 if (!isset($match_history)) {
     $match_history = \Matchmaker\Repository\MatchRepository::instance()->find_match_history_for_user($user_id, $active_match_id);
@@ -34,8 +34,38 @@ if ($is_mutual) {
 } elseif ($my_resp === 'accepted' || in_array($my_resp, ['declined', 'rejected'], true)) {
     $default_step = 3;
 }
+
+// Check if user has an approved match waiting for response that is not the currently active match
+$pending_action_match = null;
+if (!empty($matches)) {
+    foreach ($matches as $m) {
+        if (($m['status'] ?? '') === 'approved' && strtolower((string) ($m['my_response'] ?? '')) === 'pending' && (int) $m['match_id'] !== $active_match_id) {
+            $pending_action_match = $m;
+            break;
+        }
+    }
+}
+if (!$pending_action_match && !empty($match_history)) {
+    foreach ($match_history as $h) {
+        if (($h['status'] ?? '') === 'approved' && strtolower((string) ($h['my_response'] ?? '')) === 'pending' && (int) $h['match_id'] !== $active_match_id) {
+            $pending_action_match = $h;
+            break;
+        }
+    }
+}
 ?>
 <div class="mm-flow-container">
+    <?php if (!empty($pending_action_match)) : ?>
+        <div class="mm-pending-match-banner">
+            <div class="mm-pending-banner-text">
+                <span class="mm-pending-banner-icon">🔔</span>
+                <span><?php echo esc_html(sprintf(__('You have a new approved match awaiting your review: %s', 'matchmaker'), $pending_action_match['name'])); ?></span>
+            </div>
+            <button type="button" class="mm-history-open-btn mm-btn-review" data-match-id="<?php echo (int) $pending_action_match['match_id']; ?>">
+                <?php esc_html_e('Review Match Now →', 'matchmaker'); ?>
+            </button>
+        </div>
+    <?php endif; ?>
     <?php if (empty($matches)) : ?>
         <div class="dashboard-body">
             <?php if (!$is_premium) : ?>
@@ -191,6 +221,19 @@ if ($is_mutual) {
                                 <span class="mm-history-badge <?php echo esc_attr($hist_item['status_class'] ?? 'mm-history-badge-approved'); ?>">
                                     <?php echo esc_html($hist_item['status_label'] ?? __('Approved', 'matchmaker')); ?>
                                 </span>
+                                <?php if (($hist_item['status'] ?? '') === 'approved' && strtolower((string) ($hist_item['my_response'] ?? '')) === 'pending') : ?>
+                                    <button type="button" class="mm-history-open-btn mm-btn-review" data-match-id="<?php echo (int) $hist_item['match_id']; ?>">
+                                        <?php esc_html_e('Review Match →', 'matchmaker'); ?>
+                                    </button>
+                                <?php elseif (($hist_item['status'] ?? '') === 'approved') : ?>
+                                    <button type="button" class="mm-history-open-btn mm-btn-view-status" data-match-id="<?php echo (int) $hist_item['match_id']; ?>">
+                                        <?php esc_html_e('View Status →', 'matchmaker'); ?>
+                                    </button>
+                                <?php elseif (!empty($hist_item['is_mutual'])) : ?>
+                                    <button type="button" class="mm-history-open-btn mm-btn-view-mutual" data-match-id="<?php echo (int) $hist_item['match_id']; ?>">
+                                        <?php esc_html_e('View Match →', 'matchmaker'); ?>
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>

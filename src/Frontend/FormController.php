@@ -80,6 +80,16 @@ class FormController {
             return;
         }
 
+        $this->enqueue_form_assets();
+    }
+
+    /**
+     * Enqueues frontend styles and JavaScript for the matchmaking form.
+     *
+     * @return void
+     */
+    public function enqueue_form_assets(): void
+    {
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
         $js_file    = dirname(__DIR__, 2) . '/assets/js/matchmaking-form.js';
         $css_file   = dirname(__DIR__, 2) . '/assets/css/matchmaking-form.css';
@@ -109,6 +119,7 @@ class FormController {
             'hierarchyUrl' => $plugin_url . 'assets/file/hierarchy_names.json',
         ]);
     }
+
 
     /**
      * Data Hydration — pull saved values for pre-filling form
@@ -241,7 +252,11 @@ class FormController {
         $atts = shortcode_atts(['redirect' => ''], $atts, 'matchmaking_form');
         $redirect_url = !empty($atts['redirect']) ? esc_url_raw((string) $atts['redirect']) : '';
 
+        // Ensure JS & CSS assets are queued even on dynamic Elementor pages
+        $this->enqueue_form_assets();
+
         $v = $this->get_user_form_values($user_id);
+
 
         $has_existing_profile = !empty($v['user_gender']);
         $btn_label = $has_existing_profile ? __('Update Profile', 'matchmaker') : __('Submit Application', 'matchmaker');
@@ -315,7 +330,7 @@ class FormController {
                         <?php echo $this->fg->render_single_field('user_income', $v); ?>
                     <?php echo $this->fg->section_close(); ?>
 
-                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 200KB each). Only first one is mandatory and additional photos are optional.', 'upload-section', true); ?>
+                    <?php echo $this->fg->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 500KB each). Only first one is mandatory and additional photos are optional.', 'upload-section', true); ?>
                         <?php echo $this->fg->render_single_field('user_photo1', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo2', $v); ?>
                         <?php echo $this->fg->render_single_field('user_photo3', $v); ?>
@@ -507,10 +522,10 @@ class FormController {
             wp_send_json_error(['message' => __('Photo 1 is mandatory. Please provide your main profile photo.', 'matchmaker')]);
         }
 
-        // 4b. Validate image formats & size (Allowed: PNG, JPG, JPEG, WEBP | Max: 200KB each)
+        // 4b. Validate image formats & size (Allowed: PNG, JPG, JPEG, WEBP | Max: 500KB each)
         $allowed_extensions = ['jpg', 'jpeg', 'png', 'webp'];
         $allowed_mimes      = ['image/jpeg', 'image/png', 'image/webp', 'image/pjpeg'];
-        $max_file_size      = 200 * 1024; // 200 KB in bytes (204,800 bytes)
+        $max_file_size      = 500 * 1024; // 500 KB in bytes (512,000 bytes)
 
         if (!empty($_FILES['form_fields']) && is_array($_FILES['form_fields']['name'] ?? null)) {
             foreach (['user_photo1', 'user_photo2', 'user_photo3'] as $photo_k) {
@@ -547,7 +562,7 @@ class FormController {
                     }
                     wp_send_json_error([
                         'message' => sprintf(
-                            __('File size exceeds the 200KB limit for %s. Please upload an image under 200KB.', 'matchmaker'),
+                            __('File size exceeds the 500KB limit for %s. Please upload an image under 500KB.', 'matchmaker'),
                             $photo_label
                         )
                     ]);

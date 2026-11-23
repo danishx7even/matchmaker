@@ -6,6 +6,216 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 160: Show "Application Rejected" Status for Rejected Featured Profile Applications
+- **Objective**:
+  1. **Handle Admin & Candidate Rejections in Apply Button**:
+     - Previously, when an admin or candidate rejected a match application (`status = 'admin_rejected'` or `'rejected'`), `render_featured_profile_apply_button()` only checked for `pending_review`, `approved`, and `matched`. As a result, rejected applications fell through to display the active `💌 Apply for a Match` CTA button again.
+     - When the applicant clicked the re-apply button, the backend returned a generic error: *"A match record already exists with this candidate."*
+     - Updated `render_featured_profile_apply_button()` in `FeaturedProfileController.php` to detect `admin_rejected` and `rejected` statuses and render a clear Danger Red badge: `❌ Application Rejected` (`.mm-badge-rejected`).
+     - Also added handling for `expired` applications, rendering `⏱️ Application Expired` (`.mm-badge-expired`).
+  2. **Clear Backend Rejection Messaging**:
+     - Updated `handle_apply_featured_match()` in `FeaturedProfileController.php` to check the status of existing match records and explicitly return *"Your previous application for this featured candidate was rejected."* if an applicant attempts to re-apply.
+  3. **Mock & Unit Testing**:
+     - Enhanced `Fakewpdb` in `tests/bootstrap.php` to handle `wp_matches` queries in `get_row()` and `update()`.
+     - Added unit tests in `FeaturedProfileTest.php` asserting that pending matches show `Application Pending Review`, admin-rejected matches show `Application Rejected`, and the `Apply for a Match` button is removed.
+- **Implemented**:
+  - `src/Frontend/FeaturedProfileController.php`: Added `admin_rejected`, `rejected`, and `expired` cases to `render_featured_profile_apply_button()`, and improved duplicate check in `handle_apply_featured_match()`.
+  - `tests/bootstrap.php`: Added `wp_matches` row retrieval and table updates in `Fakewpdb`.
+  - `tests/Unit/FeaturedProfileTest.php`: Added assertions for pending and admin-rejected apply button states.
+- **Verification**: Complete automated test suite passed with **267/267 tests passing (0 failures, 0 errors)**, including end-to-end multi-user isolation verifying that Candidate X, Applicant A (rejected), and Applicant B (eligible) each experience their own independent application lifecycle without crosstalk.
+
+### Task 159: Fix Featured Match Source Display & Add Admin Notification Email Settings Template
+- **Objective**:
+  1. **Fix Missing / Empty "Source" in Matches Queue Table**:
+     - Identified why match #8 created from a Featured Profile application had an empty string in the "Source" column: `DBMigrator.php` previously lacked a DB version bump when adding `'featured'` to `match_source ENUM('auto','manual','featured')`, causing MySQL to save the empty string `''` on installations where the version was already `2.12.0`.
+     - Bumped DB version to `2.13.0` in `DBMigrator.php` to enforce `ALTER TABLE wp_matches MODIFY COLUMN match_source ENUM('auto','manual','featured') NOT NULL DEFAULT 'auto'`.
+     - Added self-healing SQL migration in `DBMigrator::maybe_migrate()` to repair any existing records where `match_source` was stored as `''` or `NULL` back to `'featured'`.
+     - Added defensive rendering in `matches-list.php` and `match-single.php` so empty source strings on pending matches gracefully fallback to the `⭐ Featured` badge.
+     - Added "Featured Profiles" option to the `filter_source` dropdown on the Admin Matches Queue page.
+  2. **Customizable Admin Notification Email & Settings Template**:
+     - Added `send_admin_featured_match_notification($match_id, $applicant_id, $target_user_id, $score)` in `NotificationService.php` supporting HTML MIME type, multiple comma/semicolon-separated recipients, and full placeholder interpolation: `{applicant_name}`, `{applicant_id}`, `{applicant_email}`, `{candidate_name}`, `{candidate_display}`, `{candidate_id}`, `{match_id}`, `{score}`, `{admin_match_url}`, `{site_name}`.
+     - Added Admin Settings configuration under **Email Templates** tab (Section 4: *Admin Featured Profile Match Alert*):
+       - `mm_email_admin_featured_match_recipient` (defaults to primary site `admin_email`).
+       - `mm_email_admin_featured_match_subject`.
+       - `mm_email_admin_featured_match_template` with rich WYSIWYG `wp_editor` and complete placeholder guide.
+     - Updated `AdminPortal.php` to sanitize and save these options and pass them to the settings view.
+     - Delegated email dispatch in `FeaturedProfileController::handle_apply_match()` to `NotificationService`.
+- **Implemented**:
+  - `src/Core/DBMigrator.php`: Bumped DB version to `2.13.0`, ran `ALTER TABLE` for `match_source` enum, and added self-healing query for empty match_source records.
+  - `src/View/admin/matches/matches-list.php`: Added "Featured Profiles" to source filter dropdown and defensive fallback for `⭐ Featured` badge.
+  - `src/View/admin/matches/match-single.php`: Updated single match comparison header to display `⭐ Featured Profile` badge.
+  - `src/Service/NotificationService.php`: Implemented `send_admin_featured_match_notification()` with HTML template, recipient parsing, logging, and placeholder substitution.
+  - `src/Frontend/FeaturedProfileController.php`: Replaced hardcoded `wp_mail` with `NotificationService::send_admin_featured_match_notification()` and added `get_featured_profile_display_name()`.
+  - `src/Core/PMProSync.php`: Added `get_featured_profile_display_name()` bridge method.
+  - `src/Admin/AdminPortal.php`: Added saving and variable preparation for `mm_email_admin_featured_match_*` options.
+  - `src/View/admin/settings/settings.php`: Added Section 4 "Admin Featured Profile Match Alert" under Email Templates tab with `wp_editor`.
+  - `tests/DBMigratorTest.php`: Updated DB version assertion to `2.13.0` and asserted `'featured'` in SQL.
+  - `tests/Unit/FeaturedProfileTest.php`: Added unit tests for custom email settings and source filtering.
+- **Verification**: Complete automated test suite passed with **266/266 tests passing (0 failures, 0 errors)**.
+
+### Task 158: Register Ponytail Skill Globally & Mandate in AGENTS.md
+- **Objective**:
+  1. **Skill Verification & Global Registration**:
+     - Verified `ponytail` skill in project repository (`.agents/skills/ponytail/SKILL.md` tracked via `skills-lock.json`).
+     - Installed and registered the skill globally in `~/.gemini/config/skills/ponytail/SKILL.md` for machine-wide availability across all projects and agent invocations.
+  2. **Mandate in AGENTS.md**:
+     - Added Rule 8 under "3. Core Architectural Rules & Invariants" in `AGENTS.md` explicitly requiring all AI agents to adopt the `ponytail` skill (Lazy Senior Dev Mode):
+       - Smallest complete working change.
+       - No bloat, speculative code, or unrequested abstractions.
+       - Direct reuse of existing repository classes, services, and patterns.
+       - Check blast radius and callers before editing.
+       - Concise, high-signal responses.
+- **Implemented**:
+  - `~/.gemini/config/skills/ponytail/SKILL.md`: Registered global skill.
+  - `AGENTS.md`: Mandated rule 8 for ponytail skill on all coding tasks.
+- **Verification**: Complete automated test suite passed with **264/264 tests passing (0 failures, 0 errors)**.
+
+### Task 157: Fix Premature Dismissal of Photo Errors in Top Banner Beneath Steps
+- **Objective**:
+  1. **Resolve Root Cause of Disappearing Error in Top Banner**:
+     - Investigated why `<div class="mmf-form-message" style="display: none;"></div>` was empty and hidden when an uploaded image exceeded the 500KB limit.
+     - Root cause discovered: `assets/js/matchmaking-form.js` had a secondary `change` event listener on `input[type="file"]` (originally intended for "Photo 1 is mandatory" dismissal) that checked `if (msgBox.textContent.indexOf('Photo') !== -1)`. If Photo 1 already had a preview (`hasPreview = true`), this secondary listener immediately fired on the same event cycle as Photo 2 or Photo 3 and executed `showMessage('', '')`, instantly wiping out the 500KB size error banner back to `style="display: none;"`.
+     - In addition, generic `input` and `change` bubbling handlers for standard form controls were running on `input[type="file"]` and resetting `.has-error` states.
+  2. **Prevent Premature Error Clearing**:
+     - Restricted the "Photo 1 is mandatory" dismissal listener strictly to `name="form_fields[user_photo1]"` and only when a valid file (correct format and $\le 500\text{KB}$) is chosen.
+     - Excluded `input[type="file"]` from the generic text input `change` and real-time input dismissal listeners (`input:not([type="file"])`).
+     - Enhanced `showMessage(text, type)` to dynamically re-query `msgBox` if null and apply `style.setProperty('display', 'block', 'important')` when errors are rendered, ensuring the error banner stays visible directly beneath the steps.
+- **Implemented**:
+  - `assets/js/matchmaking-form.js`: Fixed real-time dismissal logic, isolated file input change handling, and hardened `showMessage()`.
+- **Verification**: Complete automated test suite passed with **264/264 tests passing (0 failures, 0 errors)**.
+
+### Task 156: Relocate Photo & Form Validation Errors to Top Banner Beneath Steps
+- **Objective**:
+  1. **Eliminate Error Text Inside Image Viewer Slots**:
+     - Resolved issue where file size validation errors (>500KB) and invalid image format errors were injected directly inside the photo upload slots (`.elementor-field-type-upload`), causing text to overlap the camera icon and "Add Photo" label.
+     - Updated `setPhotoError()` and `clearPhotoError()` in `matchmaking-form.js` to only toggle the visual `.has-error` class on the container and ensure any inner `.mmf-upload-error` / `.mmf-field-error` elements are completely removed.
+     - In `matchmaking-form.css`, set `.upload-section .mmf-upload-error, .elementor-field-type-upload .mmf-upload-error, .upload-section .mmf-field-error, .elementor-field-type-upload .mmf-field-error { display: none !important; }` and styled `.upload-section .elementor-field-group.has-error` with a clean dashed red border (`border-color: #e11d48 !important; background: #fff5f5 !important;`).
+  2. **Display All Validation Errors at Top Beneath Step Indicators**:
+     - Routed all validation errors (file size exceeds 500KB, invalid format, mandatory Photo 1 missing, missing required fields, invalid age/height ranges) exclusively to the top alert banner (`.mmf-form-message.error`) situated directly beneath the 1-2 step wizard indicators.
+     - Updated `showMessage(text, type)` to smoothly scroll to the top of the form (`.e-form__indicators` / `.mmf-form-message`), ensuring users immediately see the warning banner with its icon and message.
+     - Removed conflicting field `scrollIntoView()` calls in `validateStep()` that previously pulled user focus away from the top error banner.
+     - Added auto-dismiss of messages in `goToStep()` so switching steps clears previous messages.
+- **Implemented**:
+  - `assets/js/matchmaking-form.js`: Updated `setPhotoError`, `clearPhotoError`, `validateStep`, `goToStep`, and `showMessage`.
+  - `assets/css/matchmaking-form.css`: Suppressed inner error text inside photo containers, styled `.upload-section .has-error`, and refined `.mmf-form-message` spacing beneath steps with entry animation.
+- **Verification**: Complete automated test suite passed with **264/264 tests passing (0 failures, 0 errors)**.
+
+### Task 155: Comprehensive Featured Profile Details View & Multi-Image Lightbox Gallery
+- **Objective**:
+  1. **Comprehensive Candidate Self Profile Display on Featured Details Page**:
+     - Updated `[featured_profile_details]` shortcode in `FeaturedProfileController.php` to render all self-profile candidate fields present in the admin candidate dashboard (`user-single.php`), specifically:
+       - Application Type (Parent Applying on Behalf of Child badge)
+       - Age (`X yrs`) & Gender
+       - Location (City, State, Country)
+       - Citizenship
+       - Origin / Ethnicity
+       - Religion / Modesty Level (`Religion / Modesty`)
+       - Height (formatted in feet/inches and cm)
+       - Languages Spoken
+       - Profession / Career
+       - Smoking / Drinking Lifestyle (`Smoking / Drinking`)
+       - Marital Status
+       - Children
+       - Education Level
+       - Yearly Income Range
+       - About Myself narrative biography
+       - Interactive "Apply for a Match" CTA button
+     - **Strict Exclusions**: Completely omitted private contact details (email, phone number, social links) and partner preferences (preferred age, height, location, citizenship, religion, etc.) to guarantee member privacy.
+  2. **Multi-Image Lightbox Gallery**:
+     - In **Public** mode:
+       - Renders primary profile photo with multi-photo badge counter (`🔍 X Photos`) and thumbnail navigation strip for all uploaded photos (`user_photo1`, `user_photo2`, `user_photo3`).
+       - Features responsive modal lightbox effect with gallery navigation (`&#10094;` / `&#10095;`), photo counter (`X / Y`), zoom toggle, backdrop dismissal, close button, and keyboard shortcuts (`Escape`, `ArrowLeft`, `ArrowRight`).
+     - In **Anonymous** mode:
+       - Strictly hides real images and displays the anonymous privacy avatar/configured silhouette, preventing image URLs from appearing in DOM attributes (`data-mm-photos` or `src`).
+  3. **Standalone Lightbox Asset Support**:
+     - Packaged standalone lightbox DOM manager and event handlers in `assets/js/featured-profiles.js`, registering `window.MM_openLightbox` and `window.MM_closeLightbox`.
+     - Automatically enqueued `assets/css/member-portal.css` and `assets/js/featured-profiles.js` via `enqueue_frontend_assets()`, ensuring full lightbox functionality across any public Elementor page without requiring the member portal script.
+  4. **Elementor Loop Field Shortcode Expansion**:
+     - Expanded `[featured_profile_field key="..."]` to support additional keys: `gender`, `height`, `citizenship`, `origin`/`ethnicity`, `languages`, `marital_status`, `children`, `income`, `lifestyle`, and `modesty`.
+- **Implemented**:
+  - `src/Frontend/FeaturedProfileController.php`:
+    - Updated `render_featured_profile_details()` to build comprehensive candidate details card and lightbox-enabled gallery.
+    - Updated `render_featured_profile_field()` to support all candidate demographic fields.
+    - Updated `enqueue_frontend_assets()` to enqueue portal CSS and featured profiles JS using `$plugin_url`.
+  - `assets/js/featured-profiles.js`:
+    - Implemented standalone lightbox modal manager (`ensureLightboxDom`, `updateLightboxView`, `openLightbox`, `closeLightbox`, `nextLightboxImage`, `prevLightboxImage`).
+    - Added delegated click handlers and keyboard listeners for gallery navigation.
+  - `tests/bootstrap.php`:
+    - Added `plugins_url()` mock and updated `get_permalink($page_id = 0)` signature to match WP Core.
+  - `tests/Unit/FeaturedProfileTest.php`:
+    - Updated `test_render_featured_profile_details_public_shows_name_and_photo()` to assert all self-profile fields, gallery attributes, and exclusion of contact details/partner preferences.
+- **Verification**: Complete automated test suite passed with **264/264 tests passing (0 failures, 0 errors)**.
+
+### Task 154: Form Error Visibility Fix, Custom Anonymous Alias on Featured Card, Default Silhouette Settings, and DB Schema ENUM Patch
+- **Objective**:
+  1. **Resolve Form Error Visibility & Photo Validation UX**:
+     - Fixed issue where image size validation error (>500KB) and invalid image format errors were not visible to users on the matchmaking form.
+     - Root causes addressed:
+       - `.mmf-form-message.error` CSS rule was missing entirely from `matchmaking-form.css`. Only `.success` had visual styles, leaving error banners unstyled.
+       - In `matchmaking-form.js`, exceeding 500KB cleared the file input and scrolled to the top unstyled message, but displayed no inline error next to the file input itself. Upon clicking "Next", the form reported "Photo 1 is mandatory" instead of the size error because the input value was already cleared.
+       - On Elementor builder templates where form shortcodes reside inside JSON data, `has_shortcode($post->post_content)` could fail, preventing script enqueues unless explicitly triggered during shortcode render.
+     - Added `#matchmaking_form .mmf-form-message.error` with high-contrast red alert styling (`display: block !important; background: #FEF2F2 !important; color: #991B1B !important; border: 1.5px solid #FCA5A5 !important`).
+     - Added inline error badges (`.mmf-upload-error`) and field error containers (`.elementor-field-group.has-error`) on file inputs and form controls, highlighting invalid fields and scrolling them smoothly into view.
+     - Created `enqueue_form_assets()` in `FormController.php` called directly from `render_form()` to guarantee assets load on Elementor pages.
+  2. **Featured Profile Default Anonymous Image Setting**:
+     - Added `mm_featured_profile_default_image` setting in Admin Settings (Tab 2: Membership & Services -> "Featured Profile Configuration").
+     - Allows administrators to set a custom silhouette or avatar image URL for anonymous profiles. If blank, falls back to the built-in SVG privacy silhouette.
+  3. **Custom Anonymous Title / Alias on Member Portal Featured Profile Card**:
+     - Added an inline input field on the Member Portal Featured Profile card (`tab-profile.php`) under the Anonymous radio option: "Anonymous Display Title / Alias (Optional)".
+     - Allows members to define their own anonymous title or alias (e.g. "Software Engineer in Riyadh", "Sister in Manchester") directly from their dashboard.
+     - Saved via AJAX to user meta `mm_featured_anonymous_name` and post meta `_mm_anonymous_name`, automatically updating their public featured card and post title.
+     - Gracefully falls back to `"Candidate #{id}"` if left blank.
+  4. **Database Schema Patch**:
+     - Added `'archived'` status to `wp_matches.status` ENUM definition and `ALTER TABLE` statement in `DBMigrator.php`.
+- **Implemented**:
+  - `assets/css/matchmaking-form.css`: Added `.mmf-form-message.error`, `.mmf-alert-content`, `.mmf-upload-error`, and `.elementor-field-group.has-error`.
+  - `assets/js/matchmaking-form.js`: Added `setPhotoError()` and `clearPhotoError()` inline helpers, improved photo format/size checks, added field error highlights and automatic clearing on input.
+  - `src/Frontend/FormController.php`: Extracted `enqueue_form_assets()` and called directly inside `render_form()`.
+  - `src/Admin/AdminPortal.php`: Added option saving and retrieval for `mm_featured_profile_default_image`.
+  - `src/View/admin/settings/settings.php`: Added "Featured Profile Default Anonymous Image" input in Tab 2.
+  - `src/View/frontend/portal/tab-profile.php`: Added anonymous display title / alias input and "Save Title" button in the Featured Profile card.
+  - `assets/js/featured-profiles.js`: Updated AJAX handler to submit `display_name` and toggle the alias input container.
+  - `src/Frontend/FeaturedProfileController.php`: Added `get_anonymous_title()`, updated `get_anonymous_avatar_html()` to support custom admin image, updated `sync_featured_post()`, `render_featured_profile_details()`, `render_featured_profile_field()`, and `handle_toggle_featured_profile()`.
+  - `src/Core/DBMigrator.php`: Added `'archived'` to `wp_matches.status` ENUM.
+  - `tests/DBMigratorTest.php`: Added assertion for `'archived'` in `dbDelta` schema.
+  - `tests/Unit/FeaturedProfileTest.php`: Added 3 new unit tests for custom anonymous alias, default image option, and AJAX portal save.
+- **Verification**: Complete automated test suite passed with **264/264 tests passing (0 failures, 0 errors)**.
+
+### Task 153: Featured Profile Public Discovery & 500KB Profile Photo Upload Limit
+
+- **Objective**:
+  1. **Photo Upload Limit Raised to 500KB**:
+     - Increased maximum profile image upload size limit from 200KB to 500KB (`500 * 1024` bytes) across server-side handling, client-side pre-upload validation, and user-facing notices.
+  2. **Public Featured Profiles Service & Visibility System**:
+     - Created a public discovery channel for members who purchase the "Featured Profile" PMPro add-on service.
+     - Synchronized CPT `featured-profile` (configured via ACF) with ACF field `connected-member` without registering duplicate CPT in code.
+     - Provided members with self-serve controls in their Member Portal (`tab-profile.php`) to toggle public visibility on/off and switch between:
+       - **Anonymous**: Masks original name with `Candidate #{user_id}` and replaces photos with a privacy silhouette avatar while preserving key matchmaking demographic criteria.
+       - **Public**: Displays original display name and uploaded photos.
+     - Designed Elementor Loop Grid custom query filter `elementor/query/mm_featured_profiles`.
+     - Developed custom shortcodes `[featured_profile_details]`, `[featured_profile_apply_button]`, and `[featured_profile_field]`.
+     - Created "Apply for a Match" interactive AJAX workflow:
+       - Non-logged-in visitors receive a login prompt redirecting back after authentication.
+       - Logged-in members without an active base tier (Free, Monthly, Event) receive a membership prompt.
+       - Logged-in eligible members can submit a match application, creating a `wp_matches` record with `status = 'pending_review'` and `match_source = 'featured'`, sending an instant email alert to the admin and recording an audit event.
+     - Added Admin Settings configuration for Featured Profile Service Level ID in `AdminPortal.php` & `settings.php`.
+     - Added `⭐ Featured` source badge in the Admin Matches Queue (`matches-list.php`).
+- **Implemented**:
+  - `src/Frontend/FormController.php`: Updated photo upload limit from 200KB to 500KB (`500 * 1024` bytes) in validation and UI hints.
+  - `assets/js/matchmaking-form.js`: Updated client-side file size guard `MAX_IMAGE_SIZE_BYTES = 500 * 1024` and error alerts.
+  - `tests/Unit/FormWizardAndShortcodesTest.php`: Updated upload size boundary test to verify files exceeding 500KB.
+  - `src/Core/DBMigrator.php`: Updated `wp_matches` table schema for `match_source` enum (`'auto','manual','featured'`).
+  - `src/Core/PMProSync.php`: Added `get_featured_profile_level_id()`, `has_active_featured_profile_service(int $user_id)`, and hooked into `sync_all_membership_levels()` to manage meta and automatically unpublish profiles on service revocation.
+  - `src/Frontend/FeaturedProfileController.php`: Built post synchronizer, Elementor loop filter, shortcodes, and AJAX endpoints for toggling visibility and submitting match applications with admin email alerts.
+  - `assets/js/featured-profiles.js`: Created lightweight frontend script for applicant match requests and portal toggle handling.
+  - `src/View/frontend/portal/tab-profile.php`: Added ⭐ Featured Profile card with real-time toggle switch, Anonymous vs. Public options, and live status badges.
+  - `src/Admin/AdminPortal.php`: Added settings handler for `mm_featured_profile_level_id`.
+  - `src/View/admin/settings/settings.php`: Added Featured Profile Service Level dropdown in Tab 2 and documented shortcodes in Tab 5.
+  - `src/View/admin/matches/matches-list.php`: Added `⭐ Featured` badge in Source column.
+  - `matchmaker.php`: Bootstrapped `FeaturedProfileController::instance()`.
+  - `tests/Unit/FeaturedProfileTest.php`: Created 11 comprehensive automated tests covering service helpers, ACF post sync, shortcodes, button states, and AJAX applications.
+- **Verification**: Ran full automated test runner with **261/261 tests passing (0 failures, 0 errors)**.
+
 ### Task 152: Lightbox Multi-Photo Gallery for Matches (Admin & Frontend)
 - **Objective**:
   1. **Resolve Lightbox Duplicate Photo Navigation Bug**:
@@ -3187,7 +3397,35 @@ This document maintains a chronological, step-by-step history of all features, a
     - Added `test_cancelled_membership_card_details_shows_cancelled_active_status()` verifying status formatting, badge class, and cancellation notice.
     - Added `test_cancelled_membership_action_links_and_can_cancel_suppression()` verifying action links and cancellation permission suppression.
     - Added `test_monthly_recurring_level_with_future_enddate_detected_as_cancelled_without_usermeta()` verifying detection when user meta is missing but level enddate is set in PMPro.
+### Task 161: Fix Active Match Prioritization Over Mutual Matches & Enable Match Opening from History
+- **Objective**:
+  1. Fix active match selection so newly approved matches awaiting review/action (`status = 'approved'`) are always prioritized as primary in the Member Portal (`tab-matches.php`) over existing or older mutual matches (`status = 'matched'`).
+  2. Prevent older/previous cycle mutual matches from persistently locking the member portal in Step 5 ("It's a Match!"), and trigger quota/cycle auto-archive upon member portal load.
+  3. Enable opening, reviewing, and switching matches directly from Match History via prominent action buttons (`Review Match →` for pending responses, `View Status →` for waiting candidate responses, and `View Match →` for mutual matches).
+  4. Display a helpful notice banner when a user is viewing a past/mutual match while having an approved match awaiting their review, with a direct 1-click CTA to jump to the pending match.
+- **Implemented**:
+  - `src/Repository/MatchRepository.php`:
+    - Updated `find_approved_matches_for_user(int $user_id, int $requested_match_id = 0): array`:
+      - Calls `$this->maybe_reset_monthly_quota($user_id)` to automatically archive mutual matches from previous billing cycles.
+      - Orders matches by status urgency: pending user responses (`status = 'approved'` and `my_response = 'pending'`) at highest priority (1), followed by waiting candidate responses (2), followed by mutual matches (3), ordered by `COALESCE(approved_at, updated_at, created_at) DESC, id DESC`.
+      - Supports an optional `$requested_match_id` parameter (`CASE WHEN id = %d THEN 0`), allowing any specific match (including archived mutual matches) to be explicitly loaded as `$matches[0]`.
+  - `src/Frontend/PortalController.php`:
+    - In `render_portal()`: Reads `$_GET['match_id']` / `$_POST['match_id']` and passes `$requested_mid` to `find_approved_matches_for_user()`.
+    - In `render_matches_html()`: Accepts optional `$requested_match_id`, passing it down to `find_approved_matches_for_user()`.
+    - In `handle_ajax_reload_tab()`: Reads `match_id` from AJAX POST/GET and passes it to `render_matches_html()`.
+  - `src/View/frontend/portal/tab-matches.php`:
+    - Added pending match alert banner (`.mm-pending-match-banner`) when viewing another match while an approved match awaits response.
+    - Updated Match History status column to render action buttons (`.mm-history-open-btn`): `Review Match →` (`.mm-btn-review`), `View Status →` (`.mm-btn-view-status`), or `View Match →` (`.mm-btn-view-mutual`) with `data-match-id`.
+  - `assets/js/member-portal.js`:
+    - Updated `MM_Portal.reloadTabAJAX(tabName, targetStep, page, matchId)` to append `match_id` to FormData.
+    - Added click listener for `.mm-history-open-btn` to smoothly reload the matches tab with the requested `match_id` via AJAX and update browser URL via `history.pushState`.
+  - `assets/css/member-portal.css`:
+    - Added styles for `.mm-pending-match-banner`, `.mm-pending-banner-text`, `.mm-pending-banner-icon`, `.mm-history-open-btn`, `.mm-btn-review`, `.mm-btn-view-status`, and `.mm-btn-view-mutual` with mobile responsive stacking.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added `test_approved_match_prioritized_over_mutual_match_and_allows_switching()` verifying prioritization of approved matches over mutual matches, requested match retrieval, and rendered alert/button markup.
+    - Updated mock query substring keys in `PortalAndEventsTest.php` and `QuotaAndExpiryTest.php`.
 - **Verification**:
-  - Executed automated test runner (`tests/run_tests.php`) — **all 227 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 268 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
 
 

@@ -9,7 +9,10 @@
  *   @var array<int, object>   $pmpro_levels
  *   @var array<int, string>   $pmpro_level_tags
  *   @var int                  $services_group_id
+ *   @var int                  $featured_profile_level_id
+ *   @var string               $featured_profile_default_image
  *   @var int                  $max_matches
+
  *   @var int                  $expiry_days
  *   @var int                  $recurrence
  *   @var int                  $max_candidates
@@ -35,6 +38,9 @@
  *   @var string               $admin_service_recipient
  *   @var string               $admin_service_subject
  *   @var string               $admin_service_template
+ *   @var string               $admin_featured_recipient
+ *   @var string               $admin_featured_subject
+ *   @var string               $admin_featured_template
  *
  * @package Matchmaker\Admin
  */
@@ -305,7 +311,31 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                             <p class="description"><?php esc_html_e('Default: 3. Any membership levels assigned to this PMPro group are treated as add-on services that require an active basic membership.', 'matchmaker'); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row"><label for="mm_featured_profile_level_id"><?php esc_html_e('Featured Profile Service Level', 'matchmaker'); ?></label></th>
+                        <td>
+                            <select name="mm_featured_profile_level_id" id="mm_featured_profile_level_id" class="regular-text">
+                                <option value="0"><?php esc_html_e('— Auto-Detect from Group 3 (Level named/tagged "Featured") —', 'matchmaker'); ?></option>
+                                <?php if (!empty($pmpro_levels)) : ?>
+                                    <?php foreach ($pmpro_levels as $lvl) : ?>
+                                        <option value="<?php echo (int) $lvl->id; ?>" <?php selected((int) $featured_profile_level_id, (int) $lvl->id); ?>>
+                                            <?php echo esc_html($lvl->name); ?> (ID: <?php echo (int) $lvl->id; ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Select which PMPro level corresponds to the "Featured Profile" add-on service. When purchased, members unlock the Featured Profile toggle in their Member Portal.', 'matchmaker'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="mm_featured_profile_default_image"><?php esc_html_e('Featured Profile Default Anonymous Image', 'matchmaker'); ?></label></th>
+                        <td>
+                            <input type="url" name="mm_featured_profile_default_image" id="mm_featured_profile_default_image" value="<?php echo esc_attr($featured_profile_default_image); ?>" class="regular-text" placeholder="https://example.com/wp-content/uploads/silhouette.png">
+                            <p class="description"><?php esc_html_e('Optional. Image URL to display as the avatar on public featured cards when a member chooses Anonymous visibility. Leave blank to use the built-in SVG privacy silhouette.', 'matchmaker'); ?></p>
+                        </td>
+                    </tr>
                 </table>
+
             </div>
 
             <!-- Bulk User Type & Free Membership Sync Tool Card -->
@@ -586,6 +616,49 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                     </tr>
                 </table>
             </div>
+
+            <!-- 4. Admin Featured Match Application Alert -->
+            <div class="mm-card" style="margin-bottom:24px; padding:20px; background:#fff; border:1px solid #ccd0d4; border-radius:6px;">
+                <h2 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">
+                    <?php esc_html_e('4. Admin Featured Profile Match Alert', 'matchmaker'); ?>
+                </h2>
+                <p class="description"><?php esc_html_e('Sent immediately to designated administrator(s) whenever a logged-in member applies to match with a candidate on the Public Featured Profiles showcase.', 'matchmaker'); ?></p>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="mm_email_admin_featured_match_recipient"><?php esc_html_e('Admin Recipient Email(s)', 'matchmaker'); ?></label></th>
+                        <td>
+                            <input type="text" name="mm_email_admin_featured_match_recipient" id="mm_email_admin_featured_match_recipient" value="<?php echo esc_attr($admin_featured_recipient); ?>" placeholder="<?php echo esc_attr(get_option('admin_email')); ?>" class="regular-text">
+                            <p class="description"><?php esc_html_e('Comma-separated email addresses. Leave blank to default to the primary site admin email (', 'matchmaker') . esc_html(get_option('admin_email')) . ').'; ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="mm_email_admin_featured_match_subject"><?php esc_html_e('Email Subject', 'matchmaker'); ?></label></th>
+                        <td>
+                            <input type="text" name="mm_email_admin_featured_match_subject" id="mm_email_admin_featured_match_subject" value="<?php echo esc_attr($admin_featured_subject); ?>" class="large-text">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="mm_email_admin_featured_match_template"><?php esc_html_e('Email Body Template', 'matchmaker'); ?></label></th>
+                        <td>
+                            <?php
+                            wp_editor($admin_featured_template, 'mm_email_admin_featured_match_template', [
+                                'textarea_name' => 'mm_email_admin_featured_match_template',
+                                'textarea_rows' => 8,
+                                'media_buttons' => true,
+                                'teeny'         => false,
+                            ]);
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Available Placeholders', 'matchmaker'); ?></th>
+                        <td>
+                            <code>{applicant_name}</code>, <code>{applicant_id}</code>, <code>{applicant_email}</code>, <code>{candidate_name}</code>, <code>{candidate_id}</code>, <code>{match_id}</code>, <code>{score}</code>, <code>{admin_match_url}</code>, <code>{site_name}</code>
+                        </td>
+                    </tr>
+                </table>
+            </div>
         </div>
 
         <!-- ==========================================
@@ -641,6 +714,21 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                             <td><code>[logout_url]</code></td>
                             <td><?php esc_html_e('Outputs secure formatted logout URL with redirect support.', 'matchmaker'); ?></td>
                             <td>Any menu or custom link</td>
+                        </tr>
+                        <tr>
+                            <td><code>[featured_profile_details]</code></td>
+                            <td><?php esc_html_e('Renders detailed card for a featured candidate (respects anonymous vs. public mode).', 'matchmaker'); ?></td>
+                            <td>Featured Profiles Single or Loop Item</td>
+                        </tr>
+                        <tr>
+                            <td><code>[featured_profile_apply_button]</code></td>
+                            <td><?php esc_html_e('Renders interactive Apply for a Match CTA button with member login/status gating.', 'matchmaker'); ?></td>
+                            <td>Featured Profiles Single or Loop Item</td>
+                        </tr>
+                        <tr>
+                            <td><code>[featured_profile_field key="..."]</code></td>
+                            <td><?php esc_html_e('Outputs individual featured profile field (name, photo, age, country, job, etc.).', 'matchmaker'); ?></td>
+                            <td>Elementor Custom Loop Grid items</td>
                         </tr>
                     </tbody>
                 </table>

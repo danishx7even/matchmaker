@@ -168,12 +168,12 @@ class FormWizardAndShortcodesTest
             throw new \RuntimeException("Expected user_photo3 to have no required star or required attribute: " . $photo3_html);
         }
 
-        // 3. Photo section open has required star, format hint, and 200KB size limit
-        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 200KB each). Only first one is mandatory and additional photos are optional.', 'upload-section', true);
+        // 3. Photo section open has required star, format hint, and 500KB size limit
+        $section_html = $this->field_generator->section_open('camera', 'Profile Photos', 'Upload 3 clear, recent photos (Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 500KB each). Only first one is mandatory and additional photos are optional.', 'upload-section', true);
         if (!str_contains($section_html, 'mm-required-star') || !str_contains($section_html, '*')) {
             throw new \RuntimeException("Expected photo section header to have required star indicator: " . $section_html);
         }
-        if (!str_contains($section_html, 'Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 200KB each')) {
+        if (!str_contains($section_html, 'Allowed formats: PNG, JPG, JPEG, WEBP | Max size: 500KB each')) {
             throw new \RuntimeException("Expected photo section header to include format hint and size limit: " . $section_html);
         }
 
@@ -317,13 +317,13 @@ class FormWizardAndShortcodesTest
             'pref_gender' => 'Male',
         ];
 
-        // Upload a valid .jpg file that exceeds 200KB (e.g. 250KB = 256,000 bytes)
+        // Upload a valid .jpg file that exceeds 500KB (e.g. 550KB = 563,200 bytes)
         $_FILES['form_fields'] = [
             'name'     => ['user_photo1' => 'large_photo.jpg'],
             'type'     => ['user_photo1' => 'image/jpeg'],
             'tmp_name' => ['user_photo1' => '/tmp/large_photo.jpg'],
             'error'    => ['user_photo1' => UPLOAD_ERR_OK],
-            'size'     => ['user_photo1' => 256000],
+            'size'     => ['user_photo1' => 563200],
         ];
 
         $caught = false;
@@ -335,8 +335,8 @@ class FormWizardAndShortcodesTest
         }
         $out = ob_get_clean();
 
-        if (!$caught || !str_contains($out, 'exceeds the 200KB limit')) {
-            throw new \RuntimeException("Expected photo exceeding 200KB to be rejected with size limit error message. Output: " . $out);
+        if (!$caught || !str_contains($out, 'exceeds the 500KB limit')) {
+            throw new \RuntimeException("Expected photo exceeding 500KB to be rejected with size limit error message. Output: " . $out);
         }
 
         // Clean up

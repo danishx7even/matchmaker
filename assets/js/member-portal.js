@@ -41,7 +41,7 @@
         /**
          * Fetch updated tab HTML content via AJAX
          */
-        reloadTabAJAX: function (tabName, targetStep, page) {
+        reloadTabAJAX: function (tabName, targetStep, page, matchId) {
             var panel = document.getElementById('mm-tab-' + tabName);
             if (!panel) return;
 
@@ -56,6 +56,9 @@
             data.append('tab', tabName);
             if (page) {
                 data.append('page', page);
+            }
+            if (matchId) {
+                data.append('match_id', matchId);
             }
             data.append('nonce', (window.mmPortalData && window.mmPortalData.nonce) ? window.mmPortalData.nonce : '');
 
@@ -728,6 +731,28 @@
                 var initialTitle = titleEl ? titleEl.textContent.trim() : '';
 
                 MM_Portal.openEventLinkModal(eventId, initialLink, initialTitle);
+            }
+
+            // 4. Match Switcher from Match History or Pending Match Alert
+            var matchSwitchBtn = e.target.closest('.mm-history-open-btn, [data-mm-action="open-match"]');
+            if (matchSwitchBtn) {
+                e.preventDefault();
+                var switchMid = parseInt(matchSwitchBtn.getAttribute('data-match-id'), 10) || 0;
+                if (switchMid > 0) {
+                    if (window.history && window.history.pushState) {
+                        try {
+                            var currentUrl = new URL(window.location.href);
+                            currentUrl.searchParams.set('tab', 'matches');
+                            currentUrl.searchParams.set('match_id', switchMid);
+                            window.history.pushState({}, '', currentUrl.toString());
+                        } catch (err) {}
+                    }
+                    MM_Portal.reloadTabAJAX('matches', null, null, switchMid);
+                    var topElem = document.querySelector('.mm-flow-container') || document.querySelector('.mm-portal-tabs-nav');
+                    if (topElem) {
+                        topElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
             }
         });
 

@@ -1985,6 +1985,87 @@ class PMProSync {
     }
 
     /**
+     * Returns the configured PMPro Level ID for the Featured Profile service.
+     * Checks option 'mm_featured_profile_level_id', or auto-detects from services group.
+     *
+     * @return int
+     */
+    public function get_featured_profile_level_id(): int
+    {
+        $lid = (int) get_option('mm_featured_profile_level_id', 0);
+        if ($lid > 0) {
+            return $lid;
+        }
+
+        // Auto-detect: check registered services for 'featured' in name or tag
+        $services = $this->get_services_levels();
+        foreach ($services as $srv) {
+            $sid   = is_object($srv) ? (int) ($srv->id ?? 0) : (int) $srv;
+            $sname = is_object($srv) && !empty($srv->name) ? (string) $srv->name : '';
+            $tag   = $this->get_level_tag($sid, $sname);
+            if (stripos($sname, 'featured') !== false || stripos($tag, 'featured') !== false) {
+                return $sid;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Checks whether a user holds an active Featured Profile add-on service.
+     *
+     * @param int $user_id
+     * @return bool
+     */
+    public function has_active_featured_profile_service(int $user_id): bool
+    {
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        // Check usermeta flag (also allows manual admin toggle / mock tests)
+        if ((bool) get_user_meta($user_id, 'mm_has_featured_profile', true)) {
+            return true;
+        }
+
+        $feat_level_id = $this->get_featured_profile_level_id();
+
+        // Check active services list
+        $active_services = $this->get_user_active_services($user_id);
+        foreach ($active_services as $asrv) {
+            $asid   = (int) ($asrv['id'] ?? 0);
+            $asname = (string) ($asrv['name'] ?? '');
+            $astag  = (string) ($asrv['tag'] ?? '');
+
+            if ($feat_level_id > 0 && $asid === $feat_level_id) {
+                return true;
+            }
+            if (stripos($asname, 'featured') !== false || stripos($astag, 'featured') !== false) {
+                return true;
+            }
+        }
+
+        if ($feat_level_id > 0 && function_exists('pmpro_hasMembershipLevel')) {
+            if (pmpro_hasMembershipLevel($feat_level_id, $user_id)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Resolves the public or anonymous display name of a featured profile member.
+     *
+     * @param int $user_id
+     * @return string
+     */
+    public function get_featured_profile_display_name(int $user_id): string
+    {
+        return \Matchmaker\Frontend\FeaturedProfileController::instance()->get_featured_profile_display_name($user_id);
+    }
+
+    /**
      * Recursion guard for assigning the free membership level.
      *
      * @var bool
@@ -2140,6 +2221,12 @@ class PMProSync {
 
             \Matchmaker\Repository\MatchRepository::instance()->update_pool_user_type($user_id, $resolved_user_type);
             \Matchmaker\Repository\MatchRepository::instance()->update_pool_one_on_one($user_id, $has_one_on_one);
+
+            $has_featured = $this->has_active_featured_profile_service($user_id);
+            update_user_meta($user_id, 'mm_has_featured_profile', $has_featured ? 1 : 0);
+            if (!$has_featured && class_exists(\Matchmaker\Frontend\FeaturedProfileController::class)) {
+                \Matchmaker\Frontend\FeaturedProfileController::instance()->handle_service_revoked($user_id);
+            }
 
             if ($resolved_user_type === 'monthly') {
                 $pool_user = \Matchmaker\Repository\MatchRepository::instance()->get_user_pool($user_id);

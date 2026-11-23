@@ -38,6 +38,7 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <option value=""><?php esc_html_e('All Sources', 'matchmaker'); ?></option>
         <option value="auto" <?php selected($source, 'auto'); ?>><?php esc_html_e('Auto Engine', 'matchmaker'); ?></option>
         <option value="manual" <?php selected($source, 'manual'); ?>><?php esc_html_e('Manual Matchmaker', 'matchmaker'); ?></option>
+        <option value="featured" <?php selected($source, 'featured'); ?>><?php esc_html_e('Featured Profiles', 'matchmaker'); ?></option>
     </select>
 
     <input type="submit" class="button" value="<?php esc_attr_e('Filter Matches', 'matchmaker'); ?>">
@@ -85,7 +86,16 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
                         <td style="text-align:center; white-space:nowrap;"><strong><?php echo (int) ($m['score'] ?? 0); ?></strong> / 6</td>
                         <?php $st_label = ($st === 'matched') ? __('Mutual Match', 'matchmaker') : ucfirst(str_replace('_', ' ', $st)); ?>
                         <td style="text-align:center; white-space:nowrap;"><span class="mm-status mm-status-<?php echo esc_attr($st); ?>"><?php echo esc_html($st_label); ?></span></td>
-                        <td style="text-align:center; white-space:nowrap;"><?php echo esc_html(ucfirst($m['match_source'] ?? 'auto')); ?></td>
+                        <td style="text-align:center; white-space:nowrap;">
+                            <?php
+                            $source_str = trim((string) ($m['match_source'] ?? ''));
+                            if ($source_str === 'featured' || ($source_str === '' && (int) ($m['score'] ?? 0) === 0)) {
+                                echo '<span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:700;padding:2px 8px;border-radius:10px;font-size:11px;">⭐ ' . esc_html__('Featured', 'matchmaker') . '</span>';
+                            } else {
+                                echo esc_html(ucfirst($source_str ?: 'auto'));
+                            }
+                            ?>
+                        </td>
                         <td style="white-space:nowrap;"><small>U1: <?php echo esc_html($m['user_one_response'] ?? 'pending'); ?> | U2: <?php echo esc_html($m['user_two_response'] ?? 'pending'); ?></small></td>
                         <td style="text-align:center; white-space:nowrap;"><small><?php echo esc_html(substr($m['created_at'] ?? '—', 0, 10)); ?></small></td>
                         <td style="text-align:center; white-space:nowrap;">

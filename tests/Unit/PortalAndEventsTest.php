@@ -850,7 +850,7 @@ final class PortalAndEventsTest extends TestCase
             'updated_at' => current_time('mysql'),
         ];
 
-        $wpdb->mock_results["SELECT * FROM wp_matches\n                 WHERE (user_one_id = {$user_id} OR user_two_id = {$user_id})\n                   AND status IN ('approved', 'matched')\n                 ORDER BY created_at DESC"] = [$match_row];
+        $wpdb->mock_results["WHERE (user_one_id = {$user_id} OR user_two_id = {$user_id})\n                   AND status IN ('approved', 'matched')"] = [$match_row];
         $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = {$candidate_id}"] = [
             'user_id' => $candidate_id,
             'city' => 'Dubai',
@@ -934,5 +934,123 @@ final class PortalAndEventsTest extends TestCase
 
         $this->assertStringContainsString('data-mm-photos="https://example.com/u1_p1.jpg,https://example.com/u1_p2.jpg"', $user_html);
         $this->assertStringContainsString('data-mm-lightbox="profile-gallery"', $user_html);
+    }
+
+    public function test_approved_match_prioritized_over_mutual_match_and_allows_switching(): void
+    {
+        $repo = MatchRepository::instance();
+        global $wpdb;
+
+        $user_id = 950;
+        $mutual_candidate_id = 951;
+        $approved_candidate_id = 952;
+
+        $mutual_match = [
+            'id' => 701,
+            'user_one_id' => $user_id,
+            'user_two_id' => $mutual_candidate_id,
+            'status' => 'matched',
+            'score' => 6,
+            'contact_revealed' => 1,
+            'user_one_response' => 'accepted',
+            'user_two_response' => 'accepted',
+            'created_at' => '2026-11-10 10:00:00',
+            'approved_at' => '2026-11-10 11:00:00',
+            'updated_at' => '2026-11-12 12:00:00',
+        ];
+
+        $approved_match = [
+            'id' => 702,
+            'user_one_id' => $user_id,
+            'user_two_id' => $approved_candidate_id,
+            'status' => 'approved',
+            'score' => 5,
+            'contact_revealed' => 0,
+            'user_one_response' => 'pending',
+            'user_two_response' => 'accepted',
+            'created_at' => '2026-11-05 08:00:00',
+            'approved_at' => '2026-11-19 14:00:00',
+            'updated_at' => '2026-11-19 14:00:00',
+        ];
+
+        // Store both matches in global __mm_matches
+        $GLOBALS['__mm_matches'][701] = $mutual_match;
+        $GLOBALS['__mm_matches'][702] = $approved_match;
+
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = {$mutual_candidate_id}"] = [
+            'user_id' => $mutual_candidate_id,
+            'city' => 'Atlanta',
+            'country' => 'USA',
+            'birth_date' => '1990-01-01',
+        ];
+        $wpdb->mock_rows["SELECT * FROM wp_matchmaking_pool WHERE user_id = {$approved_candidate_id}"] = [
+            'user_id' => $approved_candidate_id,
+            'city' => 'Los Angeles',
+            'country' => 'USA',
+            'birth_date' => '1992-05-15',
+        ];
+
+        // 1. Default lookup: approved pending match (702) MUST come before mutual match (701)
+        $wpdb->mock_results["(user_one_id = {$user_id} OR user_two_id = {$user_id})\n                   AND status IN ('approved', 'matched')"] = [
+            $approved_match,
+            $mutual_match,
+        ];
+
+        // 2. Specific requested match lookup: requesting 701 MUST place 701 first
+        $wpdb->mock_results["(user_one_id = {$user_id} OR user_two_id = {$user_id})\n                   AND (status IN ('approved', 'matched') OR (id = 701 AND status = 'archived'))"] = [
+            $mutual_match,
+            $approved_match,
+        ];
+
+        // 3. Match history queries
+        $wpdb->mock_results["(user_one_id = {$user_id} OR user_two_id = {$user_id}) AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired') AND id != 701"] = [
+            $approved_match,
+        ];
+        $wpdb->mock_results["(user_one_id = {$user_id} OR user_two_id = {$user_id}) AND status IN ('approved', 'matched', 'archived', 'rejected', 'expired') AND id != 702"] = [
+            $mutual_match,
+        ];
+
+        $matches = $repo->find_approved_matches_for_user($user_id);
+        $this->assertCount(2, $matches);
+        $this->assertEquals(702, $matches[0]['match_id']);
+        $this->assertEquals('pending', $matches[0]['my_response']);
+        $this->assertEquals(701, $matches[1]['match_id']);
+        $this->assertEquals('matched', $matches[1]['status']);
+
+        // Specific requested match lookup: requesting 701 MUST place 701 first
+        $requested_matches = $repo->find_approved_matches_for_user($user_id, 701);
+        $this->assertCount(2, $requested_matches);
+        $this->assertEquals(701, $requested_matches[0]['match_id']);
+        $this->assertEquals(702, $requested_matches[1]['match_id']);
+
+        // 3. Render tab-matches.php when 701 is active (viewing mutual match)
+        $user_type = 'monthly';
+        $is_premium = true;
+        $active_mid = 701;
+        $match_history = $repo->find_match_history_for_user($user_id, $active_mid);
+        $matches = $requested_matches;
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-matches.php';
+        $html_viewing_mutual = (string) ob_get_clean();
+
+        // Must display pending match alert banner with CTA to review match 702
+        $this->assertStringContainsString('mm-pending-match-banner', $html_viewing_mutual);
+        $this->assertStringContainsString('Review Match Now →', $html_viewing_mutual);
+        $this->assertStringContainsString('data-match-id="702"', $html_viewing_mutual);
+
+        // 4. Render tab-matches.php when 702 is active (viewing new approved match)
+        $active_mid = 702;
+        $match_history = $repo->find_match_history_for_user($user_id, $active_mid);
+        $matches = $repo->find_approved_matches_for_user($user_id);
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/tab-matches.php';
+        $html_viewing_approved = (string) ob_get_clean();
+
+        // In history, mutual match 701 must have "View Match →" CTA button with data-match-id="701"
+        $this->assertStringContainsString('mm-btn-view-mutual', $html_viewing_approved);
+        $this->assertStringContainsString('View Match →', $html_viewing_approved);
+        $this->assertStringContainsString('data-match-id="701"', $html_viewing_approved);
     }
 }

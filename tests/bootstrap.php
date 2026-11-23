@@ -31,6 +31,10 @@ function plugin_dir_url($file) {
     return 'https://example.com/wp-content/plugins/matchmaker/';
 }
 
+function plugins_url($path = '', $plugin = '') {
+    return 'https://example.com/wp-content/plugins/matchmaker/' . ltrim($path, '/');
+}
+
 
 $GLOBALS['__mm_dbdelta_sql']     = null;
 $GLOBALS['__mm_options']         = [];
@@ -126,7 +130,17 @@ class FakeWP_User {
     public string $user_registered = '';
     public array $roles = ['subscriber'];
 
-    public function __construct(int $id = 0, string $name = 'Test User', string $email = 'test@example.com', string $login = '') {
+    public function __construct(int|object $id = 0, string $name = 'Test User', string $email = 'test@example.com', string $login = '') {
+        if (is_object($id)) {
+            $obj = $id;
+            $this->ID = (int) ($obj->ID ?? 0);
+            $this->display_name = (string) ($obj->display_name ?? $name);
+            $this->user_email = (string) ($obj->user_email ?? $email);
+            $this->user_login = (string) ($obj->user_login ?? ($this->ID > 0 ? "user_{$this->ID}" : 'testuser'));
+            $this->user_nicename = (string) ($obj->user_nicename ?? $this->user_login);
+            $this->roles = is_array($obj->roles ?? null) ? $obj->roles : ['subscriber'];
+            return;
+        }
         $this->ID = $id;
         $this->display_name = $name;
         $this->user_email = $email;
@@ -511,6 +525,8 @@ class WP_Post {
     public string $post_title = '';
     public string $post_content = '';
     public string $post_excerpt = '';
+    public string $post_status = 'publish';
+    public string $post_type = 'post';
     public string $post_date = '2026-09-01 12:00:00';
     public function __construct(int $id = 1, string $title = 'Sample Event', string $excerpt = 'Event excerpt details.') {
         $this->ID = $id;
@@ -521,13 +537,24 @@ class WP_Post {
 
 class WP_Query {
     public array $posts = [];
+    public array $query_vars = [];
     public int $post_count = 0;
     public int $max_num_pages = 1;
     public int $current_post = -1;
 
     public function __construct(array $args = []) {
+        $this->query_vars = $args;
         if (isset($GLOBALS['__mm_mock_posts'])) {
             $this->posts = $GLOBALS['__mm_mock_posts'];
+        } elseif (!empty($args['post_type']) && $args['post_type'] === 'featured-profile') {
+            $this->posts = [];
+            if (!empty($GLOBALS['__mm_posts'])) {
+                foreach ($GLOBALS['__mm_posts'] as $p) {
+                    if (is_object($p) && ($p->post_type ?? '') === 'featured-profile') {
+                        $this->posts[] = $p;
+                    }
+                }
+            }
         } else {
             $this->posts = [
                 new WP_Post(101, 'Arab Zawaj Matrimonial Mixer', 'Join our exclusive networking mixer for Muslim singles.'),
@@ -547,20 +574,41 @@ class WP_Query {
         $this->current_post++;
         $GLOBALS['post'] = $this->posts[$this->current_post] ?? null;
     }
+
+    public function set(string $query_var, mixed $value): void {
+        $this->query_vars[$query_var] = $value;
+    }
+
+    public function get(string $query_var, mixed $default = '') {
+        return $this->query_vars[$query_var] ?? $default;
+    }
 }
 
 function get_post($post_id = null) {
     if ($post_id instanceof WP_Post) return $post_id;
-    if ($post_id && isset($GLOBALS['post']) && $GLOBALS['post']->ID === (int) $post_id) {
+    $pid = (int) $post_id;
+    if ($pid && isset($GLOBALS['__mm_posts'][$pid])) {
+        return $GLOBALS['__mm_posts'][$pid];
+    }
+    if ($pid && isset($GLOBALS['post']) && $GLOBALS['post']->ID === $pid) {
         return $GLOBALS['post'];
     }
-    return $GLOBALS['post'] ?? new WP_Post((int) ($post_id ?: 1));
+    return $GLOBALS['post'] ?? new WP_Post($pid ?: 1);
 }
+
+function wp_enqueue_style(...$args) { return true; }
+function wp_enqueue_script(...$args) { return true; }
+function wp_register_script(...$args) { return true; }
+function wp_register_style(...$args) { return true; }
+function wp_localize_script(...$args) { return true; }
+function wp_style_is(...$args) { return false; }
+function wp_script_is(...$args) { return false; }
 
 function setup_postdata($post): bool {
     $GLOBALS['post'] = $post;
     return true;
 }
+
 
 function wp_reset_postdata(): void {
     // Reset global post
@@ -583,10 +631,57 @@ function update_post_meta(int $post_id, string $key, $value): bool {
     return true;
 }
 
+function delete_post_meta(int $post_id, string $key): bool {
+    unset($GLOBALS['__mm_postmeta'][$post_id][$key]);
+    return true;
+}
+
+if (!function_exists('wp_login_url')) {
+    function wp_login_url(string $redirect = ''): string {
+        return 'https://example.com/login/' . ($redirect ? '?redirect_to=' . urlencode($redirect) : '');
+    }
+}
+
 if (!function_exists('get_field')) {
     function get_field(string $selector, $post_id = false, bool $format_value = true) {
         $pid = is_numeric($post_id) ? (int) $post_id : get_the_ID();
         return $GLOBALS['__mm_postmeta'][$pid][$selector] ?? null;
+    }
+}
+
+if (!function_exists('update_field')) {
+    function update_field(string $selector, $value, $post_id = false): bool {
+        $pid = is_numeric($post_id) ? (int) $post_id : get_the_ID();
+        $GLOBALS['__mm_postmeta'][$pid][$selector] = $value;
+        return true;
+    }
+}
+
+if (!function_exists('wp_insert_post')) {
+    function wp_insert_post(array $postarr, bool $wp_error = false) {
+        static $post_seq = 2000;
+        $id = !empty($postarr['ID']) ? (int) $postarr['ID'] : ++$post_seq;
+        $post = new WP_Post($id, $postarr['post_title'] ?? '', $postarr['post_content'] ?? '');
+        $post->post_status = $postarr['post_status'] ?? 'publish';
+        $post->post_type   = $postarr['post_type'] ?? 'post';
+        $GLOBALS['__mm_posts'][$id] = $post;
+        return $id;
+    }
+}
+
+if (!function_exists('wp_update_post')) {
+    function wp_update_post(array $postarr, bool $wp_error = false) {
+        $id = !empty($postarr['ID']) ? (int) $postarr['ID'] : 0;
+        if ($id) {
+            if (!isset($GLOBALS['__mm_posts'][$id])) {
+                $GLOBALS['__mm_posts'][$id] = new WP_Post($id);
+            }
+            foreach ($postarr as $k => $v) {
+                $GLOBALS['__mm_posts'][$id]->$k = $v;
+            }
+            return $id;
+        }
+        return wp_insert_post($postarr, $wp_error);
     }
 }
 
@@ -716,8 +811,8 @@ function wp_parse_url($url, $component = -1) {
     return parse_url($url, $component);
 }
 
-function get_permalink($page_id) {
-    return $page_id > 0 ? "https://example.com/?page_id={$page_id}" : '';
+function get_permalink($page_id = 0) {
+    return $page_id > 0 ? "https://example.com/?page_id={$page_id}" : 'https://example.com/';
 }
 
 function wp_create_nonce($action = -1) {
@@ -1210,6 +1305,11 @@ class Fakewpdb {
                 return $v;
             }
         }
+        if (str_contains($query, 'FROM wp_matches') || str_contains($query, 'FROM ' . $this->prefix . 'matches')) {
+            if (!empty($GLOBALS['__mm_matches'])) {
+                return array_values($GLOBALS['__mm_matches']);
+            }
+        }
         if (str_contains($query, 'wp_matchmaking_pool') && !empty($GLOBALS['__mm_pool_users'])) {
             $list = [];
             foreach ($GLOBALS['__mm_pool_users'] as $uid => $row) {
@@ -1238,6 +1338,15 @@ class Fakewpdb {
             $uid = (int) $m[1];
             return $GLOBALS['__mm_pool_users'][$uid] ?? null;
         }
+        if (str_contains($query, 'matches') && preg_match('/user_one_id = (\d+)\s+AND\s+user_two_id = (\d+)/i', $query, $m)) {
+            $u1 = (int) $m[1];
+            $u2 = (int) $m[2];
+            foreach ($GLOBALS['__mm_matches'] ?? [] as $match) {
+                if ((int) ($match['user_one_id'] ?? 0) === $u1 && (int) ($match['user_two_id'] ?? 0) === $u2) {
+                    return $match;
+                }
+            }
+        }
         return null;
     }
 
@@ -1264,6 +1373,11 @@ class Fakewpdb {
                 $u->user_nicename = $data['user_nicename'];
             }
         }
+        if (str_contains($table, 'matches') && isset($where['id']) && isset($GLOBALS['__mm_matches'][$where['id']])) {
+            foreach ($data as $k => $v) {
+                $GLOBALS['__mm_matches'][$where['id']][$k] = $v;
+            }
+        }
         return 1;
     }
 
@@ -1271,6 +1385,12 @@ class Fakewpdb {
         $cols = implode(', ', array_keys((array)$data));
         $vals = implode(', ', array_map(static fn($v) => is_numeric($v) ? (string)$v : "'" . addslashes((string)$v) . "'", array_values((array)$data)));
         $this->queries[] = "INSERT INTO {$table} ({$cols}) VALUES ({$vals})";
+        if (str_contains($table, 'matches')) {
+            $id = count($GLOBALS['__mm_matches'] ?? []) + 1;
+            $data['id'] = $id;
+            $GLOBALS['__mm_matches'][$id] = (array) $data;
+            $this->insert_id = $id;
+        }
         return 1;
     }
 
@@ -1283,6 +1403,9 @@ class Fakewpdb {
         $cols = implode(', ', array_keys((array)$data));
         $vals = implode(', ', array_map(static fn($v) => is_numeric($v) ? (string)$v : "'" . addslashes((string)$v) . "'", array_values((array)$data)));
         $this->queries[] = "REPLACE INTO {$table} ({$cols}) VALUES ({$vals})";
+        if (str_contains($table, 'matchmaking_pool') && !empty($data['user_id'])) {
+            $GLOBALS['__mm_pool_users'][(int) $data['user_id']] = (array) $data;
+        }
         return 1;
     }
 }
