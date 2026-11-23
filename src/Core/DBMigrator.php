@@ -32,7 +32,6 @@ class DBMigrator {
     {
         $self = self::instance();
         $self->maybe_migrate();
-        \Matchmaker\Core\PMProSync::instance()->sync_all_users_user_types();
         \Matchmaker\Admin\AdminPortal::register_role_and_caps();
     }
 
@@ -41,7 +40,7 @@ class DBMigrator {
         global $wpdb;
 
         $option_name = 'mm_matchmaking_db_v2_version';
-        $new_version = '2.13.0';
+        $new_version = '2.14.0';
         $installed_version = (string) get_option($option_name, '0.0.0');
         
         // Handle legacy versioning correctly without blocking upgrades
@@ -262,8 +261,35 @@ class DBMigrator {
             }
         }
 
-        // Synchronize all user types strictly to base tiers ('free', 'monthly', 'event')
-        \Matchmaker\Core\PMProSync::instance()->sync_all_users_user_types();
+        // Self-heal wp_users column collations if latin1 is detected (prevents Illegal mix of collations on Arabic/UTF-8 usernames)
+        if (!empty($wpdb->users)) {
+            $user_cols = $wpdb->get_results("SHOW FULL COLUMNS FROM {$wpdb->users}");
+            if (is_array($user_cols)) {
+                $needs_collation_fix = false;
+                foreach ($user_cols as $col) {
+                    $field     = $col->Field ?? '';
+                    $collation = $col->Collation ?? '';
+                    if (in_array($field, ['user_login', 'user_nicename', 'display_name', 'user_email'], true)) {
+                        if (is_string($collation) && stripos($collation, 'latin1') !== false) {
+                            $needs_collation_fix = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ($needs_collation_fix) {
+                    $target_collate = !empty($wpdb->collate) ? $wpdb->collate : 'utf8mb4_unicode_520_ci';
+                    $target_charset = !empty($wpdb->charset) ? $wpdb->charset : 'utf8mb4';
+                    $wpdb->query(
+                        "ALTER TABLE {$wpdb->users} 
+                         MODIFY COLUMN `user_login` VARCHAR(60) CHARACTER SET {$target_charset} COLLATE {$target_collate} NOT NULL DEFAULT '',
+                         MODIFY COLUMN `user_nicename` VARCHAR(50) CHARACTER SET {$target_charset} COLLATE {$target_collate} NOT NULL DEFAULT '',
+                         MODIFY COLUMN `display_name` VARCHAR(250) CHARACTER SET {$target_charset} COLLATE {$target_collate} NOT NULL DEFAULT '',
+                         MODIFY COLUMN `user_email` VARCHAR(100) CHARACTER SET {$target_charset} COLLATE {$target_collate} NOT NULL DEFAULT ''"
+                    );
+                }
+            }
+        }
 
         update_option($option_name, $new_version);
         // Maintain legacy numeric option for older code/tests expecting this.

@@ -3457,5 +3457,34 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — **all 268 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+---
+
+## 2026-11-23 — Task 162: Fix Plugin Activation Timeout and Resolve wp_users Latin1 Collation Error
+
+- **Objective**:
+  1. Diagnose and eliminate plugin activation timeouts and fatal aborts caused by synchronous iteration over all WordPress users and unindexed `WP_Query` lookups during `register_activation_hook`.
+  2. Prevent `FeaturedProfileController::handle_service_revoked()` from running expensive `WP_Query` postmeta searches for members who never had a featured profile enabled.
+  3. Cache found featured profile post IDs in `_mm_featured_post_id` usermeta to eliminate redundant post queries.
+  4. Decouple synchronous `PMProSync::sync_all_users_user_types()` from `DBMigrator::activate()` and `DBMigrator::maybe_migrate()`, and register `mm_sync_all_users_job` action hook for safe async background execution.
+  5. Add automated collation self-healing in `DBMigrator::maybe_migrate()` (bumped schema to `v2.14.0`) to convert `wp_users` columns (`user_login`, `user_nicename`, `display_name`, `user_email`) from `latin1` to `utf8mb4` to eliminate MySQL error 1267 ("Illegal mix of collations") on Arabic usernames.
+- **Implemented**:
+  - `src/Frontend/FeaturedProfileController.php`:
+    - Added fast bail guard to `handle_service_revoked(int $user_id)`: returns immediately if `$enabled === 0 && $cached_id === 0`, preventing unnecessary `WP_Query` executions.
+    - Updated `get_user_featured_post_id(int $user_id)` to cache found post IDs in `_mm_featured_post_id` usermeta.
+  - `src/Core/DBMigrator.php`:
+    - Removed synchronous call to `\Matchmaker\Core\PMProSync::instance()->sync_all_users_user_types()` from `activate()` and `maybe_migrate()`.
+    - Bumped migration version to `2.14.0`.
+    - Added automated self-healing inspection of `wp_users` columns (`SHOW FULL COLUMNS FROM {$wpdb->users}`) to alter any columns with `latin1` collation to `utf8mb4` with `$wpdb->collate`.
+  - `src/Core/PMProSync.php`:
+    - Registered `mm_sync_all_users_job` action hook in constructor to allow asynchronous background execution of `sync_all_users_user_types()` via Action Scheduler.
+  - `tests/DBMigratorTest.php`:
+    - Updated version assertion to `2.14.0`.
+    - Added `test_maybe_migrate_heals_latin1_wp_users_collation()`.
+  - `tests/Unit/FeaturedProfileTest.php`:
+    - Added `test_handle_service_revoked_skips_when_never_enabled()`.
+- **Verification**:
+  - Ran `php -l` lint check on all modified files — 0 syntax errors.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 273 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
 
 

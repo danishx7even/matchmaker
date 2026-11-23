@@ -85,6 +85,7 @@ class PMProSync {
         add_action('wp_footer', [$this, 'render_account_cancel_blockade_script']);
         add_action('pmpro_account_preheader', [$this, 'render_account_error_notice']);
         add_action('pmpro_membership_account_after_level_card_content', [$this, 'render_membership_account_card_details'], 10, 1);
+        add_action('mm_sync_all_users_job', [$this, 'sync_all_users_user_types']);
     }
 
     /**

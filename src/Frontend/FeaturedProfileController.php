@@ -208,7 +208,11 @@ final class FeaturedProfileController
         $q = new \WP_Query($args);
         if (!empty($q->posts) && is_array($q->posts)) {
             $first = $q->posts[0];
-            return is_object($first) ? (int) ($first->ID ?? 0) : (int) $first;
+            $found_id = is_object($first) ? (int) ($first->ID ?? 0) : (int) $first;
+            if ($found_id > 0) {
+                update_user_meta($user_id, '_mm_featured_post_id', $found_id);
+                return $found_id;
+            }
         }
 
         return 0;
@@ -307,6 +311,14 @@ final class FeaturedProfileController
     public function handle_service_revoked(int $user_id): void
     {
         if ($user_id <= 0) {
+            return;
+        }
+
+        $enabled   = (int) get_user_meta($user_id, 'mm_featured_enabled', true);
+        $cached_id = (int) get_user_meta($user_id, '_mm_featured_post_id', true);
+
+        // Fast bail if the user never had a featured profile enabled and has no associated post ID
+        if ($enabled === 0 && $cached_id === 0) {
             return;
         }
 

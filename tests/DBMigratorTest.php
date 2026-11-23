@@ -37,16 +37,38 @@ final class DBMigratorTest extends TestCase
         $this->assertStringContainsString('user_two_rejection_reason', $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString("'archived'", $GLOBALS['__mm_dbdelta_sql']);
         $this->assertStringContainsString("'featured'", $GLOBALS['__mm_dbdelta_sql']);
-        $this->assertEquals('2.13.0', $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version']);
-
+        $this->assertEquals('2.14.0', $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version']);
     }
 
     public function test_maybe_migrate_skips_when_already_installed(): void
     {
-        $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version'] = '2.13.0';
+        $GLOBALS['__mm_options']['mm_matchmaking_db_v2_version'] = '2.14.0';
         $migrator = DBMigrator::instance();
         $migrator->maybe_migrate();
 
         $this->assertNull($GLOBALS['__mm_dbdelta_sql']);
+    }
+
+    public function test_maybe_migrate_heals_latin1_wp_users_collation(): void
+    {
+        $GLOBALS['wpdb']->mock_results["SHOW FULL COLUMNS FROM {$GLOBALS['wpdb']->users}"] = [
+            (object) ['Field' => 'user_login', 'Collation' => 'latin1_swedish_ci'],
+            (object) ['Field' => 'user_nicename', 'Collation' => 'latin1_swedish_ci'],
+            (object) ['Field' => 'display_name', 'Collation' => 'latin1_swedish_ci'],
+            (object) ['Field' => 'user_email', 'Collation' => 'latin1_swedish_ci'],
+        ];
+
+        $migrator = DBMigrator::instance();
+        $migrator->maybe_migrate();
+
+        $found_alter = false;
+        foreach ($GLOBALS['wpdb']->queries as $q) {
+            if (str_contains($q, "ALTER TABLE {$GLOBALS['wpdb']->users}") && str_contains($q, 'user_login')) {
+                $found_alter = true;
+                break;
+            }
+        }
+
+        $this->assertTrue($found_alter, 'Expected ALTER TABLE on wp_users to heal latin1 collation');
     }
 }

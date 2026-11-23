@@ -124,6 +124,14 @@ final class FeaturedProfileTest extends TestCase
         $this->assertSame(0, (int) get_user_meta($user_id, 'mm_featured_enabled', true));
     }
 
+    public function test_handle_service_revoked_skips_when_never_enabled(): void
+    {
+        $user_id = 999;
+        // User has no meta for featured enabled or post_id
+        $this->controller->handle_service_revoked($user_id);
+        $this->assertSame(0, (int) get_user_meta($user_id, 'mm_featured_enabled', true));
+    }
+
     public function test_elementor_query_filter_sets_post_type_and_publish_status(): void
     {
         $query = new \WP_Query();
