@@ -123,7 +123,30 @@
                 });
             };
 
-            $('#mm-featured-enabled-check').on('change', saveFeaturedSettings);
+            $('#mm-featured-enabled-check').on('change', function () {
+                var isEnabled = $(this).is(':checked');
+                if (isEnabled) {
+                    $('#mm-featured-visibility-options').slideDown(200);
+                    $('#mm-featured-live-badge').show();
+                    $('#mm-featured-hidden-badge').hide();
+                } else {
+                    $('#mm-featured-visibility-options').slideUp(200);
+                    $('#mm-featured-live-badge').hide();
+                    $('#mm-featured-hidden-badge').show();
+                }
+                saveFeaturedSettings();
+            });
+
+            $(document).on('click', '.mm-visibility-card', function (e) {
+                if ($(e.target).closest('input, button, a, label').length) {
+                    return;
+                }
+                var $radio = $(this).find('input[type="radio"]');
+                if (!$radio.is(':checked')) {
+                    $radio.prop('checked', true).trigger('change');
+                }
+            });
+
             $('input[name="mm_featured_visibility_mode"]').on('change', function () {
                 var mode = $(this).val();
                 $('.mm-visibility-card').removeClass('is-active');
@@ -136,10 +159,12 @@
                 }
                 saveFeaturedSettings();
             });
+
             $('#mm-featured-save-name-btn').on('click', function (e) {
                 e.preventDefault();
                 saveFeaturedSettings();
             });
+
             $('#mm-featured-display-name-input').on('keydown', function (e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();

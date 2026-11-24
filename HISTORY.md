@@ -3617,3 +3617,35 @@ This document maintains a chronological, step-by-step history of all features, a
   - Ran `php -l` lint check on `src/View/frontend/portal/tab-profile.php` — 0 syntax errors detected.
   - Executed automated test runner (`tests/run_tests.php`) — **all 281 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+---
+
+## 2026-11-24 — Task 167: Simplify Featured Profile Status Card, Fix Switcher Active State & Horizontal Alignment
+
+- **Objective**:
+  1. Fix layout distortion where the visibility mode section was appearing horizontally next to the toggle switch instead of stacked beneath it.
+  2. Fix invalid HTML label nesting: remove block elements from `<label>` and separate `<div class="mm-featured-toggle-row">` from `<label class="mm-switch-control">`, preventing the browser HTML parser from improperly enclosing child visibility options within the switch label.
+  3. Fix toggle active state:
+     - Use general sibling combinator `~` instead of `+` (`input[type="checkbox"]:checked ~ .mm-switch-slider`) to withstand WordPress auto-injected `<br>` or whitespace.
+     - Add robust state resolution for `$is_featured_enabled` so when `mm_featured_enabled` user meta is unset on initial purchase, it checks if the user's featured post is published.
+  4. Simplify and un-bloat design:
+     - Clean, flat, modern card with warm `#fed7aa` border without nested multi-layer boxes.
+     - Position "CHOOSE YOUR VISIBILITY MODE:" directly beneath the switcher row.
+     - Lay out "Anonymous (Recommended)" and "Public" side-by-side using responsive 2-column grid (`grid-template-columns: 1fr 1fr; gap: 16px;`), collapsing to 1-column on mobile screens (`<= 640px`).
+     - Remove artificial box wrapper around radio dots; use clean native radio buttons alongside title and descriptions.
+  5. Provide immediate UI feedback on toggle change in `featured-profiles.js`.
+- **Implemented**:
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Separated `.mm-featured-toggle-row` from `.mm-switch-control` without wrapping `<div>` in `<label>`.
+    - Placed `#mm-featured-visibility-options` beneath the toggle row.
+    - Used clean `<div class="mm-visibility-card">` with simple `<label class="mm-visibility-radio-label">` (radio + title only) to guarantee zero parser breakage.
+  - `assets/css/member-portal.css`:
+    - Replaced multi-layer nested styles with clean, lightweight CSS.
+    - Added `grid-template-columns: 1fr 1fr` for horizontal side-by-side alignment with mobile fallback.
+    - Updated switcher selector to `input[type="checkbox"]:checked ~ .mm-switch-slider`.
+  - `assets/js/featured-profiles.js`:
+    - Added immediate toggle feedback on `#mm-featured-enabled-check` change and full-card click delegation for `.mm-visibility-card`.
+- **Verification**:
+  - Ran `php -l` lint check on `src/View/frontend/portal/tab-profile.php` — 0 syntax errors detected.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 281 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+
