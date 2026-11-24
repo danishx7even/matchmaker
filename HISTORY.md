@@ -3583,3 +3583,37 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Ran `php -l` lint check on all modified files — 0 syntax errors.
   - Executed automated test runner (`tests/run_tests.php`) — **all 281 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+## 2026-11-24 — Task 166: Fix Featured Profile Status Card Frontend Styling & Upgrade Asset/Plugin Versioning
+
+- **Objective**:
+  1. Fix visual and styling anomalies on the Member Portal Featured Profile Status card (`tab-profile.php`):
+     - Replace emoji glyphs (`🟢`, `⚪`) with robust CSS status indicators (`.mm-status-dot.mm-dot-live` with subtle pulsing aura and `.mm-status-dot.mm-dot-hidden`), eliminating font-metric bounding-box projection artifacts (the green arc/crescent floating above the badge).
+     - Fix card header alignment (`.mm-featured-header`) so the status badge sits cleanly in the top right corner without wrapping down awkwardly.
+     - Replace plain unstyled browser checkbox with a modern, smooth toggle switch card (`.mm-switch-slider`) while strictly preserving `#mm-featured-enabled-check` and its change event handler.
+     - Redesign "Choose Your Visibility Mode" radio inputs into modern, isolated selectable cards (`.mm-visibility-card`) with active border highlights (`.is-active`).
+     - Fix the squished alias input field and crammed two-line "SAVE TITLE" button using a dedicated flex group (`.mm-anon-input-group`) with `flex: 1`, full width, and `white-space: nowrap !important`.
+  2. Upgrade plugin and asset versioning to `2.16.0`:
+     - Bump `Version: 2.16.0` and `MM_VERSION` in `matchmaker.php`.
+     - Implement composite cache-busting (`filemtime`) in `FeaturedProfileController.php` for `member-portal.css` and `featured-profiles.js`.
+     - Update version fallbacks across all controllers (`PortalController.php`, `AdminPortal.php`, `FormController.php`, `PMProSync.php`, `EmailVerificationService.php`).
+  3. Ensure 100% preservation of all existing IDs, values, AJAX endpoints (`mm_toggle_featured_profile`), and functionality.
+- **Implemented**:
+  - `matchmaker.php`:
+    - Updated plugin header version to `2.16.0` and defined `MM_VERSION` as `2.16.0`.
+  - `src/Frontend/FeaturedProfileController.php`:
+    - Updated version fallback to `2.16.0` and added composite `filemtime` cache-busting for CSS and JS assets.
+  - `src/Frontend/PortalController.php`, `src/Admin/AdminPortal.php`, `src/Frontend/FormController.php`, `src/Core/PMProSync.php`, `src/Service/EmailVerificationService.php`:
+    - Bumped fallback version constants to `2.16.0`.
+  - `assets/css/member-portal.css`:
+    - Added scoped rules for `.mm-featured-portal-card`, `.mm-featured-header`, `.mm-featured-title`, `.mm-featured-badge`, `.mm-status-dot` (`.mm-dot-live` with `@keyframes mmPulseDot` and `.mm-dot-hidden`), `.mm-featured-toggle-box`, `.mm-switch-slider` (iOS-style toggle), `.mm-visibility-grid`, `.mm-visibility-card` (`.is-active`), and `.mm-anon-input-group` (with full-width input and single-line `#mm-featured-save-name-btn`).
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Refactored Featured Profile Status card markup using clean semantic classes and `.mm-status-dot` while retaining exact IDs, names, and event triggers.
+  - `assets/js/featured-profiles.js`:
+    - Added `.is-active` toggle logic on `.mm-visibility-card` on radio selection.
+- **Verification**:
+  - Ran `php -l` lint check on `src/View/frontend/portal/tab-profile.php` — 0 syntax errors detected.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 281 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+

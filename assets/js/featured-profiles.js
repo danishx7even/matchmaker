@@ -126,6 +126,9 @@
             $('#mm-featured-enabled-check').on('change', saveFeaturedSettings);
             $('input[name="mm_featured_visibility_mode"]').on('change', function () {
                 var mode = $(this).val();
+                $('.mm-visibility-card').removeClass('is-active');
+                $(this).closest('.mm-visibility-card').addClass('is-active');
+
                 if (mode === 'anonymous') {
                     $('#mm-featured-anon-name-wrap').slideDown(150);
                 } else {

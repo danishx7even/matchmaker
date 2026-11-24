@@ -150,65 +150,77 @@ $badge_label = $repo->format_tier_label($user_type);
         $feat_visibility     = (string) get_user_meta($user_id, 'mm_featured_visibility', true) ?: 'anonymous';
         $feat_anon_name      = (string) get_user_meta($user_id, 'mm_featured_anonymous_name', true);
     ?>
-        <div class="az-card mm-featured-portal-card" id="mm-featured-portal-card" style="border:1.5px solid #fed7aa; background:linear-gradient(180deg, #fffaf5 0%, #ffffff 100%); margin-bottom:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
-                <div>
-                    <h3 style="margin:0 0 4px; font-size:18px; color:#9a3412; display:flex; align-items:center; gap:8px;">
+        <div class="az-card mm-featured-portal-card" id="mm-featured-portal-card">
+            <div class="mm-featured-header">
+                <div class="mm-featured-header-text">
+                    <h3 class="mm-featured-title">
                         ⭐ <?php esc_html_e('Featured Profile Status', 'matchmaker'); ?>
                     </h3>
-                    <p style="margin:0; font-size:13px; color:#78350f;">
+                    <p class="mm-featured-desc">
                         <?php esc_html_e('You have purchased the Featured Profile service. You can toggle your visibility and choose how your profile appears on the public Featured Profiles page.', 'matchmaker'); ?>
                     </p>
                 </div>
-                <div>
-                    <span id="mm-featured-live-badge" class="mm-badge" style="background:#ecfdf5; color:#065f46; border:1px solid #10b981; font-weight:700; font-size:12px; padding:4px 10px; border-radius:12px; <?php echo $is_featured_enabled ? '' : 'display:none;'; ?>">
-                        🟢 <?php esc_html_e('Live & Published', 'matchmaker'); ?>
+                <div class="mm-featured-header-badges">
+                    <span id="mm-featured-live-badge" class="mm-featured-badge mm-badge-live" style="<?php echo $is_featured_enabled ? '' : 'display:none;'; ?>">
+                        <span class="mm-status-dot mm-dot-live"></span>
+                        <span><?php esc_html_e('Live & Published', 'matchmaker'); ?></span>
                     </span>
-                    <span id="mm-featured-hidden-badge" class="mm-badge" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; font-weight:700; font-size:12px; padding:4px 10px; border-radius:12px; <?php echo !$is_featured_enabled ? '' : 'display:none;'; ?>">
-                        ⚪ <?php esc_html_e('Hidden from Public', 'matchmaker'); ?>
+                    <span id="mm-featured-hidden-badge" class="mm-featured-badge mm-badge-hidden" style="<?php echo !$is_featured_enabled ? '' : 'display:none;'; ?>">
+                        <span class="mm-status-dot mm-dot-hidden"></span>
+                        <span><?php esc_html_e('Hidden from Public', 'matchmaker'); ?></span>
                     </span>
                 </div>
             </div>
 
-            <div style="background:#fff; border:1px solid #ffedd5; border-radius:12px; padding:16px; margin-bottom:12px;">
-                <label style="display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:600; color:#1e293b; font-size:15px;">
-                    <input type="checkbox" id="mm-featured-enabled-check" value="1" <?php checked($is_featured_enabled, true); ?> style="width:20px; height:20px; accent-color:#CC723F; cursor:pointer;">
-                    <span><?php esc_html_e('Feature my profile on the Public Featured Profiles page', 'matchmaker'); ?></span>
+            <div class="mm-featured-toggle-box">
+                <label class="mm-switch-label" for="mm-featured-enabled-check">
+                    <div class="mm-switch-text">
+                        <span class="mm-switch-title"><?php esc_html_e('Feature my profile on the Public Featured Profiles page', 'matchmaker'); ?></span>
+                        <span class="mm-switch-subtitle"><?php esc_html_e('Turn on to make your profile discoverable on the public directory', 'matchmaker'); ?></span>
+                    </div>
+                    <div class="mm-switch-control">
+                        <input type="checkbox" id="mm-featured-enabled-check" value="1" <?php checked($is_featured_enabled, true); ?>>
+                        <span class="mm-switch-slider"></span>
+                    </div>
                 </label>
 
-                <div id="mm-featured-visibility-options" style="margin-top:14px; padding-top:14px; border-top:1px solid #f8fafc; <?php echo $is_featured_enabled ? '' : 'display:none;'; ?>">
-                    <div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:8px;">
+                <div id="mm-featured-visibility-options" class="mm-visibility-options-wrapper" style="<?php echo $is_featured_enabled ? '' : 'display:none;'; ?>">
+                    <div class="mm-visibility-heading">
                         <?php esc_html_e('Choose Your Visibility Mode:', 'matchmaker'); ?>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:12px;">
-                        <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:#334155;">
-                            <input type="radio" name="mm_featured_visibility_mode" value="anonymous" <?php checked($feat_visibility, 'anonymous'); ?> style="margin-top:2px; accent-color:#CC723F;">
-                            <div style="flex:1;">
-                                <strong><?php esc_html_e('Anonymous (Recommended)', 'matchmaker'); ?></strong>
-                                <div style="color:#64748b; font-size:12px; margin-bottom:6px;">
+                    <div class="mm-visibility-grid">
+                        <label class="mm-visibility-card <?php echo ($feat_visibility === 'anonymous') ? 'is-active' : ''; ?>">
+                            <input type="radio" class="mm-visibility-radio" name="mm_featured_visibility_mode" value="anonymous" <?php checked($feat_visibility, 'anonymous'); ?>>
+                            <div class="mm-visibility-card-body">
+                                <div class="mm-visibility-card-title">
+                                    🔒 <?php esc_html_e('Anonymous (Recommended)', 'matchmaker'); ?>
+                                </div>
+                                <div class="mm-visibility-card-desc">
                                     <?php esc_html_e('Your real name and photo will be hidden. A privacy silhouette and candidate title will be shown. Members can still view your background, education, and career to apply.', 'matchmaker'); ?>
                                 </div>
-                                <div id="mm-featured-anon-name-wrap" style="margin-top:6px; <?php echo ($feat_visibility === 'anonymous') ? '' : 'display:none;'; ?>">
+                                <div id="mm-featured-anon-name-wrap" style="<?php echo ($feat_visibility === 'anonymous') ? '' : 'display:none;'; ?>">
                                     <label for="mm-featured-display-name-input" style="display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:4px;">
                                         <?php esc_html_e('Anonymous Display Title / Alias:', 'matchmaker'); ?>
                                     </label>
-                                    <div style="display:flex; gap:8px; align-items:center;">
-                                        <input type="text" id="mm-featured-display-name-input" value="<?php echo esc_attr($feat_anon_name); ?>" placeholder="<?php echo esc_attr(sprintf(__('e.g. Candidate #%d or custom alias', 'matchmaker'), $user_id)); ?>" maxlength="60" style="padding:6px 12px; border:1.5px solid #cbd5e1; border-radius:6px; font-size:13px; max-width:280px; width:100%;">
-                                        <button type="button" id="mm-featured-save-name-btn" class="button" style="padding:4px 12px; font-size:12px; height:32px; background:#CC723F; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600;">
+                                    <div class="mm-anon-input-group">
+                                        <input type="text" id="mm-featured-display-name-input" value="<?php echo esc_attr($feat_anon_name); ?>" placeholder="<?php echo esc_attr(sprintf(__('e.g. Candidate #%d or custom alias', 'matchmaker'), $user_id)); ?>" maxlength="60">
+                                        <button type="button" id="mm-featured-save-name-btn" class="button">
                                             <?php esc_html_e('Save Title', 'matchmaker'); ?>
                                         </button>
                                     </div>
-                                    <span style="display:block; color:#94a3b8; font-size:11px; margin-top:3px;">
+                                    <span style="display:block; color:#94a3b8; font-size:11px; margin-top:4px;">
                                         <?php esc_html_e('Leave blank to display as "Candidate #{id}".', 'matchmaker'); ?>
                                     </span>
                                 </div>
                             </div>
                         </label>
-                        <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:#334155;">
-                            <input type="radio" name="mm_featured_visibility_mode" value="public" <?php checked($feat_visibility, 'public'); ?> style="margin-top:2px; accent-color:#CC723F;">
-                            <div>
-                                <strong><?php esc_html_e('Public', 'matchmaker'); ?></strong>
-                                <div style="color:#64748b; font-size:12px;">
+                        <label class="mm-visibility-card <?php echo ($feat_visibility === 'public') ? 'is-active' : ''; ?>">
+                            <input type="radio" class="mm-visibility-radio" name="mm_featured_visibility_mode" value="public" <?php checked($feat_visibility, 'public'); ?>>
+                            <div class="mm-visibility-card-body">
+                                <div class="mm-visibility-card-title">
+                                    🌐 <?php esc_html_e('Public', 'matchmaker'); ?>
+                                </div>
+                                <div class="mm-visibility-card-desc">
                                     <?php esc_html_e('Your display name and primary profile photo will be publicly visible on the Featured Profiles page.', 'matchmaker'); ?>
                                 </div>
                             </div>
@@ -217,8 +229,7 @@ $badge_label = $repo->format_tier_label($user_type);
                 </div>
             </div>
 
-
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="mm-featured-footer">
                 <span id="mm-featured-save-status" style="font-size:12px; font-weight:600; display:none;"></span>
                 <small style="color:#94a3b8; font-size:11px; margin-left:auto;">
                     <?php esc_html_e('Changes save automatically.', 'matchmaker'); ?>

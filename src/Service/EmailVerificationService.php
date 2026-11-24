@@ -802,7 +802,7 @@ img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__DIR__, 2));
         $css_file   = dirname(__DIR__, 2) . '/assets/css/email-verification.css';
         $js_file    = dirname(__DIR__, 2) . '/assets/js/email-verification.js';
-        $base_ver   = defined('MM_VERSION') ? MM_VERSION : '2.14.0';
+        $base_ver   = defined('MM_VERSION') ? MM_VERSION : '2.16.0';
         $css_ver    = $base_ver . '.' . (file_exists($css_file) ? (string) filemtime($css_file) : '0');
         $js_ver     = $base_ver . '.' . (file_exists($js_file) ? (string) filemtime($js_file) : '0');
 

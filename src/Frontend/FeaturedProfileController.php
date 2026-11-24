@@ -60,8 +60,12 @@ final class FeaturedProfileController
      */
     public function enqueue_frontend_assets(): void
     {
-        $min_ver    = defined('MM_VERSION') ? MM_VERSION : '2.10.0';
+        $min_ver    = defined('MM_VERSION') ? MM_VERSION : '2.16.0';
         $plugin_url = defined('MM_URL') ? MM_URL : (function_exists('plugin_dir_url') ? plugin_dir_url(dirname(__DIR__, 2) . '/matchmaker.php') : '');
+        $js_file    = dirname(__DIR__, 2) . '/assets/js/featured-profiles.js';
+        $css_file   = dirname(__DIR__, 2) . '/assets/css/member-portal.css';
+        $js_ver     = $min_ver . '.' . (file_exists($js_file) ? (string) filemtime($js_file) : '0');
+        $css_ver    = $min_ver . '.' . (file_exists($css_file) ? (string) filemtime($css_file) : '0');
 
         // Enqueue member portal styles for complete lightbox modal & component styling
         if (function_exists('wp_enqueue_style')) {
@@ -69,7 +73,7 @@ final class FeaturedProfileController
                 'mm-member-portal-styles',
                 $plugin_url . 'assets/css/member-portal.css',
                 [],
-                $min_ver
+                $css_ver
             );
         }
 
@@ -79,7 +83,7 @@ final class FeaturedProfileController
                 'mm-featured-profiles',
                 $plugin_url . 'assets/js/featured-profiles.js',
                 ['jquery'],
-                $min_ver,
+                $js_ver,
                 true
             );
         }
