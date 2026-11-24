@@ -651,5 +651,141 @@ final class FeaturedProfileTest extends TestCase
         $btn_candidate_still = $this->controller->render_featured_profile_apply_button(['post_id' => $post_id]);
         $this->assertStringContainsString('Your Featured Profile', $btn_candidate_still);
     }
+
+    public function test_parse_image_dimensions_utility(): void
+    {
+        // 1. Shorthand "200x300"
+        $d1 = FeaturedProfileController::parse_image_dimensions(['dimensions' => '200x300']);
+        $this->assertSame('200px', $d1['width']);
+        $this->assertSame('300px', $d1['height']);
+        $this->assertSame(200, $d1['size_num']);
+        $this->assertSame('12px', $d1['radius']);
+        $this->assertSame('cover', $d1['fit']);
+
+        // 2. Square number "150"
+        $d2 = FeaturedProfileController::parse_image_dimensions(['size' => '150', 'radius' => 'circle', 'fit' => 'contain']);
+        $this->assertSame('150px', $d2['width']);
+        $this->assertSame('150px', $d2['height']);
+        $this->assertSame('50%', $d2['radius']);
+        $this->assertSame('contain', $d2['fit']);
+
+        // 3. Named WordPress size "thumbnail"
+        $d3 = FeaturedProfileController::parse_image_dimensions(['size' => 'thumbnail', 'border_radius' => '8']);
+        $this->assertSame('150px', $d3['width']);
+        $this->assertSame('150px', $d3['height']);
+        $this->assertSame('8px', $d3['radius']);
+
+        // 4. Explicit width and height overriding
+        $d4 = FeaturedProfileController::parse_image_dimensions([
+            'width'  => '100%',
+            'height' => '250px',
+            'radius' => '16px',
+            'fit'    => 'fill',
+        ]);
+        $this->assertSame('100%', $d4['width']);
+        $this->assertSame('250px', $d4['height']);
+        $this->assertSame('16px', $d4['radius']);
+        $this->assertSame('fill', $d4['fit']);
+    }
+
+    public function test_render_featured_profile_field_photo_size_and_dimensions(): void
+    {
+        $user_id = 458;
+        $user = new \WP_User((object) [
+            'ID'           => $user_id,
+            'display_name' => 'Laila Test',
+        ]);
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        MatchRepository::instance()->upsert_pool([
+            'user_id'    => $user_id,
+            'birth_date' => '1996-04-10',
+            'country'    => 'Morocco',
+            'city'       => 'Casablanca',
+            'user_type'  => 'monthly',
+        ]);
+        update_user_meta($user_id, 'user_photo1', 'https://example.com/laila1.jpg');
+        update_user_meta($user_id, 'user_photo2', 'https://example.com/laila2.jpg');
+
+        // Public post
+        $post_id_pub = $this->controller->sync_featured_post($user_id, true, 'public');
+
+        // 1. Photo with custom width, height, and circular radius
+        $html_pub_round = $this->controller->render_featured_profile_field([
+            'key'     => 'photo',
+            'post_id' => $post_id_pub,
+            'width'   => '140',
+            'height'  => '140',
+            'radius'  => '50%',
+        ]);
+        $this->assertStringContainsString('https://example.com/laila1.jpg', $html_pub_round);
+        $this->assertStringContainsString('width:140px;', $html_pub_round);
+        $this->assertStringContainsString('height:140px;', $html_pub_round);
+        $this->assertStringContainsString('border-radius:50%;', $html_pub_round);
+        $this->assertStringContainsString('object-fit:cover;', $html_pub_round);
+
+        // 2. Photo with dimensions attribute and fit="contain"
+        $html_pub_dims = $this->controller->render_featured_profile_field([
+            'key'        => 'photo',
+            'post_id'    => $post_id_pub,
+            'dimensions' => '200x260',
+            'fit'        => 'contain',
+        ]);
+        $this->assertStringContainsString('width:200px;', $html_pub_dims);
+        $this->assertStringContainsString('height:260px;', $html_pub_dims);
+        $this->assertStringContainsString('object-fit:contain;', $html_pub_dims);
+
+        // 3. Photo 2 slot
+        $html_pub_p2 = $this->controller->render_featured_profile_field([
+            'key'     => 'photo_2',
+            'post_id' => $post_id_pub,
+            'size'    => '180',
+        ]);
+        $this->assertStringContainsString('https://example.com/laila2.jpg', $html_pub_p2);
+        $this->assertStringContainsString('width:180px;', $html_pub_p2);
+        $this->assertStringContainsString('height:180px;', $html_pub_p2);
+
+        // 4. Anonymous candidate scaling
+        $post_id_anon = $this->controller->sync_featured_post($user_id, true, 'anonymous');
+        $html_anon = $this->controller->render_featured_profile_field([
+            'key'     => 'photo',
+            'post_id' => $post_id_anon,
+            'size'    => '100x100',
+            'radius'  => 'circle',
+        ]);
+        $this->assertStringContainsString('mm-anonymous-avatar', $html_anon);
+        $this->assertStringContainsString('width:100px;', $html_anon);
+        $this->assertStringContainsString('height:100px;', $html_anon);
+        $this->assertStringContainsString('border-radius:50%;', $html_anon);
+    }
+
+    public function test_render_featured_profile_details_custom_photo_dimensions(): void
+    {
+        $user_id = 459;
+        $user = new \WP_User((object) [
+            'ID'           => $user_id,
+            'display_name' => 'Samir Test',
+        ]);
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        MatchRepository::instance()->upsert_pool([
+            'user_id'    => $user_id,
+            'birth_date' => '1992-08-15',
+            'country'    => 'Jordan',
+            'city'       => 'Amman',
+            'user_type'  => 'monthly',
+        ]);
+        update_user_meta($user_id, 'user_photo1', 'https://example.com/samir1.jpg');
+
+        $post_id = $this->controller->sync_featured_post($user_id, true, 'public');
+
+        $html_details = $this->controller->render_featured_profile_details([
+            'post_id'    => $post_id,
+            'photo_size' => '400x360',
+        ]);
+
+        $this->assertStringContainsString('max-width:400px;', $html_details);
+        $this->assertStringContainsString('height:360px;', $html_details);
+    }
 }
 

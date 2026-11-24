@@ -3486,5 +3486,100 @@ This document maintains a chronological, step-by-step history of all features, a
   - Ran `php -l` lint check on all modified files — 0 syntax errors.
   - Executed automated test runner (`tests/run_tests.php`) — **all 273 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+---
 
+## 2026-11-24 — Task 163: Matches Step 5 Heart Icon & Standalone Services Grid Shortcode
 
+- **Objective**:
+  1. Replace the celebration icon in Member Portal Matches Step 5 (`step-5-contact.php`) from the party horn/popper SVG to a crisp, solid white heart SVG inside the brand orange gradient bubble.
+  2. Implement a standalone shortcode `[matchmaker_services_grid]` (with aliases `[az_services_grid]` and `[matchmaker_services]`) to render the add-on services grid on any frontend page outside the dashboard.
+  3. Enforce the requirement that users must have an active base membership (Free, Monthly, or Event) before purchasing add-on services:
+     - When active base membership is present: render active service status badges and direct PMPro checkout links.
+     - When base membership is lacking or user is logged out: render an informative banner notice above the grid and route CTAs to the membership plans selection page (`$pricing_url`) with a "Membership Required →" indicator.
+- **Implemented**:
+  - `src/View/frontend/portal/steps/step-5-contact.php`:
+    - Replaced the party horn SVG with a standard 24x24 heart SVG (`M20.84 4.61a5.5 5.5...`) filled in white inside `.status-avatar-bubble.orange`.
+  - `src/View/frontend/portal/tab-services.php`:
+    - Added dynamic detection of base membership via `$sync->has_active_base_membership($user_id)` and `$user_type`.
+    - Added conditional render of `.mm-services-notice-banner` when base membership is missing.
+    - Updated purchase CTAs to point to `$pricing_url` with class `.mm-service-cta-require-base` when base membership is required.
+    - Added support for custom `$columns` and `$show_notice` attributes.
+  - `src/Frontend/PortalController.php`:
+    - Registered shortcodes: `[matchmaker_services_grid]`, `[az_services_grid]`, and `[matchmaker_services]`.
+    - Implemented `render_services_grid(array|string $atts = []): string` handling asset enqueuing, user state evaluation, and template rendering.
+    - Updated `maybe_enqueue_assets()` to recognize the new services grid shortcodes.
+  - `assets/css/member-portal.css`:
+    - Added styles for `.mm-services-notice-banner` and `.mm-service-cta-require-base`.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added `test_step_5_renders_heart_icon_celebration()` verifying heart SVG rendering.
+    - Added `test_services_grid_shortcode_registration()` verifying all three shortcodes exist.
+    - Added `test_services_grid_shortcode_enforces_base_membership()` verifying notice banner and requirement CTAs for guests vs direct checkout for members.
+- **Verification**:
+  - Ran `php -l` lint check on all modified files — 0 syntax errors.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 276 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+## 2026-11-24 — Task 164: Include Detailed Shortcode Documentation in Admin Settings Shortcodes Tab
+
+- **Objective**:
+  1. Overhaul Tab 6 (`#mm-panel-shortcodes`) in `src/View/admin/settings/settings.php` into a complete, high-signal documentation manual covering all 17 registered shortcodes.
+  2. Structure documentation into an overview summary table and 7 categorized detailed reference sections:
+     - **Master Overview Table**: Shortcode, category badge, quick summary, and recommended placement.
+     - **Section 1: Member Dashboard Portal**: `[matchmaker_member_portal]` (alias `[az_profile]`), documenting 4 tabs (Profile, Matches 5-state flow, Services, Events) and 15s Heartbeat API polling.
+     - **Section 2: Add-on Services Grid**: `[matchmaker_services_grid]` (aliases `[az_services_grid]`, `[matchmaker_services]`), documenting `columns` and `show_notice` parameters, base membership requirement gating, and usage examples.
+     - **Section 3: Matchmaking Questionnaire Wizard**: `[matchmaking_form]` and `[matchmaking_field field="..."]`, documenting multi-step validation, photo requirements, and 28 supported field slugs.
+     - **Section 4: Event Registration & RSVP**: `[event_rsvp_button]` (aliases `[az_event_rsvp_button]`, `[rsvp_button]`) and `[event_reg_form]` (aliases `[az_event_reg_form]`, `[event_registration_form]`), documenting single event post context detection and tier-gating rules.
+     - **Section 5: Featured Profiles**: `[featured_profile_details]`, `[featured_profile_apply_button]`, and `[featured_profile_field key="..."]`, documenting anonymous vs public privacy masking, candidate isolation, and loop grid integration.
+     - **Section 6: Email Verification**: `[az_email_verification]`, documenting 6-digit OTP handling, 60s resend cooldown, and grandfathering.
+     - **Section 7: Authentication Logout**: `[logout_url redirect="..."]`, documenting secure nonce handling and custom redirects.
+  3. Improve UX by hiding the irrelevant "Save All Settings" button row when Tab 6 (Shortcodes) is selected.
+- **Implemented**:
+  - `src/View/admin/settings/settings.php`:
+    - Replaced the bare-bones shortcodes table with the comprehensive documentation UI containing copyable code snippets, parameter breakdown tables, and usage examples.
+    - Updated tab-switching JavaScript to hide `#mm-main-submit-row` when switching to `shortcodes` (alongside `bulk-email` and `file-logs`).
+- **Verification**:
+  - Ran `php -l` lint check on `src/View/admin/settings/settings.php` — 0 syntax errors.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 276 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
+---
+
+## 2026-11-24 — Task 165: Image Size, Dimension, Radius, and Styling Controls in Shortcodes
+
+- **Objective**:
+  1. Provide granular control over image dimensions, sizing, cropping, aspect fit, and border-radius when displaying profile images via shortcodes.
+  2. Enhance `[featured_profile_field key="photo"]` (and `photo_1`, `photo_2`, `photo_3`):
+     - Support attributes: `width`, `height`, `size` / `dimensions` (e.g. `200x200`, `150`, `thumbnail`, `medium`, `large`), `radius` / `border_radius` (e.g. `12px`, `50%`, `circle`), `fit` / `object_fit` (`cover`, `contain`, `fill`), `class`, `style`, and `alt`.
+     - Update `get_anonymous_avatar_html()` to adapt anonymous placeholder avatar containers and SVGs to custom dimensions and circular avatars.
+  3. Enhance `[featured_profile_details]`:
+     - Support `photo_width`, `photo_height`, `photo_size`, `dimensions` parameters to adjust the main featured presentation card image box.
+  4. Implement standalone member photo shortcode `[matchmaker_profile_photo]` (aliases: `[az_profile_photo]`, `[matchmaker_photo]`):
+     - Renders any member's or the current logged-in user's photo anywhere across the site.
+     - Supports `user_id`, `photo` (1, 2, 3), full dimensional parameters (`width`, `height`, `size`, `dimensions`), `fit`, `radius` (`50%` for circular avatars), custom classes/styles, and full-screen zoom `lightbox="yes"`.
+  5. Update Admin Settings Documentation:
+     - Documented all image sizing parameters, attributes table, and copyable snippets in Tab 6 of the settings portal.
+  6. Automated Test Suite:
+     - Added comprehensive unit tests in `FeaturedProfileTest.php` and `PortalAndEventsTest.php`.
+- **Implemented**:
+  - `src/Frontend/FeaturedProfileController.php`:
+    - Added `parse_image_dimensions(array $atts, string $default_width, string $default_height, string $default_radius): array` static utility.
+    - Updated `get_anonymous_avatar_html()` with width, height, radius, class, and style parameters.
+    - Updated `render_featured_profile_details()` to parse and apply `$card_dims`.
+    - Updated `render_featured_profile_field()` to handle `photo`, `photo_1`, `photo_2`, `photo_3` with custom dimension styling.
+  - `src/Frontend/PortalController.php`:
+    - Registered shortcodes `[matchmaker_profile_photo]`, `[az_profile_photo]`, and `[matchmaker_photo]`.
+    - Implemented `render_profile_photo(array|string $atts): string` with user resolution, fallback avatar handling, dimensional styling, and optional lightbox.
+    - Added shortcodes to conditional asset enqueueing in `maybe_enqueue_assets()`.
+  - `src/View/admin/settings/settings.php`:
+    - Added `[matchmaker_profile_photo]` to Master Overview Table.
+    - Detailed image sizing parameters in Section 5 (Featured Profiles).
+    - Added Section 8 detailing Member Profile Photo shortcode attributes and examples.
+  - `tests/bootstrap.php`:
+    - Added `sanitize_html_class()` helper stub.
+  - `tests/Unit/FeaturedProfileTest.php`:
+    - Added `test_parse_image_dimensions_utility()`, `test_render_featured_profile_field_photo_size_and_dimensions()`, and `test_render_featured_profile_details_custom_photo_dimensions()`.
+  - `tests/Unit/PortalAndEventsTest.php`:
+    - Added `test_profile_photo_shortcode_registration()` and `test_render_profile_photo_with_custom_dimensions_and_radius()`.
+- **Verification**:
+  - Ran `php -l` lint check on all modified files — 0 syntax errors.
+  - Executed automated test runner (`tests/run_tests.php`) — **all 281 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.

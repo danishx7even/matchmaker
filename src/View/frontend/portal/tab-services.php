@@ -16,10 +16,25 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$sync            = \Matchmaker\Core\PMProSync::instance();
-$services        = $sync->get_services_levels();
-$checkout_base   = \Matchmaker\Service\ProfileService::instance()->get_membership_checkout_url();
-$level_tags      = $sync->get_level_tags();
+$user_id       = isset($user_id) ? (int) $user_id : get_current_user_id();
+$sync          = \Matchmaker\Core\PMProSync::instance();
+$services      = $sync->get_services_levels();
+$checkout_base = \Matchmaker\Service\ProfileService::instance()->get_membership_checkout_url();
+$pricing_url   = \Matchmaker\Service\ProfileService::instance()->get_pricing_url();
+$level_tags    = $sync->get_level_tags();
+$columns       = isset($columns) ? max(1, min(4, (int) $columns)) : 2;
+$show_notice   = isset($show_notice) ? (bool) $show_notice : true;
+
+// Evaluate active base membership
+if (!isset($has_base)) {
+    if (!empty($user_type) && in_array($user_type, ['free', 'monthly', 'event'], true)) {
+        $has_base = true;
+    } elseif ($user_id > 0) {
+        $has_base = $sync->has_active_base_membership($user_id);
+    } else {
+        $has_base = false;
+    }
+}
 ?>
 <div class="az-wrap mm-services-wrap">
     <?php if (empty($services)) : ?>
@@ -29,7 +44,19 @@ $level_tags      = $sync->get_level_tags();
             </p>
         </div>
     <?php else : ?>
-        <div class="mm-services-grid" style="display:grid !important; grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:24px !important; width:100% !important; align-items:stretch !important;">
+        <?php if (!$has_base && $show_notice) : ?>
+            <div class="mm-services-notice-banner">
+                <span style="font-size:20px; line-height:1;">ℹ️</span>
+                <div>
+                    <strong><?php esc_html_e('Base Membership Required:', 'matchmaker'); ?></strong>
+                    <?php esc_html_e('You must have an active membership plan (Free, Monthly, or Event) before purchasing add-on services.', 'matchmaker'); ?>
+                    <a href="<?php echo esc_url($pricing_url); ?>">
+                        <?php esc_html_e('View Membership Plans →', 'matchmaker'); ?>
+                    </a>
+                </div>
+            </div>
+        <?php endif; ?>
+        <div class="mm-services-grid" style="display:grid !important; grid-template-columns:repeat(<?php echo (int) $columns; ?>, minmax(0, 1fr)) !important; gap:24px !important; width:100% !important; align-items:stretch !important;">
             <?php foreach ($services as $srv) : 
                 $lvl_id = is_object($srv) ? (int) ($srv->id ?? 0) : (int) $srv;
                 if ($lvl_id <= 0) {
@@ -110,13 +137,25 @@ $level_tags      = $sync->get_level_tags();
                                 </svg>
                                 <?php esc_html_e('Purchased / Active', 'matchmaker'); ?>
                             </div>
-                            <a href="<?php echo esc_url($checkout_url); ?>" class="btn btn-primary mm-service-cta-btn" style="text-align:center !important; width:100% !important;">
-                                <?php esc_html_e('Purchase Again →', 'matchmaker'); ?>
-                            </a>
+                            <?php if ($has_base) : ?>
+                                <a href="<?php echo esc_url($checkout_url); ?>" class="btn btn-primary mm-service-cta-btn" style="text-align:center !important; width:100% !important;">
+                                    <?php esc_html_e('Purchase Again →', 'matchmaker'); ?>
+                                </a>
+                            <?php else : ?>
+                                <a href="<?php echo esc_url($pricing_url); ?>" class="btn btn-primary mm-service-cta-btn mm-service-cta-require-base" style="text-align:center !important; width:100% !important;" title="<?php esc_attr_e('A base membership plan is required before purchasing this service.', 'matchmaker'); ?>">
+                                    <?php esc_html_e('Membership Required →', 'matchmaker'); ?>
+                                </a>
+                            <?php endif; ?>
                         <?php else : ?>
-                            <a href="<?php echo esc_url($checkout_url); ?>" class="btn btn-primary mm-service-cta-btn" style="text-align:center !important; width:100% !important;">
-                                <?php esc_html_e('Purchase Service →', 'matchmaker'); ?>
-                            </a>
+                            <?php if ($has_base) : ?>
+                                <a href="<?php echo esc_url($checkout_url); ?>" class="btn btn-primary mm-service-cta-btn" style="text-align:center !important; width:100% !important;">
+                                    <?php esc_html_e('Purchase Service →', 'matchmaker'); ?>
+                                </a>
+                            <?php else : ?>
+                                <a href="<?php echo esc_url($pricing_url); ?>" class="btn btn-primary mm-service-cta-btn mm-service-cta-require-base" style="text-align:center !important; width:100% !important;" title="<?php esc_attr_e('A base membership plan is required before purchasing this service.', 'matchmaker'); ?>">
+                                    <?php esc_html_e('Membership Required →', 'matchmaker'); ?>
+                                </a>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>

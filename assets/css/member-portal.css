@@ -1300,6 +1300,47 @@ a.az-edit-btn:hover {
     box-sizing: border-box;
 }
 
+.mm-services-notice-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #fff8f5;
+    border: 1px solid #fbd6c5;
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 24px;
+    color: #1e293b;
+    font-size: 14px;
+    line-height: 1.5;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.mm-services-notice-banner a {
+    color: #CC723F;
+    font-weight: 600;
+    text-decoration: underline;
+    margin-left: 6px;
+    transition: color 0.15s ease;
+}
+
+.mm-services-notice-banner a:hover {
+    color: #b55d2c;
+}
+
+.mm-service-cta-btn.mm-service-cta-require-base {
+    background: #475569 !important;
+    border-color: #475569 !important;
+    color: #ffffff !important;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.mm-service-cta-btn.mm-service-cta-require-base:hover {
+    background: #334155 !important;
+    border-color: #334155 !important;
+    color: #ffffff !important;
+}
+
 /* ----------------------------------------------------
    Responsive Media Queries (Mobile & Tablet Support)
 ---------------------------------------------------- */

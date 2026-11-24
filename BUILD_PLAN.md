@@ -7,10 +7,9 @@
 ---
 
 ## Objectives & Scope
-*No active tasks. System is idle.*
+*No active tasks. System is idle and ready for new task assignment.*
 
 ---
 
 ## Step-by-Step Checklist
-*No pending actions.*
-
+*No active steps.*

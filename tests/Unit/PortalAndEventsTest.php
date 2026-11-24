@@ -1053,4 +1053,116 @@ final class PortalAndEventsTest extends TestCase
         $this->assertStringContainsString('View Match →', $html_viewing_approved);
         $this->assertStringContainsString('data-match-id="701"', $html_viewing_approved);
     }
+
+    public function test_step_5_renders_heart_icon_celebration(): void
+    {
+        $active_match = [
+            'match_id' => 99,
+            'name'     => 'Amina K.',
+            'age'      => 27,
+            'location' => 'Dubai, UAE',
+            'photo'    => 'https://example.com/amina.jpg',
+            'photos'   => ['https://example.com/amina.jpg'],
+        ];
+        $default_step = 5;
+
+        ob_start();
+        include dirname(dirname(__DIR__)) . '/src/View/frontend/portal/steps/step-5-contact.php';
+        $html = (string) ob_get_clean();
+
+        // Must render heart SVG path inside orange avatar bubble
+        $this->assertStringContainsString('M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z', $html);
+        $this->assertStringContainsString('status-avatar-bubble orange', $html);
+        $this->assertStringNotContainsString('m2 22 5.8-10.7', $html); // Party popper must be removed
+    }
+
+    public function test_services_grid_shortcode_registration(): void
+    {
+        $controller = PortalController::instance();
+        $this->assertTrue(shortcode_exists('matchmaker_services_grid'));
+        $this->assertTrue(shortcode_exists('az_services_grid'));
+        $this->assertTrue(shortcode_exists('matchmaker_services'));
+    }
+
+    public function test_services_grid_shortcode_enforces_base_membership(): void
+    {
+        $controller = PortalController::instance();
+
+        // 1. Guest / User without base membership
+        $GLOBALS['__mm_current_user_id'] = 0;
+        $html_guest = $controller->render_services_grid();
+
+        $this->assertStringContainsString('mm-services-notice-banner', $html_guest);
+        $this->assertStringContainsString('Base Membership Required:', $html_guest);
+        $this->assertStringContainsString('mm-service-cta-require-base', $html_guest);
+        $this->assertStringContainsString('Membership Required →', $html_guest);
+
+        // 2. User with base membership (Monthly)
+        $user_id = 915;
+        $GLOBALS['__mm_current_user_id'] = $user_id;
+        $monthly_level = new \FakePMProLevel(1, 'Monthly Gold');
+        $GLOBALS['__mm_pmpro_levels'][1] = $monthly_level;
+        $GLOBALS['__mm_user_pmpro_level'][$user_id] = 1;
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [$monthly_level];
+        update_option('mm_pmpro_tier_mapping', [1 => 'monthly']);
+        update_user_meta($user_id, 'user_type', 'monthly');
+
+        $html_member = $controller->render_services_grid();
+
+        $this->assertStringNotContainsString('mm-services-notice-banner', $html_member);
+        $this->assertStringNotContainsString('mm-service-cta-require-base', $html_member);
+        $this->assertStringContainsString('Purchase Service →', $html_member);
+    }
+
+    public function test_profile_photo_shortcode_registration(): void
+    {
+        $controller = PortalController::instance();
+        $this->assertTrue(shortcode_exists('matchmaker_profile_photo'));
+        $this->assertTrue(shortcode_exists('az_profile_photo'));
+        $this->assertTrue(shortcode_exists('matchmaker_photo'));
+    }
+
+    public function test_render_profile_photo_with_custom_dimensions_and_radius(): void
+    {
+        $controller = PortalController::instance();
+        $user_id = 916;
+        $user = new \FakeWP_User($user_id, 'Kareem Portal', 'kareem@example.com');
+        $GLOBALS['__mm_users'][$user_id] = $user;
+        $GLOBALS['__mm_current_user_id'] = $user_id;
+
+        update_user_meta($user_id, 'user_photo1', 'https://example.com/kareem_main.jpg');
+        update_user_meta($user_id, 'user_photo2', 'https://example.com/kareem_secondary.jpg');
+
+        // 1. Current logged-in user with size="120x120" and radius="50%"
+        $html_round = $controller->render_profile_photo([
+            'size'   => '120x120',
+            'radius' => '50%',
+        ]);
+        $this->assertStringContainsString('https://example.com/kareem_main.jpg', $html_round);
+        $this->assertStringContainsString('width:120px;', $html_round);
+        $this->assertStringContainsString('height:120px;', $html_round);
+        $this->assertStringContainsString('border-radius:50%;', $html_round);
+        $this->assertStringContainsString('object-fit:cover;', $html_round);
+
+        // 2. Secondary photo with explicit width, height, and lightbox enabled
+        $html_p2 = $controller->render_profile_photo([
+            'photo'    => '2',
+            'width'    => '240',
+            'height'   => '320',
+            'fit'      => 'contain',
+            'lightbox' => 'yes',
+        ]);
+        $this->assertStringContainsString('https://example.com/kareem_secondary.jpg', $html_p2);
+        $this->assertStringContainsString('width:240px;', $html_p2);
+        $this->assertStringContainsString('height:320px;', $html_p2);
+        $this->assertStringContainsString('object-fit:contain;', $html_p2);
+        $this->assertStringContainsString('mm-lightbox-trigger', $html_p2);
+        $this->assertStringContainsString('data-mm-lightbox="profile-photo-' . $user_id . '"', $html_p2);
+        $this->assertStringContainsString('cursor:zoom-in;', $html_p2);
+
+        // 3. Guest with fallback="none" -> Empty string
+        $GLOBALS['__mm_current_user_id'] = 0;
+        $html_guest_none = $controller->render_profile_photo(['fallback' => 'none']);
+        $this->assertSame('', $html_guest_none);
+    }
 }

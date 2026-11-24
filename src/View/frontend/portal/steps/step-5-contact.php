@@ -16,16 +16,8 @@ if (!defined('ABSPATH')) {
 <div id="step-5" class="view-state <?php echo (($default_step ?? 1) === 5) ? 'active' : ''; ?>">
     <div class="centered-state-wrapper" style="max-width: 620px;">
         <div class="status-avatar-bubble orange" style="background: linear-gradient(135deg, #CC723F 0%, #E89158 100%); width: 76px; height: 76px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(204, 114, 63, 0.35); margin: 0 auto 20px;">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m2 22 5.8-10.7 8.12 8.12L2 22Z"/>
-                <path d="M17.13 3.29a2 2 0 0 1 2.83 0l.75.75a2 2 0 0 1 0 2.83l-8.12 8.12-3.58-3.58 8.12-8.12Z"/>
-                <path d="m15 5 2 2"/>
-                <circle cx="18" cy="14" r="1.2" fill="#ffffff"/>
-                <circle cx="12" cy="5" r="1.2" fill="#ffffff"/>
-                <circle cx="21" cy="9" r="1.2" fill="#ffffff"/>
-                <path d="M10 2 9 3.5"/>
-                <path d="M15 1.5 16 3"/>
-                <path d="M22 6 20.5 7"/>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="#ffffff" stroke="#ffffff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
         </div>
 

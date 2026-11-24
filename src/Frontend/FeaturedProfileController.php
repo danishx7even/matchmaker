@@ -37,6 +37,7 @@ final class FeaturedProfileController
     {
         // Elementor Loop Grid custom query filter
         add_action('elementor/query/mm_featured_profiles', [$this, 'filter_elementor_featured_profiles']);
+        add_action('elementor/query/featured_profiles',    [$this, 'filter_elementor_featured_profiles']);
 
         // Public & Member Shortcodes
         add_shortcode('featured_profile_details', [$this, 'render_featured_profile_details']);
@@ -406,22 +407,149 @@ final class FeaturedProfileController
     }
 
     /**
+     * Parses width, height, dimensions, radius, and fit parameters from shortcode attributes.
+     *
+     * @param array<string, mixed> $atts
+     * @param string               $default_width
+     * @param string               $default_height
+     * @param string               $default_radius
+     * @return array{width: string, height: string, radius: string, fit: string, size_num: int}
+     */
+    public static function parse_image_dimensions(
+        array $atts,
+        string $default_width = '100%',
+        string $default_height = 'auto',
+        string $default_radius = '12px'
+    ): array {
+        $width     = '';
+        $height    = '';
+        $radius    = '';
+        $fit       = 'cover';
+        $size_num  = 0;
+
+        // 1. Dimensions or size attribute e.g. "200x300", "150", "thumbnail"
+        $dim_str = !empty($atts['dimensions']) ? trim((string) $atts['dimensions']) : (!empty($atts['size']) ? trim((string) $atts['size']) : '');
+        if ($dim_str !== '') {
+            if (preg_match('/^(\d+)\s*[xX*×]\s*(\d+)$/', $dim_str, $matches)) {
+                $width    = $matches[1] . 'px';
+                $height   = $matches[2] . 'px';
+                $size_num = (int) $matches[1];
+            } elseif (ctype_digit($dim_str)) {
+                $width    = $dim_str . 'px';
+                $height   = $dim_str . 'px';
+                $size_num = (int) $dim_str;
+            } elseif (in_array(strtolower($dim_str), ['thumb', 'thumbnail'], true)) {
+                $width    = '150px';
+                $height   = '150px';
+                $size_num = 150;
+            } elseif (strtolower($dim_str) === 'medium') {
+                $width    = '300px';
+                $height   = '300px';
+                $size_num = 300;
+            } elseif (strtolower($dim_str) === 'large') {
+                $width    = '800px';
+                $height   = '800px';
+                $size_num = 800;
+            } elseif (strtolower($dim_str) === 'full') {
+                $width    = '100%';
+                $height   = 'auto';
+            }
+        }
+
+        // 2. Explicit width attribute overrides
+        if (!empty($atts['width'])) {
+            $w = trim((string) $atts['width']);
+            $width = is_numeric($w) ? $w . 'px' : $w;
+            if (is_numeric($w) && $size_num === 0) {
+                $size_num = (int) $w;
+            }
+        }
+
+        // 3. Explicit height attribute overrides
+        if (!empty($atts['height'])) {
+            $h = trim((string) $atts['height']);
+            $height = is_numeric($h) ? $h . 'px' : $h;
+        }
+
+        // Fallbacks
+        if ($width === '') {
+            $width = $default_width;
+        }
+        if ($height === '') {
+            $height = $default_height;
+        }
+
+        // 4. Border radius attribute e.g. "8px", "50%", "round", "circle"
+        $rad_raw = !empty($atts['radius']) ? trim((string) $atts['radius']) : (!empty($atts['border_radius']) ? trim((string) $atts['border_radius']) : '');
+        if ($rad_raw !== '') {
+            if (in_array(strtolower($rad_raw), ['circle', 'round', 'full'], true)) {
+                $radius = '50%';
+            } elseif (is_numeric($rad_raw)) {
+                $radius = $rad_raw . 'px';
+            } else {
+                $radius = $rad_raw;
+            }
+        } else {
+            $radius = $default_radius;
+        }
+
+        // 5. Object fit attribute
+        $fit_raw = !empty($atts['fit']) ? trim((string) $atts['fit']) : (!empty($atts['object_fit']) ? trim((string) $atts['object_fit']) : '');
+        if ($fit_raw !== '' && in_array(strtolower($fit_raw), ['cover', 'contain', 'fill', 'none', 'scale-down'], true)) {
+            $fit = strtolower($fit_raw);
+        }
+
+        return [
+            'width'    => $width,
+            'height'   => $height,
+            'radius'   => $radius,
+            'fit'      => $fit,
+            'size_num' => $size_num,
+        ];
+    }
+
+    /**
      * Helper to get anonymous avatar image or silhouette SVG markup.
      *
-     * @param int $size
+     * @param int    $size
+     * @param string $width
+     * @param string $height
+     * @param string $radius
+     * @param string $class
+     * @param string $style
      * @return string
      */
-    public function get_anonymous_avatar_html(int $size = 180): string
-    {
-        $custom_img = trim((string) get_option('mm_featured_profile_default_image', ''));
+    public function get_anonymous_avatar_html(
+        int $size = 180,
+        string $width = '',
+        string $height = '',
+        string $radius = '',
+        string $class = '',
+        string $style = ''
+    ): string {
+        $w_style = $width !== '' ? $width : ($size > 0 ? $size . 'px' : '100%');
+        $h_style = $height !== '' ? $height : ($size > 0 ? $size . 'px' : 'auto');
+        $r_style = $radius !== '' ? $radius : '14px';
+
+        $custom_class = trim('mm-anonymous-avatar ' . $class);
+        $custom_img   = trim((string) get_option('mm_featured_profile_default_image', ''));
         if ($custom_img !== '') {
-            return '<div class="mm-anonymous-avatar mm-anonymous-custom-img-wrap" style="width:' . $size . 'px;height:' . $size . 'px;border-radius:14px;overflow:hidden;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,0.08);" title="' . esc_attr__('Anonymous Featured Profile', 'matchmaker') . '">
-                <img src="' . esc_url($custom_img) . '" alt="' . esc_attr__('Anonymous Candidate', 'matchmaker') . '" class="mm-anonymous-avatar-img" style="width:100%;height:100%;object-fit:cover;display:block;">
+            return '<div class="' . esc_attr($custom_class . ' mm-anonymous-custom-img-wrap') . '" style="width:' . esc_attr($w_style) . ';height:' . esc_attr($h_style) . ';border-radius:' . esc_attr($r_style) . ';overflow:hidden;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,0.08);' . esc_attr($style) . '" title="' . esc_attr__('Anonymous Featured Profile', 'matchmaker') . '">
+                <img src="' . esc_url($custom_img) . '" alt="' . esc_attr__('Anonymous Candidate', 'matchmaker') . '" class="mm-anonymous-avatar-img" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit;">
             </div>';
         }
 
-        return '<div class="mm-anonymous-avatar" style="width:' . $size . 'px;height:' . $size . 'px;border-radius:14px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;border:2px dashed #cbd5e1;margin:0 auto;" title="' . esc_attr__('Anonymous Featured Profile', 'matchmaker') . '">
-            <svg width="' . (int) ($size * 0.5) . '" height="' . (int) ($size * 0.5) . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        // SVG sizing
+        $svg_size = $size > 0 ? (int) ($size * 0.5) : 48;
+        if (preg_match('/^(\d+)/', $w_style, $wm) && preg_match('/^(\d+)/', $h_style, $hm)) {
+            $min_dim = min((int) $wm[1], (int) $hm[1]);
+            if ($min_dim > 0) {
+                $svg_size = max(16, (int) ($min_dim * 0.45));
+            }
+        }
+
+        return '<div class="' . esc_attr($custom_class) . '" style="width:' . esc_attr($w_style) . ';height:' . esc_attr($h_style) . ';border-radius:' . esc_attr($r_style) . ';background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;border:2px dashed #cbd5e1;margin:0 auto;' . esc_attr($style) . '" title="' . esc_attr__('Anonymous Featured Profile', 'matchmaker') . '">
+            <svg width="' . $svg_size . '" height="' . $svg_size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>
@@ -440,9 +568,17 @@ final class FeaturedProfileController
     {
         $this->enqueue_frontend_assets();
 
+        $raw_atts = is_array($atts) ? $atts : [];
         $atts = shortcode_atts([
-            'post_id' => 0,
-        ], is_array($atts) ? $atts : []);
+            'post_id'      => 0,
+            'photo_width'  => '',
+            'photo_height' => '',
+            'photo_size'   => '',
+            'dimensions'   => '',
+            'width'        => '',
+            'height'       => '',
+            'size'         => '',
+        ], $raw_atts);
 
         $post_id = (int) $atts['post_id'];
         if ($post_id <= 0) {
@@ -502,6 +638,12 @@ final class FeaturedProfileController
         $about_me     = !empty($meta['user_about_me']) ? $meta['user_about_me'] : '';
         $is_parent    = !empty($pool['is_parent_applying']) || !empty($meta['is_parent_applying']);
 
+        $card_dims = self::parse_image_dimensions([
+            'width'      => $atts['photo_width'] ?: $atts['width'],
+            'height'     => $atts['photo_height'] ?: $atts['height'],
+            'dimensions' => $atts['photo_size'] ?: ($atts['dimensions'] ?: $atts['size']),
+        ], '340px', '320px', '16px');
+
         ob_start();
         ?>
 <div class="mm-featured-card mm-featured-details-view"
@@ -511,16 +653,16 @@ final class FeaturedProfileController
     <div class="mm-featured-gallery-section" style="margin-bottom:20px; text-align:center;">
         <?php if ($is_anonymous || empty($user_photos)) : ?>
         <div class="mm-featured-photo-wrap" style="margin-bottom:14px;">
-            <?php echo $this->get_anonymous_avatar_html(180); ?>
+            <?php echo $this->get_anonymous_avatar_html(180, $card_dims['width'], $card_dims['height'], $card_dims['radius']); ?>
         </div>
         <?php else : ?>
         <!-- Primary Photo with Lightbox -->
         <div class="mm-featured-main-photo-wrap"
-            style="position:relative; max-width:340px; margin:0 auto 12px; border-radius:16px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.08); background:#f8fafc;">
+            style="position:relative; max-width:<?php echo esc_attr($card_dims['width']); ?>; margin:0 auto 12px; border-radius:<?php echo esc_attr($card_dims['radius']); ?>; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.08); background:#f8fafc;">
             <img src="<?php echo esc_url($user_photos[0]); ?>" alt="<?php echo esc_attr($display_name); ?>"
                 data-mm-lightbox="featured-gallery-<?php echo $post_id; ?>"
                 data-mm-photos="<?php echo $user_photos_attr; ?>" class="mm-lightbox-trigger mm-featured-main-img"
-                style="width:100%; height:320px; object-fit:cover; display:block; cursor:zoom-in; transition:transform 0.2s ease;"
+                style="width:100%; height:<?php echo esc_attr($card_dims['height']); ?>; object-fit:cover; display:block; cursor:zoom-in; transition:transform 0.2s ease;"
                 title="<?php esc_attr_e('Click to view full photo', 'matchmaker'); ?>"
                 onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}">
             <span
@@ -688,21 +830,34 @@ final class FeaturedProfileController
      */
     public function render_featured_profile_field(array|string $atts = []): string
     {
+        $raw_atts = is_array($atts) ? $atts : [];
         $atts = shortcode_atts([
-            'key'     => 'name',
-            'post_id' => 0,
-        ], is_array($atts) ? $atts : []);
+            'key'           => 'name',
+            'post_id'       => 0,
+            'user_id'       => 0,
+            'width'         => '',
+            'height'        => '',
+            'size'          => '',
+            'dimensions'    => '',
+            'fit'           => 'cover',
+            'object_fit'    => '',
+            'radius'        => '',
+            'border_radius' => '',
+            'class'         => '',
+            'style'         => '',
+            'alt'           => '',
+        ], $raw_atts);
 
         $post_id = (int) $atts['post_id'];
         if ($post_id <= 0) {
             $post_id = get_the_ID() ?: 0;
         }
 
-        if ($post_id <= 0) {
-            return '';
+        $user_id = (int) $atts['user_id'];
+        if ($user_id <= 0 && $post_id > 0) {
+            $user_id = $this->get_connected_user_id($post_id);
         }
 
-        $user_id = $this->get_connected_user_id($post_id);
         if ($user_id <= 0) {
             return '';
         }
@@ -711,7 +866,7 @@ final class FeaturedProfileController
         $pool       = $repo->get_user_pool($user_id);
         $meta       = $repo->get_meta_block($user_id);
         $user       = get_userdata($user_id);
-        $visibility = get_post_meta($post_id, '_mm_visibility_mode', true) ?: (get_user_meta($user_id, 'mm_featured_visibility', true) ?: 'anonymous');
+        $visibility = ($post_id > 0 ? get_post_meta($post_id, '_mm_visibility_mode', true) : '') ?: (get_user_meta($user_id, 'mm_featured_visibility', true) ?: 'anonymous');
         $is_anon    = ($visibility === 'anonymous');
 
         switch (strtolower(trim((string) $atts['key']))) {
@@ -722,14 +877,62 @@ final class FeaturedProfileController
 
 
             case 'photo':
-                if ($is_anon) {
-                    return $this->get_anonymous_avatar_html(120);
+            case 'photo_1':
+            case 'photo_2':
+            case 'photo_3':
+                $dims = self::parse_image_dimensions($atts, '100%', 'auto', '12px');
+                $custom_class = trim('mm-featured-loop-photo ' . preg_replace('/[^a-zA-Z0-9_\-\s]/', '', (string) $atts['class']));
+                $extra_style  = trim((string) $atts['style']);
+                if ($extra_style !== '' && !str_ends_with($extra_style, ';')) {
+                    $extra_style .= ';';
                 }
+
+                if ($is_anon) {
+                    $avatar_size = $dims['size_num'] > 0 ? $dims['size_num'] : 120;
+                    return $this->get_anonymous_avatar_html(
+                        $avatar_size,
+                        $dims['width'],
+                        $dims['height'],
+                        $dims['radius'],
+                        $custom_class,
+                        $extra_style
+                    );
+                }
+
                 $photos = $repo->get_user_photos($user_id);
-                $p1 = !empty($photos['user_photo1']) ? $photos['user_photo1'] : '';
-                return $p1
-                    ? '<img src="' . esc_url($p1) . '" alt="' . esc_attr($user ? $user->display_name : '') . '" class="mm-featured-loop-photo" style="border-radius:12px;width:100%;height:auto;object-fit:cover;">'
-                    : $this->get_anonymous_avatar_html(120);
+                $key_str = strtolower(trim((string) $atts['key']));
+                $photo_url = '';
+                if ($key_str === 'photo_2') {
+                    $photo_url = !empty($photos['user_photo2']) ? $photos['user_photo2'] : '';
+                } elseif ($key_str === 'photo_3') {
+                    $photo_url = !empty($photos['user_photo3']) ? $photos['user_photo3'] : '';
+                } else {
+                    $photo_url = !empty($photos['user_photo1']) ? $photos['user_photo1'] : '';
+                }
+
+                if (!$photo_url) {
+                    $avatar_size = $dims['size_num'] > 0 ? $dims['size_num'] : 120;
+                    return $this->get_anonymous_avatar_html(
+                        $avatar_size,
+                        $dims['width'],
+                        $dims['height'],
+                        $dims['radius'],
+                        $custom_class,
+                        $extra_style
+                    );
+                }
+
+                $alt_text = !empty($atts['alt'])
+                    ? sanitize_text_field((string) $atts['alt'])
+                    : ($user ? $user->display_name : sprintf(__('Member #%d', 'matchmaker'), $user_id));
+
+                $img_style = 'width:' . esc_attr($dims['width']) . ';'
+                           . 'height:' . esc_attr($dims['height']) . ';'
+                           . 'object-fit:' . esc_attr($dims['fit']) . ';'
+                           . 'border-radius:' . esc_attr($dims['radius']) . ';'
+                           . ($extra_style ? ' ' . esc_attr($extra_style) : '');
+
+                return '<img src="' . esc_url($photo_url) . '" alt="' . esc_attr($alt_text) . '" class="' . esc_attr($custom_class) . '" style="' . $img_style . '">';
 
             case 'age':
                 return esc_html($repo->calc_age($pool['birth_date'] ?? ''));
@@ -739,6 +942,12 @@ final class FeaturedProfileController
 
             case 'city':
                 return esc_html($pool['city'] ?? '');
+
+            case 'location':
+                $city = $pool['city'] ?? '';
+                $country = $pool['country'] ?? '';
+                $loc = trim($city . ($city && $country ? ', ' : '') . $country);
+                return esc_html($loc ?: ($pool['location'] ?? '—'));
 
             case 'gender':
                 return !empty($pool['gender']) ? esc_html(ucfirst($pool['gender'])) : '—';

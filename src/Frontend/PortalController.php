@@ -37,6 +37,12 @@ class PortalController
     {
         add_shortcode('matchmaker_member_portal', [$this, 'render_portal']);
         add_shortcode('az_profile',                [$this, 'render_portal']); // Backward-compatibility alias
+        add_shortcode('matchmaker_services_grid',  [$this, 'render_services_grid']);
+        add_shortcode('az_services_grid',          [$this, 'render_services_grid']); // Alias
+        add_shortcode('matchmaker_services',       [$this, 'render_services_grid']); // Alias
+        add_shortcode('matchmaker_profile_photo',  [$this, 'render_profile_photo']);
+        add_shortcode('az_profile_photo',          [$this, 'render_profile_photo']); // Alias
+        add_shortcode('matchmaker_photo',          [$this, 'render_profile_photo']); // Alias
 
         // AJAX handlers matching member-portal.js action names
         add_action('wp_ajax_mm_submit_match_response', [$this, 'handle_ajax_match_response']);
@@ -59,7 +65,16 @@ class PortalController
 
         $dashboard_id = (int) get_option('mm_page_dashboard_id', 0);
         $is_dashboard = ($dashboard_id > 0 && function_exists('is_page') && is_page($dashboard_id));
-        $has_shortcode = is_a($post, 'WP_Post') && (has_shortcode($post->post_content, 'matchmaker_member_portal') || has_shortcode($post->post_content, 'az_profile'));
+        $has_shortcode = is_a($post, 'WP_Post') && (
+            has_shortcode($post->post_content, 'matchmaker_member_portal') ||
+            has_shortcode($post->post_content, 'az_profile') ||
+            has_shortcode($post->post_content, 'matchmaker_services_grid') ||
+            has_shortcode($post->post_content, 'az_services_grid') ||
+            has_shortcode($post->post_content, 'matchmaker_services') ||
+            has_shortcode($post->post_content, 'matchmaker_profile_photo') ||
+            has_shortcode($post->post_content, 'az_profile_photo') ||
+            has_shortcode($post->post_content, 'matchmaker_photo')
+        );
 
         if (!$is_dashboard && !$has_shortcode) {
             return;
@@ -393,6 +408,160 @@ class PortalController
         ob_start();
         include __DIR__ . '/../View/frontend/portal/tab-services.php';
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Render standalone services grid [matchmaker_services_grid].
+     * Can be embedded on any frontend page outside the member dashboard.
+     * Requires active base membership before purchasing services.
+     *
+     * @param array|string $atts Shortcode attributes.
+     * @return string Rendered HTML markup.
+     */
+    public function render_services_grid(array|string $atts = []): string
+    {
+        $this->enqueue_portal_assets();
+
+        $parsed_atts = shortcode_atts([
+            'columns'     => 2,
+            'show_notice' => 'true',
+        ], is_array($atts) ? $atts : [], 'matchmaker_services_grid');
+
+        $user_id     = get_current_user_id();
+        $user        = $user_id > 0 ? wp_get_current_user() : null;
+        $sync        = \Matchmaker\Core\PMProSync::instance();
+        $repo        = \Matchmaker\Repository\MatchRepository::instance();
+        $user_type   = $user_id > 0 ? $sync->get_current_user_type($user_id) : 'guest';
+        $has_base    = $user_id > 0 && $sync->has_active_base_membership($user_id);
+        $is_premium  = in_array($user_type, ['monthly'], true);
+        $columns     = max(1, min(4, (int) $parsed_atts['columns']));
+        $show_notice = filter_var($parsed_atts['show_notice'], FILTER_VALIDATE_BOOLEAN);
+
+        ob_start();
+        include dirname(__DIR__) . '/View/frontend/portal/tab-services.php';
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Renders member/user profile photo shortcode: [matchmaker_profile_photo].
+     *
+     * Shortcode attributes:
+     * - user_id: int (default: current logged in user)
+     * - photo: string '1'|'2'|'3' (default '1')
+     * - width: string (e.g. '150', '150px', '100%')
+     * - height: string (e.g. '150', '150px', 'auto')
+     * - size: string (e.g. '150', '150x150', 'thumbnail', 'medium', 'large', 'full')
+     * - dimensions: string (e.g. '200x200')
+     * - fit: string 'cover'|'contain'|'fill' (default 'cover')
+     * - radius: string '12px'|'50%'|'circle' (default '12px')
+     * - class: string (additional CSS class)
+     * - style: string (additional inline CSS)
+     * - alt: string (custom alt text)
+     * - lightbox: string 'yes'|'no' (default 'no')
+     * - fallback: string 'avatar'|'placeholder'|'none' (default 'avatar')
+     *
+     * @param array<string, mixed>|string $atts
+     * @return string
+     */
+    public function render_profile_photo(array|string $atts = []): string
+    {
+        $raw_atts = is_array($atts) ? $atts : [];
+        $parsed_atts = shortcode_atts([
+            'user_id'       => 0,
+            'photo'         => '1',
+            'photo_num'     => '',
+            'width'         => '',
+            'height'        => '',
+            'size'          => '',
+            'dimensions'    => '',
+            'fit'           => 'cover',
+            'object_fit'    => '',
+            'radius'        => '',
+            'border_radius' => '',
+            'class'         => '',
+            'style'         => '',
+            'alt'           => '',
+            'lightbox'      => 'no',
+            'fallback'      => 'avatar',
+        ], $raw_atts, 'matchmaker_profile_photo');
+
+        $user_id = (int) $parsed_atts['user_id'];
+        if ($user_id <= 0) {
+            $user_id = get_current_user_id();
+        }
+
+        if ($user_id <= 0 && $parsed_atts['fallback'] === 'none') {
+            return '';
+        }
+
+        // Parse dimensions
+        $dims = \Matchmaker\Frontend\FeaturedProfileController::parse_image_dimensions($parsed_atts, '100%', 'auto', '12px');
+        $custom_class = trim('mm-profile-photo ' . preg_replace('/[^a-zA-Z0-9_\-\s]/', '', (string) $parsed_atts['class']));
+        $extra_style  = trim((string) $parsed_atts['style']);
+        if ($extra_style !== '' && !str_ends_with($extra_style, ';')) {
+            $extra_style .= ';';
+        }
+
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $user_photos = $user_id > 0 ? $repo->get_user_photos($user_id) : [];
+        $photo_num = trim((string) ($parsed_atts['photo_num'] ?: $parsed_atts['photo']));
+        if (!in_array($photo_num, ['1', '2', '3'], true)) {
+            $photo_num = '1';
+        }
+
+        $photo_url = $user_photos['user_photo' . $photo_num] ?? '';
+
+        $user = $user_id > 0 ? get_userdata($user_id) : null;
+        $name = $user ? $user->display_name : ($user_id > 0 ? sprintf(__('Member #%d', 'matchmaker'), $user_id) : __('Member', 'matchmaker'));
+        $alt_text = !empty($parsed_atts['alt']) ? sanitize_text_field((string) $parsed_atts['alt']) : $name;
+
+        // If no photo found, handle fallback
+        if (empty($photo_url)) {
+            if ($parsed_atts['fallback'] === 'none') {
+                return '';
+            }
+            if ($user_id > 0 && function_exists('get_avatar_url')) {
+                $photo_url = (string) get_avatar_url($user_id, ['size' => $dims['size_num'] > 0 ? $dims['size_num'] : 150]);
+            }
+            if (empty($photo_url)) {
+                // Anonymous silhouette
+                $avatar_size = $dims['size_num'] > 0 ? $dims['size_num'] : 120;
+                return \Matchmaker\Frontend\FeaturedProfileController::instance()->get_anonymous_avatar_html(
+                    $avatar_size,
+                    $dims['width'],
+                    $dims['height'],
+                    $dims['radius'],
+                    $custom_class,
+                    $extra_style
+                );
+            }
+        }
+
+        $enable_lightbox = filter_var($parsed_atts['lightbox'], FILTER_VALIDATE_BOOLEAN) || in_array(strtolower((string) $parsed_atts['lightbox']), ['yes', '1', 'true'], true);
+        $lightbox_attrs = '';
+        if ($enable_lightbox) {
+            $this->enqueue_portal_assets();
+            $custom_class = trim($custom_class . ' mm-lightbox-trigger');
+            $all_photos = array_values(array_filter([
+                $user_photos['user_photo1'] ?? '',
+                $user_photos['user_photo2'] ?? '',
+                $user_photos['user_photo3'] ?? '',
+            ]));
+            if (empty($all_photos) && $photo_url) {
+                $all_photos = [$photo_url];
+            }
+            $photos_attr = esc_attr(implode(',', $all_photos));
+            $lightbox_attrs = ' data-mm-lightbox="profile-photo-' . $user_id . '" data-mm-photos="' . $photos_attr . '" title="' . esc_attr__('Click to view full photo', 'matchmaker') . '" onclick="if(window.MM_openLightbox){window.MM_openLightbox(this);return false;}"';
+        }
+
+        $img_style = 'width:' . esc_attr($dims['width']) . ';'
+                   . 'height:' . esc_attr($dims['height']) . ';'
+                   . 'object-fit:' . esc_attr($dims['fit']) . ';'
+                   . 'border-radius:' . esc_attr($dims['radius']) . ';'
+                   . ($enable_lightbox ? 'cursor:zoom-in;' : '')
+                   . ($extra_style ? ' ' . esc_attr($extra_style) : '');
+
+        return '<img src="' . esc_url($photo_url) . '" alt="' . esc_attr($alt_text) . '" class="' . esc_attr($custom_class) . '" style="' . $img_style . '"' . $lightbox_attrs . '>';
     }
 
     /**

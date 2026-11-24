@@ -392,6 +392,11 @@ function sanitize_key($key) {
     return is_string($key) ? strtolower(preg_replace('/[^a-z0-9_\-]/', '', $key)) : '';
 }
 
+function sanitize_html_class($class, $fallback = '') {
+    $sanitized = is_string($class) ? preg_replace('/[^a-zA-Z0-9_\-]/', '', $class) : '';
+    return $sanitized !== '' ? $sanitized : $fallback;
+}
+
 function wp_unslash($val) {
     return $val;
 }
