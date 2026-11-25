@@ -169,8 +169,97 @@ class AdminPortal
     }
 
     /**
-     * Remove non-authorized admin menus for Matchmaker Admin and Events Organizer users.
-     * Ensures they can only see and access authorized management screens (and their profile).
+     * Returns the role access matrix mapping role slugs to allowed menu/screen capabilities.
+     *
+     * @return array<string, array<string, int>>
+     */
+    public function get_role_access_matrix(): array
+    {
+        $saved = get_option('mm_role_access_matrix', null);
+        if (is_array($saved) && !empty($saved)) {
+            return $saved;
+        }
+
+        // Built-in sensible defaults
+        return [
+            'matchmaker_admin' => [
+                'pool'         => 1,
+                'matches'      => 1,
+                'settings'     => 1,
+                'logs'         => 1,
+                'event_clicks' => 1,
+                'events'       => 0,
+                'forminator'   => 0,
+                'posts'        => 0,
+                'pages'        => 0,
+                'users'        => 0,
+                'tools'        => 0,
+            ],
+            'events_organizer' => [
+                'pool'         => 0,
+                'matches'      => 0,
+                'settings'     => 0,
+                'logs'         => 0,
+                'event_clicks' => 1,
+                'events'       => 1,
+                'forminator'   => 1,
+                'posts'        => 0,
+                'pages'        => 0,
+                'users'        => 0,
+                'tools'        => 0,
+            ],
+        ];
+    }
+
+    /**
+     * Checks if a specific feature or menu item is allowed for a user based on role matrix.
+     *
+     * @param string        $item Matrix item key ('pool', 'matches', 'settings', 'logs', 'event_clicks', 'events', 'forminator', 'posts', 'pages', 'users', 'tools').
+     * @param \WP_User|null $user
+     * @return bool
+     */
+    public function is_item_allowed_for_user(string $item, ?\WP_User $user = null): bool
+    {
+        if ($user === null) {
+            $user = function_exists('wp_get_current_user') ? wp_get_current_user() : null;
+        }
+
+        if (!$user || !isset($user->ID) || $user->ID <= 0) {
+            return false;
+        }
+
+        if (user_can($user, 'manage_options')) {
+            return true;
+        }
+
+        $roles  = (array) ($user->roles ?? []);
+        $matrix = $this->get_role_access_matrix();
+
+        foreach ($roles as $role) {
+            if (isset($matrix[$role]) && is_array($matrix[$role])) {
+                if (!empty($matrix[$role][$item])) {
+                    return true;
+                }
+            } else {
+                // Fallbacks if role is not configured in matrix
+                if ($role === 'matchmaker_admin' || user_can($user, 'manage_matchmaker')) {
+                    if (in_array($item, ['pool', 'matches', 'settings', 'logs', 'event_clicks'], true)) {
+                        return true;
+                    }
+                }
+                if ($role === 'events_organizer' || user_can($user, 'manage_events_organizer')) {
+                    if (in_array($item, ['events', 'forminator', 'event_clicks'], true)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Remove non-authorized admin menus for restricted non-admin roles based on Role Access Matrix.
      *
      * @return void
      */
@@ -183,10 +272,22 @@ class AdminPortal
         $user = function_exists('wp_get_current_user') ? wp_get_current_user() : null;
         $roles = ($user && isset($user->roles)) ? (array) $user->roles : [];
 
-        $is_events_organizer = in_array('events_organizer', $roles, true) || current_user_can('manage_events_organizer');
-        $is_matchmaker_admin = in_array('matchmaker_admin', $roles, true) || current_user_can('manage_matchmaker');
+        $matrix = $this->get_role_access_matrix();
+        $is_managed_role = in_array('events_organizer', $roles, true)
+            || in_array('matchmaker_admin', $roles, true)
+            || current_user_can('manage_events_organizer')
+            || current_user_can('manage_matchmaker');
 
-        if (!$is_events_organizer && !$is_matchmaker_admin) {
+        if (!$is_managed_role) {
+            foreach ($roles as $r) {
+                if (isset($matrix[$r])) {
+                    $is_managed_role = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$is_managed_role) {
             return;
         }
 
@@ -196,17 +297,66 @@ class AdminPortal
 
         $cpt_slug = (string) get_option('mm_events_cpt_slug', 'event');
 
+        $can_pool         = $this->is_item_allowed_for_user('pool', $user);
+        $can_matches      = $this->is_item_allowed_for_user('matches', $user);
+        $can_settings     = $this->is_item_allowed_for_user('settings', $user);
+        $can_logs         = $this->is_item_allowed_for_user('logs', $user);
+        $can_event_clicks = $this->is_item_allowed_for_user('event_clicks', $user);
+        $can_events       = $this->is_item_allowed_for_user('events', $user);
+        $can_forminator   = $this->is_item_allowed_for_user('forminator', $user);
+        $can_posts        = $this->is_item_allowed_for_user('posts', $user);
+        $can_pages        = $this->is_item_allowed_for_user('pages', $user);
+        $can_users        = $this->is_item_allowed_for_user('users', $user);
+        $can_tools        = $this->is_item_allowed_for_user('tools', $user);
+
+        // Submenus under Matchmaking
+        if (!$can_pool && function_exists('remove_submenu_page')) {
+            remove_submenu_page('matchmaking-pool', 'matchmaking-pool');
+        }
+        if (!$can_matches && function_exists('remove_submenu_page')) {
+            remove_submenu_page('matchmaking-pool', 'matchmaking-matches');
+        }
+        if (!$can_settings && function_exists('remove_submenu_page')) {
+            remove_submenu_page('matchmaking-pool', 'matchmaking-settings');
+        }
+        if (!$can_logs && function_exists('remove_submenu_page')) {
+            remove_submenu_page('matchmaking-pool', 'matchmaking-logs');
+        }
+        if (!$can_event_clicks && function_exists('remove_submenu_page')) {
+            remove_submenu_page('edit.php?post_type=' . $cpt_slug, 'matchmaking-event-clicks');
+        }
+
+        if (!$can_pool && !$can_matches && !$can_settings && !$can_logs) {
+            remove_menu_page('matchmaking-pool');
+        }
+
+        // Add-on & Core Menus
+        if (!$can_events) {
+            remove_menu_page('edit.php?post_type=' . $cpt_slug);
+        }
+        if (!$can_forminator) {
+            remove_menu_page('forminator');
+        }
+        if (!$can_posts) {
+            remove_menu_page('edit.php');
+        }
+        if (!$can_pages) {
+            remove_menu_page('edit.php?post_type=page');
+        }
+        if (!$can_users) {
+            remove_menu_page('users.php');
+        }
+        if (!$can_tools) {
+            remove_menu_page('tools.php');
+        }
+
         // Common core and third-party disallowed menus
         $disallowed_menus = [
             'index.php',                  // Dashboard
-            'edit.php',                    // Posts
             'upload.php',                  // Media
-            'edit.php?post_type=page',     // Pages
             'edit-comments.php',           // Comments
             'themes.php',                  // Appearance
             'plugins.php',                 // Plugins
-            'users.php',                   // Users
-            'tools.php',                   // Tools
             'options-general.php',         // Settings
             'pmpro-membershiplevels',      // PMPro
             'pmpro-memberslist',
@@ -239,15 +389,6 @@ class AdminPortal
             'elementor-custom-code',
         ];
 
-        if ($is_events_organizer) {
-            // Events Organizer only has access to Events menu & submenus, Forminator, and profile
-            $disallowed_menus[] = 'matchmaking-pool';
-        } else {
-            // Matchmaker Admin only has access to Matchmaking menu & submenus + profile
-            $disallowed_menus[] = 'edit.php?post_type=' . $cpt_slug;
-            $disallowed_menus[] = 'forminator';
-        }
-
         foreach ($disallowed_menus as $menu_slug) {
             remove_menu_page($menu_slug);
         }
@@ -255,9 +396,28 @@ class AdminPortal
         // Dynamic $menu sweep: purge any remaining non-whitelisted top-level menu
         global $menu;
         if (is_array($menu)) {
-            $allowed_slugs = $is_events_organizer
-                ? ['edit.php?post_type=' . $cpt_slug, 'forminator', 'profile.php']
-                : ['matchmaking-pool', 'profile.php'];
+            $allowed_slugs = ['profile.php'];
+            if ($can_pool || $can_matches || $can_settings || $can_logs) {
+                $allowed_slugs[] = 'matchmaking-pool';
+            }
+            if ($can_events) {
+                $allowed_slugs[] = 'edit.php?post_type=' . $cpt_slug;
+            }
+            if ($can_forminator) {
+                $allowed_slugs[] = 'forminator';
+            }
+            if ($can_posts) {
+                $allowed_slugs[] = 'edit.php';
+            }
+            if ($can_pages) {
+                $allowed_slugs[] = 'edit.php?post_type=page';
+            }
+            if ($can_users) {
+                $allowed_slugs[] = 'users.php';
+            }
+            if ($can_tools) {
+                $allowed_slugs[] = 'tools.php';
+            }
 
             foreach ($menu as $idx => $item) {
                 $slug = $item[2] ?? '';
@@ -288,10 +448,22 @@ class AdminPortal
         $user = function_exists('wp_get_current_user') ? wp_get_current_user() : null;
         $roles = ($user && isset($user->roles)) ? (array) $user->roles : [];
 
-        $is_events_organizer = in_array('events_organizer', $roles, true) || current_user_can('manage_events_organizer');
-        $is_matchmaker_admin = in_array('matchmaker_admin', $roles, true) || current_user_can('manage_matchmaker');
+        $matrix = $this->get_role_access_matrix();
+        $is_managed_role = in_array('events_organizer', $roles, true)
+            || in_array('matchmaker_admin', $roles, true)
+            || current_user_can('manage_events_organizer')
+            || current_user_can('manage_matchmaker');
 
-        if (!$is_events_organizer && !$is_matchmaker_admin) {
+        if (!$is_managed_role) {
+            foreach ($roles as $r) {
+                if (isset($matrix[$r])) {
+                    $is_managed_role = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$is_managed_role) {
             return;
         }
 
@@ -316,7 +488,7 @@ class AdminPortal
     }
 
     /**
-     * Enforce strict page-level gating for Matchmaker Admin and Events Organizer users.
+     * Enforce strict page-level gating for restricted non-admin roles based on Role Access Matrix.
      * Redirects visits to wp-admin/ or index.php or other unauthorized backend screens.
      *
      * @return void
@@ -330,10 +502,22 @@ class AdminPortal
         $user = function_exists('wp_get_current_user') ? wp_get_current_user() : null;
         $roles = ($user && isset($user->roles)) ? (array) $user->roles : [];
 
-        $is_events_organizer = in_array('events_organizer', $roles, true) || current_user_can('manage_events_organizer');
-        $is_matchmaker_admin = in_array('matchmaker_admin', $roles, true) || current_user_can('manage_matchmaker');
+        $matrix = $this->get_role_access_matrix();
+        $is_managed_role = in_array('events_organizer', $roles, true)
+            || in_array('matchmaker_admin', $roles, true)
+            || current_user_can('manage_events_organizer')
+            || current_user_can('manage_matchmaker');
 
-        if (!$is_events_organizer && !$is_matchmaker_admin) {
+        if (!$is_managed_role) {
+            foreach ($roles as $r) {
+                if (isset($matrix[$r])) {
+                    $is_managed_role = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$is_managed_role) {
             return;
         }
 
@@ -349,22 +533,42 @@ class AdminPortal
             return;
         }
 
-        $cpt_slug = (string) get_option('mm_events_cpt_slug', 'event');
+        $cpt_slug  = (string) get_option('mm_events_cpt_slug', 'event');
+        $page      = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
+        $post_type = isset($_GET['post_type']) ? sanitize_text_field(wp_unslash((string) $_GET['post_type'])) : (isset($_POST['post_type']) ? sanitize_text_field(wp_unslash((string) $_POST['post_type'])) : '');
 
-        if ($is_events_organizer) {
-            $is_allowed = false;
-            $post_type = isset($_GET['post_type']) ? sanitize_text_field(wp_unslash((string) $_GET['post_type'])) : (isset($_POST['post_type']) ? sanitize_text_field(wp_unslash((string) $_POST['post_type'])) : '');
-            $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
+        $is_allowed = false;
 
-            // 1. Event CPT listing, creation, and taxonomy screens
-            if (in_array($pagenow, ['edit.php', 'post-new.php', 'edit-tags.php', 'term.php'], true)) {
-                if ($post_type === $cpt_slug) {
-                    $is_allowed = true;
-                }
-            }
+        // 1. Candidate Pool
+        if ($page === 'matchmaking-pool' && $this->is_item_allowed_for_user('pool', $user)) {
+            $is_allowed = true;
+        }
 
-            // 2. Event post editing (post.php)
-            if ($pagenow === 'post.php') {
+        // 2. Matches Queue
+        if ($page === 'matchmaking-matches' && $this->is_item_allowed_for_user('matches', $user)) {
+            $is_allowed = true;
+        }
+
+        // 3. Settings
+        if ($page === 'matchmaking-settings' && $this->is_item_allowed_for_user('settings', $user)) {
+            $is_allowed = true;
+        }
+
+        // 4. Logs
+        if ($page === 'matchmaking-logs' && $this->is_item_allowed_for_user('logs', $user)) {
+            $is_allowed = true;
+        }
+
+        // 5. Event Clicks Analytics
+        if ($page === 'matchmaking-event-clicks' && $this->is_item_allowed_for_user('event_clicks', $user)) {
+            $is_allowed = true;
+        }
+
+        // 6. Events CPT
+        if ($this->is_item_allowed_for_user('events', $user)) {
+            if (in_array($pagenow, ['edit.php', 'post-new.php', 'edit-tags.php', 'term.php'], true) && $post_type === $cpt_slug) {
+                $is_allowed = true;
+            } elseif ($pagenow === 'post.php') {
                 $post_id = isset($_GET['post']) ? (int) $_GET['post'] : (isset($_POST['post_ID']) ? (int) $_POST['post_ID'] : 0);
                 if ($post_id > 0 && function_exists('get_post_type')) {
                     if (get_post_type($post_id) === $cpt_slug) {
@@ -374,36 +578,66 @@ class AdminPortal
                     $is_allowed = true;
                 }
             }
+        }
 
-            // 3. Matchmaking event clicks analytics submenu under events
-            if ($page === 'matchmaking-event-clicks') {
-                $is_allowed = true;
-            }
-
-            // 4. Forminator top-level page and submenus
+        // 7. Forminator
+        if ($this->is_item_allowed_for_user('forminator', $user)) {
             if ($page === 'forminator' || str_starts_with($page, 'forminator')) {
                 $is_allowed = true;
             }
-
-            if (!$is_allowed) {
-                wp_safe_redirect(admin_url('edit.php?post_type=' . $cpt_slug));
-                exit;
-            }
-            return;
         }
 
-        // Matchmaker Admin restrictions
-        $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash((string) $_GET['page'])) : '';
-        $allowed_matchmaking_pages = [
-            'matchmaking-pool',
-            'matchmaking-matches',
-            'matchmaking-settings',
-            'matchmaking-logs',
-            'matchmaking-event-clicks',
-        ];
+        // 8. Posts
+        if ($this->is_item_allowed_for_user('posts', $user)) {
+            if (in_array($pagenow, ['edit.php', 'post-new.php', 'edit-tags.php', 'term.php', 'post.php'], true) && ($post_type === '' || $post_type === 'post')) {
+                if ($pagenow === 'post.php') {
+                    $post_id = isset($_GET['post']) ? (int) $_GET['post'] : (isset($_POST['post_ID']) ? (int) $_POST['post_ID'] : 0);
+                    if ($post_id === 0 || (function_exists('get_post_type') && get_post_type($post_id) === 'post')) {
+                        $is_allowed = true;
+                    }
+                } else {
+                    $is_allowed = true;
+                }
+            }
+        }
 
-        if (!in_array($page, $allowed_matchmaking_pages, true)) {
-            wp_safe_redirect(admin_url('admin.php?page=matchmaking-pool'));
+        // 9. Pages
+        if ($this->is_item_allowed_for_user('pages', $user)) {
+            if (in_array($pagenow, ['edit.php', 'post-new.php', 'post.php'], true) && $post_type === 'page') {
+                $is_allowed = true;
+            }
+        }
+
+        // 10. Users
+        if ($this->is_item_allowed_for_user('users', $user)) {
+            if (in_array($pagenow, ['users.php', 'user-new.php', 'user-edit.php'], true)) {
+                $is_allowed = true;
+            }
+        }
+
+        // 11. Tools
+        if ($this->is_item_allowed_for_user('tools', $user)) {
+            if ($pagenow === 'tools.php') {
+                $is_allowed = true;
+            }
+        }
+
+        if (!$is_allowed) {
+            if ($this->is_item_allowed_for_user('pool', $user)) {
+                wp_safe_redirect(admin_url('admin.php?page=matchmaking-pool'));
+            } elseif ($this->is_item_allowed_for_user('matches', $user)) {
+                wp_safe_redirect(admin_url('admin.php?page=matchmaking-matches'));
+            } elseif ($this->is_item_allowed_for_user('events', $user)) {
+                wp_safe_redirect(admin_url('edit.php?post_type=' . $cpt_slug));
+            } elseif ($this->is_item_allowed_for_user('forminator', $user)) {
+                wp_safe_redirect(admin_url('admin.php?page=forminator'));
+            } elseif ($this->is_item_allowed_for_user('posts', $user)) {
+                wp_safe_redirect(admin_url('edit.php'));
+            } elseif ($this->is_item_allowed_for_user('event_clicks', $user)) {
+                wp_safe_redirect(admin_url('edit.php?post_type=' . $cpt_slug . '&page=matchmaking-event-clicks'));
+            } else {
+                wp_safe_redirect(admin_url('profile.php'));
+            }
             exit;
         }
     }
@@ -435,7 +669,7 @@ class AdminPortal
         $plugin_url = defined('MM_URL') ? MM_URL : plugin_dir_url(dirname(__FILE__, 3));
         $css_file   = dirname(dirname(__DIR__)) . '/assets/css/admin-matchmaker.css';
         $js_file    = dirname(dirname(__DIR__)) . '/assets/js/admin-matchmaker.js';
-        $base_ver   = defined('MM_VERSION') ? MM_VERSION : '2.16.0';
+        $base_ver   = defined('MM_VERSION') ? MM_VERSION : '2.17.0';
         $css_ver    = $base_ver . '.' . (file_exists($css_file) ? (string) filemtime($css_file) : '0');
         $js_ver     = $base_ver . '.' . (file_exists($js_file) ? (string) filemtime($js_file) : '0');
 
@@ -756,6 +990,50 @@ class AdminPortal
                 update_option('mm_email_admin_featured_match_template', wp_kses_post(wp_unslash($_POST['mm_email_admin_featured_match_template'])));
             }
 
+            // Role Access Matrix Configuration
+            if (isset($_POST['mm_role_access_submitted'])) {
+                $raw_access  = isset($_POST['mm_role_access']) && is_array($_POST['mm_role_access']) ? $_POST['mm_role_access'] : [];
+                $matrix      = [];
+                $valid_items = [
+                    'pool', 'matches', 'settings', 'logs', 'event_clicks',
+                    'events', 'forminator',
+                    'posts', 'pages', 'users', 'tools'
+                ];
+                $all_roles   = function_exists('get_editable_roles') ? get_editable_roles() : [];
+                unset($all_roles['administrator']);
+
+                if (empty($all_roles)) {
+                    $all_roles = [
+                        'matchmaker_admin' => ['name' => 'Matchmaker Admin'],
+                        'events_organizer' => ['name' => 'Events Organizer'],
+                        'editor'           => ['name' => 'Editor'],
+                        'author'           => ['name' => 'Author'],
+                    ];
+                }
+
+                foreach (array_keys($all_roles) as $role_slug) {
+                    $matrix[$role_slug] = [];
+                    foreach ($valid_items as $item) {
+                        $matrix[$role_slug][$item] = !empty($raw_access[$role_slug][$item]) ? 1 : 0;
+                    }
+                }
+
+                update_option('mm_role_access_matrix', $matrix);
+
+                if (function_exists('get_role')) {
+                    foreach ($matrix as $r_slug => $perms) {
+                        $r_obj = get_role($r_slug);
+                        if ($r_obj && method_exists($r_obj, 'add_cap')) {
+                            $has_mm_perm = !empty($perms['pool']) || !empty($perms['matches']) || !empty($perms['settings']) || !empty($perms['logs']) || !empty($perms['event_clicks']);
+                            if ($has_mm_perm) {
+                                $r_obj->add_cap('read', true);
+                                $r_obj->add_cap('manage_matchmaker', true);
+                            }
+                        }
+                    }
+                }
+            }
+
             \Matchmaker\Service\FileLoggerService::info(
                 'Admin #' . get_current_user_id() . ' updated plugin settings.',
                 ['admin_id' => get_current_user_id()],
@@ -769,7 +1047,7 @@ class AdminPortal
         // 3. GET Query Actions (Approve / Reject / Trigger / Manual Match / CSV Export)
         $action   = sanitize_text_field(wp_unslash($_GET['mm_action'] ?? $_GET['action'] ?? ''));
         $match_id = (int) ($_GET['match_id'] ?? 0);
-        $user_id  = (int) ($_GET['user_id'] ?? 0);
+        $user_id  = (int) ($_GET['user_id'] ?? $_GET['id'] ?? 0);
         $nonce    = sanitize_text_field(wp_unslash($_GET['_wpnonce'] ?? ''));
 
         if (empty($action)) {
@@ -931,6 +1209,36 @@ class AdminPortal
             );
             mm_enqueue_user_matching_job($user_id, 'admin_manual_trigger');
             add_settings_error('mm_admin_notices', 'job_queued', sprintf(__('Matching engine job queued for User #%d.', 'matchmaker'), $user_id), 'updated');
+            return;
+        }
+
+        // --- CREATE FEATURED PROFILE POST ---
+        if ($action === 'create_featured_profile' && $user_id > 0 && wp_verify_nonce($nonce, 'mm_create_featured_' . $user_id)) {
+            $feat_ctrl = class_exists(\Matchmaker\Frontend\FeaturedProfileController::class)
+                ? \Matchmaker\Frontend\FeaturedProfileController::instance()
+                : null;
+
+            if ($feat_ctrl) {
+                $existing_post_id = $feat_ctrl->get_user_featured_post_id($user_id);
+                if ($existing_post_id > 0) {
+                    wp_safe_redirect(admin_url('post.php?post=' . $existing_post_id . '&action=edit'));
+                    if (!defined('MM_UNIT_TESTS')) {
+                        exit;
+                    }
+                    return;
+                }
+
+                $new_post_id = $feat_ctrl->sync_featured_post($user_id, true, 'anonymous');
+                if ($new_post_id > 0) {
+                    wp_safe_redirect(admin_url('post.php?post=' . $new_post_id . '&action=edit'));
+                    if (!defined('MM_UNIT_TESTS')) {
+                        exit;
+                    }
+                    return;
+                }
+            }
+
+            add_settings_error('mm_admin_notices', 'feature_error', __('Could not create featured profile post.', 'matchmaker'), 'error');
             return;
         }
 

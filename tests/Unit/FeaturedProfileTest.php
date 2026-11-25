@@ -79,7 +79,7 @@ final class FeaturedProfileTest extends TestCase
         ]);
         $GLOBALS['__mm_users'][$user_id] = $user;
 
-        // 1. Initial creation: Anonymous & Enabled
+        // 1. Initial creation: Anonymous & Published with show_featured_profile = false
         $post_id = $this->controller->sync_featured_post($user_id, true, 'anonymous');
         $this->assertIsInt($post_id);
         $this->assertGreaterThan(0, $post_id);
@@ -90,22 +90,29 @@ final class FeaturedProfileTest extends TestCase
         $this->assertSame('featured-profile', $post->post_type);
         $this->assertStringContainsString('Candidate #450', $post->post_title);
 
-        // Check meta
+        // Check meta & ACF defaults
         $this->assertSame($user_id, (int) get_post_meta($post_id, 'connected-member', true));
-        $this->assertSame('anonymous', get_post_meta($post_id, '_mm_visibility_mode', true));
-        $this->assertSame(1, (int) get_user_meta($user_id, 'mm_featured_enabled', true));
+        $this->assertSame('anonymous', get_post_meta($post_id, 'featured_profile_mode', true));
+        $this->assertSame('false', get_post_meta($post_id, 'show_featured_profile', true));
+        $this->assertFalse($this->controller->is_profile_approved($post_id));
+        $this->assertSame('anonymous', $this->controller->get_profile_mode($post_id, $user_id));
+        $this->assertSame(1, (int) get_user_meta($user_id, 'mm_has_featured_profile', true));
         $this->assertSame('anonymous', get_user_meta($user_id, 'mm_featured_visibility', true));
 
-        // 2. Update to Public & Disabled (Draft)
-        $updated_post_id = $this->controller->sync_featured_post($user_id, false, 'public');
+        // 2. Update to Public Mode: post_status remains publish, mode becomes public, show_featured_profile preserved as false
+        $updated_post_id = $this->controller->sync_featured_post($user_id, true, 'public');
         $this->assertSame($post_id, $updated_post_id, 'Should update same post ID');
 
         $updated_post = $GLOBALS['__mm_posts'][$post_id];
-        $this->assertSame('draft', $updated_post->post_status);
+        $this->assertSame('publish', $updated_post->post_status);
         $this->assertStringContainsString('Layla Hassan', $updated_post->post_title);
-        $this->assertSame('public', get_post_meta($post_id, '_mm_visibility_mode', true));
-        $this->assertSame(0, (int) get_user_meta($user_id, 'mm_featured_enabled', true));
-        $this->assertSame('public', get_user_meta($user_id, 'mm_featured_visibility', true));
+        $this->assertSame('public', get_post_meta($post_id, 'featured_profile_mode', true));
+        $this->assertSame('public', $this->controller->get_profile_mode($post_id, $user_id));
+        $this->assertSame('false', get_post_meta($post_id, 'show_featured_profile', true));
+
+        // 3. Admin approves profile
+        update_post_meta($post_id, 'show_featured_profile', 'true');
+        $this->assertTrue($this->controller->is_profile_approved($post_id));
     }
 
     public function test_handle_service_revoked_unpublishes_post(): void
@@ -139,6 +146,14 @@ final class FeaturedProfileTest extends TestCase
 
         $this->assertSame('featured-profile', $query->get('post_type'));
         $this->assertSame('publish', $query->get('post_status'));
+
+        $meta_query = $query->get('meta_query');
+        $this->assertIsArray($meta_query);
+        $this->assertNotEmpty($meta_query);
+        $clause = $meta_query[0] ?? [];
+        $this->assertSame('OR', $clause['relation'] ?? '');
+        $this->assertSame('show_featured_profile', $clause[0]['key'] ?? '');
+        $this->assertSame('true', $clause[0]['value'] ?? '');
     }
 
     public function test_render_featured_profile_details_anonymous_masks_name_and_photo(): void
@@ -401,8 +416,9 @@ final class FeaturedProfileTest extends TestCase
         $out_succ = ob_get_clean();
 
         $this->assertTrue($caught_succ);
-        $this->assertStringContainsString('now live on the public page', $out_succ);
-        $this->assertSame(1, (int) get_user_meta($user_id, 'mm_featured_enabled', true));
+        $this->assertStringContainsString('Your featured profile settings have been updated.', $out_succ);
+        $this->assertStringContainsString('"is_approved":false', $out_succ);
+        $this->assertSame(1, (int) get_user_meta($user_id, 'mm_has_featured_profile', true));
         $this->assertSame('public', get_user_meta($user_id, 'mm_featured_visibility', true));
     }
 
@@ -786,6 +802,107 @@ final class FeaturedProfileTest extends TestCase
 
         $this->assertStringContainsString('max-width:400px;', $html_details);
         $this->assertStringContainsString('height:360px;', $html_details);
+    }
+
+    public function test_role_access_matrix_and_permission_checks(): void
+    {
+        $admin_portal = \Matchmaker\Admin\AdminPortal::instance();
+
+        // 1. Matrix defaults
+        $matrix = $admin_portal->get_role_access_matrix();
+        $this->assertIsArray($matrix);
+        $this->assertArrayHasKey('matchmaker_admin', $matrix);
+        $this->assertArrayHasKey('events_organizer', $matrix);
+
+        $this->assertSame(1, $matrix['matchmaker_admin']['pool']);
+        $this->assertSame(1, $matrix['matchmaker_admin']['matches']);
+        $this->assertSame(0, $matrix['matchmaker_admin']['events']);
+
+        $this->assertSame(0, $matrix['events_organizer']['pool']);
+        $this->assertSame(1, $matrix['events_organizer']['events']);
+        $this->assertSame(1, $matrix['events_organizer']['forminator']);
+
+        // 2. Administrator has access to everything
+        $admin_user = new \WP_User((object) ['ID' => 1, 'roles' => ['administrator']]);
+        $GLOBALS['__mm_users'][1] = $admin_user;
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('pool', $admin_user));
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('events', $admin_user));
+
+        // 3. Matchmaker Admin user
+        $mm_user = new \WP_User((object) ['ID' => 2, 'roles' => ['matchmaker_admin']]);
+        $GLOBALS['__mm_users'][2] = $mm_user;
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('pool', $mm_user));
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('matches', $mm_user));
+        $this->assertFalse($admin_portal->is_item_allowed_for_user('events', $mm_user));
+
+        // 4. Events Organizer user
+        $eo_user = new \WP_User((object) ['ID' => 3, 'roles' => ['events_organizer']]);
+        $GLOBALS['__mm_users'][3] = $eo_user;
+        $this->assertFalse($admin_portal->is_item_allowed_for_user('pool', $eo_user));
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('events', $eo_user));
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('forminator', $eo_user));
+
+        // 5. Custom configured role in matrix
+        $custom_matrix = $matrix;
+        $custom_matrix['editor'] = [
+            'pool'         => 1,
+            'matches'      => 0,
+            'settings'     => 0,
+            'logs'         => 0,
+            'event_clicks' => 0,
+            'events'       => 0,
+            'forminator'   => 0,
+            'posts'        => 1,
+            'pages'        => 1,
+            'users'        => 0,
+            'tools'        => 0,
+        ];
+        update_option('mm_role_access_matrix', $custom_matrix);
+
+        $editor_user = new \WP_User((object) ['ID' => 4, 'roles' => ['editor']]);
+        $GLOBALS['__mm_users'][4] = $editor_user;
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('pool', $editor_user));
+        $this->assertFalse($admin_portal->is_item_allowed_for_user('matches', $editor_user));
+        $this->assertTrue($admin_portal->is_item_allowed_for_user('posts', $editor_user));
+
+        // Cleanup
+        delete_option('mm_role_access_matrix');
+    }
+
+    public function test_admin_create_featured_profile_action(): void
+    {
+        $user_id = 490;
+        $user = new \WP_User((object) ['ID' => $user_id, 'display_name' => 'Candidate 490']);
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        $admin_user = new \WP_User((object) ['ID' => 1, 'roles' => ['administrator']]);
+        $GLOBALS['__mm_users'][1] = $admin_user;
+        wp_set_current_user(1);
+
+        $_GET = [
+            'page'     => 'matchmaking-pool',
+            'action'   => 'create_featured_profile',
+            'user_id'  => (string) $user_id,
+            '_wpnonce' => wp_create_nonce('mm_create_featured_' . $user_id),
+        ];
+
+        // Should create post and trigger safe redirect
+        $caught_redirect = false;
+        try {
+            \Matchmaker\Admin\AdminPortal::instance()->handle_admin_actions();
+        } catch (\RuntimeException $e) {
+            $caught_redirect = str_starts_with($e->getMessage(), 'wp_safe_redirect:');
+        }
+
+        $post_id = $this->controller->get_user_featured_post_id($user_id);
+        $this->assertGreaterThan(0, $post_id);
+        $this->assertSame('publish', $GLOBALS['__mm_posts'][$post_id]->post_status);
+        $this->assertSame('false', get_post_meta($post_id, 'show_featured_profile', true));
+        $this->assertSame('anonymous', get_post_meta($post_id, 'featured_profile_mode', true));
+        $this->assertSame(1, (int) get_user_meta($user_id, 'mm_has_featured_profile', true));
+
+        // Clear GET
+        $_GET = [];
     }
 }
 

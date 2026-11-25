@@ -146,14 +146,9 @@ $badge_label = $repo->format_tier_label($user_type);
     <?php
     $has_featured_service = \Matchmaker\Core\PMProSync::instance()->has_active_featured_profile_service($user_id);
     if ($has_featured_service) :
-        $meta_enabled        = get_user_meta($user_id, 'mm_featured_enabled', true);
-        if ($meta_enabled === '') {
-            $feat_post_id        = \Matchmaker\Frontend\FeaturedProfileController::instance()->get_user_featured_post_id($user_id);
-            $is_featured_enabled = ($feat_post_id > 0) ? (get_post_status($feat_post_id) === 'publish') : true;
-        } else {
-            $is_featured_enabled = (bool) $meta_enabled;
-        }
-        $feat_visibility     = (string) get_user_meta($user_id, 'mm_featured_visibility', true) ?: 'anonymous';
+        $feat_post_id        = \Matchmaker\Frontend\FeaturedProfileController::instance()->get_user_featured_post_id($user_id);
+        $is_approved         = ($feat_post_id > 0) ? \Matchmaker\Frontend\FeaturedProfileController::instance()->is_profile_approved($feat_post_id) : false;
+        $feat_visibility     = \Matchmaker\Frontend\FeaturedProfileController::instance()->get_profile_mode($feat_post_id, $user_id);
         $feat_anon_name      = (string) get_user_meta($user_id, 'mm_featured_anonymous_name', true);
     ?>
         <div class="az-card mm-featured-portal-card" id="mm-featured-portal-card">
@@ -163,32 +158,39 @@ $badge_label = $repo->format_tier_label($user_type);
                         ⭐ <?php esc_html_e('Featured Profile Status', 'matchmaker'); ?>
                     </h3>
                     <p class="mm-featured-desc">
-                        <?php esc_html_e('You have purchased the Featured Profile service. You can toggle your visibility and choose how your profile appears on the public Featured Profiles page.', 'matchmaker'); ?>
+                        <?php esc_html_e('You have purchased the Featured Profile service. Choose how your profile appears on the public Featured Profiles directory below.', 'matchmaker'); ?>
                     </p>
                 </div>
                 <div class="mm-featured-header-badges">
-                    <span id="mm-featured-live-badge" class="mm-featured-badge mm-badge-live" style="<?php echo $is_featured_enabled ? '' : 'display:none;'; ?>">
+                    <span id="mm-featured-approved-badge" class="mm-featured-badge mm-badge-live" style="<?php echo $is_approved ? '' : 'display:none;'; ?>">
                         <span class="mm-status-dot mm-dot-live"></span>
-                        <span><?php esc_html_e('Live & Published', 'matchmaker'); ?></span>
+                        <span><?php esc_html_e('Live & Featured', 'matchmaker'); ?></span>
                     </span>
-                    <span id="mm-featured-hidden-badge" class="mm-featured-badge mm-badge-hidden" style="<?php echo !$is_featured_enabled ? '' : 'display:none;'; ?>">
-                        <span class="mm-status-dot mm-dot-hidden"></span>
-                        <span><?php esc_html_e('Hidden from Public', 'matchmaker'); ?></span>
+                    <span id="mm-featured-review-badge" class="mm-featured-badge mm-badge-review" style="<?php echo !$is_approved ? '' : 'display:none;'; ?>">
+                        <span class="mm-status-dot mm-dot-review"></span>
+                        <span><?php esc_html_e('Under Review', 'matchmaker'); ?></span>
                     </span>
                 </div>
             </div>
 
-            <div class="mm-featured-toggle-row">
-                <div class="mm-switch-text">
-                    <span class="mm-switch-title"><?php esc_html_e('Feature my profile on the Public Featured Profiles page', 'matchmaker'); ?></span>
-                    <span class="mm-switch-subtitle"><?php esc_html_e('Turn on to make your profile discoverable on the public directory', 'matchmaker'); ?></span>
-                </div>
-                <label class="mm-switch-control" for="mm-featured-enabled-check">
-                    <input type="checkbox" id="mm-featured-enabled-check" value="1" <?php checked($is_featured_enabled, true); ?>><span class="mm-switch-slider"></span>
-                </label>
+            <!-- Administrator Review Notice Banner -->
+            <div class="mm-featured-review-notice <?php echo $is_approved ? 'is-approved' : 'is-pending'; ?>" id="mm-featured-review-notice">
+                <?php if ($is_approved) : ?>
+                    <span class="mm-notice-icon">🟢</span>
+                    <span class="mm-notice-text">
+                        <strong><?php esc_html_e('Profile Active:', 'matchmaker'); ?></strong>
+                        <?php esc_html_e('Your featured profile has been reviewed and accepted by our team and is currently visible on the public Featured Profiles directory.', 'matchmaker'); ?>
+                    </span>
+                <?php else : ?>
+                    <span class="mm-notice-icon">⏳</span>
+                    <span class="mm-notice-text">
+                        <strong><?php esc_html_e('Under Review:', 'matchmaker'); ?></strong>
+                        <?php esc_html_e('Our administration team will review your profile details. Upon acceptance, your profile will be actively featured on the public directory.', 'matchmaker'); ?>
+                    </span>
+                <?php endif; ?>
             </div>
 
-            <div id="mm-featured-visibility-options" class="mm-visibility-options-wrapper" style="<?php echo $is_featured_enabled ? '' : 'display:none;'; ?>">
+            <div id="mm-featured-visibility-options" class="mm-visibility-options-wrapper">
                 <div class="mm-visibility-heading">
                     <?php esc_html_e('Choose Your Visibility Mode:', 'matchmaker'); ?>
                 </div>

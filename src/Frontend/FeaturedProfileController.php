@@ -60,7 +60,7 @@ final class FeaturedProfileController
      */
     public function enqueue_frontend_assets(): void
     {
-        $min_ver    = defined('MM_VERSION') ? MM_VERSION : '2.16.0';
+        $min_ver    = defined('MM_VERSION') ? MM_VERSION : '2.17.0';
         $plugin_url = defined('MM_URL') ? MM_URL : (function_exists('plugin_dir_url') ? plugin_dir_url(dirname(__DIR__, 2) . '/matchmaker.php') : '');
         $js_file    = dirname(__DIR__, 2) . '/assets/js/featured-profiles.js';
         $css_file   = dirname(__DIR__, 2) . '/assets/css/member-portal.css';
@@ -231,7 +231,7 @@ final class FeaturedProfileController
      * @param string $visibility_mode 'anonymous' or 'public'.
      * @return int|false Post ID on success, false on error.
      */
-    public function sync_featured_post(int $user_id, bool $enabled, string $visibility_mode = 'anonymous', string $display_name = ''): int|false
+    public function sync_featured_post(int $user_id, bool $enabled = true, string $visibility_mode = 'anonymous', string $display_name = ''): int|false
     {
         if ($user_id <= 0) {
             return false;
@@ -244,7 +244,8 @@ final class FeaturedProfileController
 
         $visibility_mode = in_array($visibility_mode, ['public', 'anonymous'], true) ? $visibility_mode : 'anonymous';
         $post_id         = $this->get_user_featured_post_id($user_id);
-        $post_status     = $enabled ? 'publish' : 'draft';
+        $is_new          = ($post_id <= 0);
+        $post_status     = 'publish';
 
         if ($display_name !== '') {
             update_user_meta($user_id, 'mm_featured_anonymous_name', $display_name);
@@ -281,24 +282,47 @@ final class FeaturedProfileController
         if (function_exists('update_field')) {
             update_field('connected-member', $user_id, $post_id);
             update_field('connected_member', $user_id, $post_id);
+            update_field('featured_profile_mode', $visibility_mode, $post_id);
+
+            // If newly created post, set show_featured_profile to 'false' (awaiting admin review)
+            if ($is_new) {
+                update_field('show_featured_profile', 'false', $post_id);
+            } else {
+                $existing_show = get_field('show_featured_profile', $post_id);
+                if ($existing_show === null || $existing_show === false || $existing_show === '') {
+                    update_field('show_featured_profile', 'false', $post_id);
+                }
+            }
         }
+
         update_post_meta($post_id, 'connected-member', $user_id);
         update_post_meta($post_id, 'connected_member', $user_id);
         update_post_meta($post_id, '_mm_visibility_mode', $visibility_mode);
+        update_post_meta($post_id, 'featured_profile_mode', $visibility_mode);
+
+        if ($is_new) {
+            update_post_meta($post_id, 'show_featured_profile', 'false');
+        } else {
+            $curr_show = get_post_meta($post_id, 'show_featured_profile', true);
+            if ($curr_show === '') {
+                update_post_meta($post_id, 'show_featured_profile', 'false');
+            }
+        }
+
         if ($display_name !== '') {
             update_post_meta($post_id, '_mm_anonymous_name', $display_name);
         }
 
         // Store user state
-        update_user_meta($user_id, 'mm_featured_enabled', $enabled ? 1 : 0);
+        update_user_meta($user_id, 'mm_has_featured_profile', 1);
+        update_user_meta($user_id, 'mm_featured_enabled', 1);
         update_user_meta($user_id, 'mm_featured_visibility', $visibility_mode);
         update_user_meta($user_id, '_mm_featured_post_id', $post_id);
 
-
         if (class_exists(FileLoggerService::class)) {
             FileLoggerService::info(
-                'Featured profile synced for user #' . $user_id . ': enabled=' . ($enabled ? '1' : '0') . ', visibility=' . $visibility_mode . ', post_id=' . $post_id . '.',
-                ['user_id' => $user_id, 'enabled' => $enabled, 'visibility' => $visibility_mode, 'post_id' => $post_id],
+                'Featured profile synced for user #' . $user_id . ': visibility=' . $visibility_mode . ', post_id=' . $post_id . '.',
+                ['user_id' => $user_id, 'visibility' => $visibility_mode, 'post_id' => $post_id],
                 'profile'
             );
         }
@@ -307,8 +331,70 @@ final class FeaturedProfileController
     }
 
     /**
+     * Checks if a featured profile post has been approved by admin (show_featured_profile == 'true' or '1').
+     *
+     * @param int $post_id
+     * @return bool
+     */
+    public function is_profile_approved(int $post_id): bool
+    {
+        if ($post_id <= 0) {
+            return false;
+        }
+
+        if (function_exists('get_field')) {
+            $val = get_field('show_featured_profile', $post_id);
+            if ($val === 'true' || $val === true || $val === '1' || $val === 1) {
+                return true;
+            }
+            if ($val === 'false' || $val === false || $val === '0' || $val === 0) {
+                return false;
+            }
+        }
+
+        $meta = get_post_meta($post_id, 'show_featured_profile', true);
+        return ($meta === 'true' || $meta === '1' || $meta === true || $meta === 1);
+    }
+
+    /**
+     * Resolves the profile mode ('anonymous' or 'public') for a post or user.
+     *
+     * @param int $post_id
+     * @param int $user_id
+     * @return string 'anonymous'|'public'
+     */
+    public function get_profile_mode(int $post_id = 0, int $user_id = 0): string
+    {
+        if ($post_id > 0) {
+            if (function_exists('get_field')) {
+                $mode = get_field('featured_profile_mode', $post_id);
+                if (in_array($mode, ['anonymous', 'public'], true)) {
+                    return (string) $mode;
+                }
+            }
+            $meta_mode = get_post_meta($post_id, 'featured_profile_mode', true);
+            if (in_array($meta_mode, ['anonymous', 'public'], true)) {
+                return (string) $meta_mode;
+            }
+            $legacy_mode = get_post_meta($post_id, '_mm_visibility_mode', true);
+            if (in_array($legacy_mode, ['anonymous', 'public'], true)) {
+                return (string) $legacy_mode;
+            }
+        }
+
+        if ($user_id > 0) {
+            $user_mode = get_user_meta($user_id, 'mm_featured_visibility', true);
+            if (in_array($user_mode, ['anonymous', 'public'], true)) {
+                return (string) $user_mode;
+            }
+        }
+
+        return 'anonymous';
+    }
+
+    /**
      * Invoked when a member's Featured Profile service expires or is cancelled.
-     * Automatically unpublishes (drafts) their featured profile post.
+     * Sets post to 'draft' and clears active metadata.
      *
      * @param int $user_id
      * @return void
@@ -329,11 +415,17 @@ final class FeaturedProfileController
 
         $post_id = $this->get_user_featured_post_id($user_id);
         if ($post_id > 0) {
+            if (function_exists('update_field')) {
+                update_field('show_featured_profile', 'false', $post_id);
+            }
+            update_post_meta($post_id, 'show_featured_profile', 'false');
+
             wp_update_post([
                 'ID'          => $post_id,
                 'post_status' => 'draft',
             ]);
         }
+        delete_user_meta($user_id, 'mm_has_featured_profile');
         update_user_meta($user_id, 'mm_featured_enabled', 0);
 
         if (class_exists(FileLoggerService::class)) {
@@ -356,8 +448,31 @@ final class FeaturedProfileController
         $query->set('post_type', 'featured-profile');
         $query->set('post_status', 'publish');
 
-        // Only include posts where connected member has active pool profile
-        // Elementor loop handles post querying cleanly
+        $meta_query = $query->get('meta_query');
+        if (!is_array($meta_query)) {
+            $meta_query = [];
+        }
+
+        $meta_query[] = [
+            'relation' => 'OR',
+            [
+                'key'     => 'show_featured_profile',
+                'value'   => 'true',
+                'compare' => '=',
+            ],
+            [
+                'key'     => 'show_featured_profile',
+                'value'   => '1',
+                'compare' => '=',
+            ],
+            [
+                'key'     => 'show_featured_profile',
+                'value'   => true,
+                'compare' => '=',
+            ],
+        ];
+
+        $query->set('meta_query', $meta_query);
     }
 
     /**
@@ -402,7 +517,8 @@ final class FeaturedProfileController
             return 'Member #' . $user_id;
         }
 
-        $visibility = (string) get_user_meta($user_id, 'mm_featured_visibility', true) ?: 'anonymous';
+        $post_id    = $this->get_user_featured_post_id($user_id);
+        $visibility = $this->get_profile_mode($post_id, $user_id);
         if ($visibility === 'anonymous') {
             return $this->get_anonymous_title($user_id, false);
         }
@@ -602,10 +718,7 @@ final class FeaturedProfileController
         $pool       = $repo->get_user_pool($user_id);
         $meta       = $repo->get_meta_block($user_id);
         $user       = get_userdata($user_id);
-        $visibility = get_post_meta($post_id, '_mm_visibility_mode', true);
-        if (empty($visibility)) {
-            $visibility = (string) get_user_meta($user_id, 'mm_featured_visibility', true) ?: 'anonymous';
-        }
+        $visibility = $this->get_profile_mode($post_id, $user_id);
 
         $is_anonymous = ($visibility === 'anonymous');
         $display_name = $is_anonymous
@@ -870,7 +983,7 @@ final class FeaturedProfileController
         $pool       = $repo->get_user_pool($user_id);
         $meta       = $repo->get_meta_block($user_id);
         $user       = get_userdata($user_id);
-        $visibility = ($post_id > 0 ? get_post_meta($post_id, '_mm_visibility_mode', true) : '') ?: (get_user_meta($user_id, 'mm_featured_visibility', true) ?: 'anonymous');
+        $visibility = $this->get_profile_mode($post_id, $user_id);
         $is_anon    = ($visibility === 'anonymous');
 
         switch (strtolower(trim((string) $atts['key']))) {
@@ -1118,27 +1231,53 @@ final class FeaturedProfileController
             wp_send_json_error(['message' => __('You have not purchased the Featured Profile service.', 'matchmaker')]);
         }
 
-        $enabled         = !empty($_POST['enabled']);
         $visibility_mode = sanitize_key($_POST['visibility_mode'] ?? 'anonymous');
+        $visibility_mode = in_array($visibility_mode, ['public', 'anonymous'], true) ? $visibility_mode : 'anonymous';
         $display_name    = sanitize_text_field(wp_unslash($_POST['display_name'] ?? ''));
 
         if (isset($_POST['display_name'])) {
             update_user_meta($user_id, 'mm_featured_anonymous_name', $display_name);
         }
 
-        $post_id = $this->sync_featured_post($user_id, $enabled, $visibility_mode, $display_name);
-        if (!$post_id) {
-            wp_send_json_error(['message' => __('Failed to update featured profile post.', 'matchmaker')]);
+        update_user_meta($user_id, 'mm_featured_visibility', $visibility_mode);
+        update_user_meta($user_id, 'mm_has_featured_profile', 1);
+
+        $post_id = $this->get_user_featured_post_id($user_id);
+        if ($post_id <= 0) {
+            $post_id = $this->sync_featured_post($user_id, true, $visibility_mode, $display_name);
+        } else {
+            if (function_exists('update_field')) {
+                update_field('featured_profile_mode', $visibility_mode, $post_id);
+            }
+            update_post_meta($post_id, 'featured_profile_mode', $visibility_mode);
+            update_post_meta($post_id, '_mm_visibility_mode', $visibility_mode);
+
+            if ($display_name !== '') {
+                update_post_meta($post_id, '_mm_anonymous_name', $display_name);
+            }
+
+            $user_obj = get_userdata($user_id);
+            $post_title = ($visibility_mode === 'anonymous')
+                ? $this->get_anonymous_title($user_id, true)
+                : ($user_obj ? $user_obj->display_name : 'Member #' . $user_id);
+
+            wp_update_post([
+                'ID'         => $post_id,
+                'post_title' => $post_title,
+            ]);
         }
 
+        if (!$post_id) {
+            wp_send_json_error(['message' => __('Failed to update featured profile settings.', 'matchmaker')]);
+        }
+
+        $is_approved = $this->is_profile_approved($post_id);
 
         wp_send_json_success([
             'post_id'         => $post_id,
-            'enabled'         => $enabled,
             'visibility_mode' => $visibility_mode,
-            'message'         => $enabled
-                ? __('Your Featured Profile is now live on the public page!', 'matchmaker')
-                : __('Your Featured Profile has been hidden from the public page.', 'matchmaker'),
+            'is_approved'     => $is_approved,
+            'message'         => __('Your featured profile settings have been updated.', 'matchmaker'),
         ]);
     }
 

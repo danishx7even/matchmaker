@@ -71,7 +71,6 @@
         if ($toggleCard.length) {
             var saveFeaturedSettings = function () {
                 var config       = window.mmFeaturedConfig || {};
-                var isEnabled    = $('#mm-featured-enabled-check').is(':checked') ? 1 : 0;
                 var visibility   = $('input[name="mm_featured_visibility_mode"]:checked').val() || 'anonymous';
                 var displayName  = $.trim($('#mm-featured-display-name-input').val() || '');
                 var $statusText  = $('#mm-featured-save-status');
@@ -85,7 +84,6 @@
                     data: {
                         action: 'mm_toggle_featured_profile',
                         nonce: config.toggle_nonce,
-                        enabled: isEnabled,
                         visibility_mode: visibility,
                         display_name: displayName
                     },
@@ -97,14 +95,14 @@
                                 $statusText.fadeOut(600);
                             }, 3500);
 
-                            if (isEnabled) {
-                                $('#mm-featured-visibility-options').slideDown(200);
-                                $('#mm-featured-live-badge').show();
-                                $('#mm-featured-hidden-badge').hide();
+                            if (res.data && res.data.is_approved) {
+                                $('#mm-featured-approved-badge').show();
+                                $('#mm-featured-review-badge').hide();
+                                $('#mm-featured-review-notice').removeClass('is-pending').addClass('is-approved');
                             } else {
-                                $('#mm-featured-visibility-options').slideUp(200);
-                                $('#mm-featured-live-badge').hide();
-                                $('#mm-featured-hidden-badge').show();
+                                $('#mm-featured-approved-badge').hide();
+                                $('#mm-featured-review-badge').show();
+                                $('#mm-featured-review-notice').removeClass('is-approved').addClass('is-pending');
                             }
 
                             if (visibility === 'anonymous') {
@@ -122,20 +120,6 @@
                     }
                 });
             };
-
-            $('#mm-featured-enabled-check').on('change', function () {
-                var isEnabled = $(this).is(':checked');
-                if (isEnabled) {
-                    $('#mm-featured-visibility-options').slideDown(200);
-                    $('#mm-featured-live-badge').show();
-                    $('#mm-featured-hidden-badge').hide();
-                } else {
-                    $('#mm-featured-visibility-options').slideUp(200);
-                    $('#mm-featured-live-badge').hide();
-                    $('#mm-featured-hidden-badge').show();
-                }
-                saveFeaturedSettings();
-            });
 
             $(document).on('click', '.mm-visibility-card', function (e) {
                 if ($(e.target).closest('input, button, a, label').length) {

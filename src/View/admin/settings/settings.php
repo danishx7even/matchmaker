@@ -89,6 +89,9 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
         <a href="#tab-shortcodes" class="nav-tab" data-tab="shortcodes">
             📖 <?php esc_html_e('Shortcodes & System', 'matchmaker'); ?>
         </a>
+        <a href="#tab-roles" class="nav-tab" data-tab="roles">
+            🔐 <?php esc_html_e('Role Access', 'matchmaker'); ?>
+        </a>
     </nav>
 
     <form method="post" action="" id="mm-settings-form">
@@ -1122,6 +1125,129 @@ $repo = \Matchmaker\Repository\MatchRepository::instance();
 
 &lt;!-- Secondary Photo Preview --&gt;
 [matchmaker_profile_photo photo="2" width="180px" height="180px" radius="14px"]</code></pre>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             TAB 7: ROLE ACCESS MATRIX
+             ========================================== -->
+        <div class="mm-settings-tab-panel" id="mm-panel-roles">
+            <div class="mm-card">
+                <h2>🔐 <?php esc_html_e('Role-Based Menu & Screen Access Permissions', 'matchmaker'); ?></h2>
+                <p class="description" style="margin-bottom: 20px;">
+                    <?php esc_html_e('Configure which WordPress admin menus and Matchmaker sections are accessible for each non-administrator user role. Administrators always have full, unrestricted backend access.', 'matchmaker'); ?>
+                </p>
+
+                <input type="hidden" name="mm_role_access_submitted" value="1">
+
+                <?php
+                $editable_roles = function_exists('get_editable_roles') ? get_editable_roles() : [];
+                unset($editable_roles['administrator']);
+
+                if (empty($editable_roles)) {
+                    $editable_roles = [
+                        'matchmaker_admin' => ['name' => __('Matchmaker Admin', 'matchmaker')],
+                        'events_organizer' => ['name' => __('Events Organizer', 'matchmaker')],
+                        'editor'           => ['name' => __('Editor', 'matchmaker')],
+                        'author'           => ['name' => __('Author', 'matchmaker')],
+                    ];
+                }
+
+                $role_matrix = \Matchmaker\Admin\AdminPortal::instance()->get_role_access_matrix();
+                ?>
+
+                <div style="overflow-x: auto;">
+                    <table class="widefat striped mm-role-access-table" style="min-width: 950px; border: 1px solid #ccd0d4; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <thead>
+                            <tr style="background: #f8fafc;">
+                                <th rowspan="2" style="vertical-align: middle; width: 180px; font-weight: 700; border-right: 2px solid #e2e8f0; font-size: 13px;">
+                                    <?php esc_html_e('User Role', 'matchmaker'); ?>
+                                </th>
+                                <th colspan="5" style="text-align: center; background: #fff7ed; color: #9a3412; font-weight: 700; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #fed7aa;">
+                                    ❤️ <?php esc_html_e('Matchmaker Sections', 'matchmaker'); ?>
+                                </th>
+                                <th colspan="2" style="text-align: center; background: #eff6ff; color: #1e40af; font-weight: 700; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #bfdbfe;">
+                                    🔌 <?php esc_html_e('Add-on Menus', 'matchmaker'); ?>
+                                </th>
+                                <th colspan="4" style="text-align: center; background: #f1f5f9; color: #334155; font-weight: 700; border-bottom: 1px solid #cbd5e1;">
+                                    ⚙️ <?php esc_html_e('WordPress Core', 'matchmaker'); ?>
+                                </th>
+                            </tr>
+                            <tr style="font-size: 11px; text-align: center;">
+                                <!-- Matchmaker -->
+                                <th style="text-align: center; background: #fffaf5; font-weight: 600;"><?php esc_html_e('Pool', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #fffaf5; font-weight: 600;"><?php esc_html_e('Matches', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #fffaf5; font-weight: 600;"><?php esc_html_e('Settings', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #fffaf5; font-weight: 600;"><?php esc_html_e('Logs', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #fffaf5; font-weight: 600; border-right: 2px solid #e2e8f0;"><?php esc_html_e('Analytics', 'matchmaker'); ?></th>
+                                <!-- Add-on -->
+                                <th style="text-align: center; background: #f8faff; font-weight: 600;"><?php esc_html_e('Events', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #f8faff; font-weight: 600; border-right: 2px solid #e2e8f0;"><?php esc_html_e('Forminator', 'matchmaker'); ?></th>
+                                <!-- Core -->
+                                <th style="text-align: center; background: #f8fafc; font-weight: 600;"><?php esc_html_e('Posts', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #f8fafc; font-weight: 600;"><?php esc_html_e('Pages', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #f8fafc; font-weight: 600;"><?php esc_html_e('Users', 'matchmaker'); ?></th>
+                                <th style="text-align: center; background: #f8fafc; font-weight: 600;"><?php esc_html_e('Tools', 'matchmaker'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($editable_roles as $role_key => $role_info) : 
+                                $r_name = is_array($role_info) ? ($role_info['name'] ?? $role_key) : $role_key;
+                                $r_perms = $role_matrix[$role_key] ?? [];
+                            ?>
+                                <tr>
+                                    <td style="font-weight: 600; border-right: 2px solid #e2e8f0; vertical-align: middle;">
+                                        <span><?php echo esc_html(function_exists('translate_user_role') ? translate_user_role($r_name) : $r_name); ?></span>
+                                        <code style="display: block; font-size: 10px; color: #64748b; font-weight: 400;"><?php echo esc_html($role_key); ?></code>
+                                    </td>
+
+                                    <!-- Matchmaker Sections -->
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][pool]" value="1" <?php checked(!empty($r_perms['pool']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][matches]" value="1" <?php checked(!empty($r_perms['matches']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][settings]" value="1" <?php checked(!empty($r_perms['settings']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][logs]" value="1" <?php checked(!empty($r_perms['logs']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle; border-right: 2px solid #e2e8f0;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][event_clicks]" value="1" <?php checked(!empty($r_perms['event_clicks']), true); ?>>
+                                    </td>
+
+                                    <!-- Add-on Menus -->
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][events]" value="1" <?php checked(!empty($r_perms['events']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle; border-right: 2px solid #e2e8f0;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][forminator]" value="1" <?php checked(!empty($r_perms['forminator']), true); ?>>
+                                    </td>
+
+                                    <!-- WordPress Core -->
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][posts]" value="1" <?php checked(!empty($r_perms['posts']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][pages]" value="1" <?php checked(!empty($r_perms['pages']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][users]" value="1" <?php checked(!empty($r_perms['users']), true); ?>>
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        <input type="checkbox" name="mm_role_access[<?php echo esc_attr($role_key); ?>][tools]" value="1" <?php checked(!empty($r_perms['tools']), true); ?>>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="description" style="margin-top: 15px; color: #64748b;">
+                    💡 <?php esc_html_e('Tip: Giving a role access to Matchmaker sections will automatically ensure they possess the necessary backend permission to view the Matchmaker menu.', 'matchmaker'); ?>
+                </p>
             </div>
         </div>
 

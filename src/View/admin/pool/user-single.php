@@ -75,6 +75,19 @@ $user_photos_attr = !empty($user_photos) ? esc_attr(implode(',', $user_photos)) 
         </p>
     </div>
     <div>
+        <?php
+        $featured_post_id = class_exists(\Matchmaker\Frontend\FeaturedProfileController::class)
+            ? \Matchmaker\Frontend\FeaturedProfileController::instance()->get_user_featured_post_id($user_id)
+            : 0;
+        if ($featured_post_id > 0) : ?>
+            <a href="<?php echo esc_url(admin_url('post.php?post=' . $featured_post_id . '&action=edit')); ?>" class="button button-secondary" style="margin-right:8px;">
+                ⭐ <?php esc_html_e('Edit Featured Profile', 'matchmaker'); ?>
+            </a>
+        <?php else : ?>
+            <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&user_id=' . $user_id . '&view_user=' . $user_id . '&action=create_featured_profile'), 'mm_create_featured_' . $user_id)); ?>" class="button button-secondary" style="margin-right:8px;">
+                ⭐ <?php esc_html_e('Feature', 'matchmaker'); ?>
+            </a>
+        <?php endif; ?>
         <?php if (!$has_mutual) : ?>
             <a href="<?php echo esc_url($manual_url); ?>" class="button button-secondary" style="margin-right:8px;">
                 + <?php esc_html_e('Manual Matchmaker', 'matchmaker'); ?>

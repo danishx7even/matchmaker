@@ -1397,6 +1397,22 @@ body.mm-lightbox-open {
     accent-color: #CC723F;
 }
 
+/* =============================================================
+   Role Access Permissions Matrix Table
+   ============================================================= */
+.mm-role-access-table th {
+    padding: 10px 12px;
+}
+.mm-role-access-table td {
+    padding: 12px 14px;
+}
+.mm-role-access-table input[type="checkbox"] {
+    accent-color: #CC723F;
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+}
+
 
 
 

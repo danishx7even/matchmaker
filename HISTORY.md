@@ -6,6 +6,43 @@ This document maintains a chronological, step-by-step history of all features, a
 
 ## Chronological Task & Feature Log
 
+### Task 163: Featured Profile Approval Flow, Admin Feature Action, & Dynamic Role Access Settings (v2.17.0)
+- **Objective**:
+  1. **Featured Profile Approval Flow**:
+     - Removed member-side hide/show switch from member profile page (`tab-profile.php`). Members who purchase the Featured Profile add-on can choose between Anonymous and Public display modes, but cannot publish directly to the public directory.
+     - Added an Under Review notice banner informing members that their profile is awaiting administrator review before being shown on the public directory.
+     - Integrated ACF radio fields on `featured-profile` post:
+       - `show_featured_profile`: ('false' / 'true', default 'false') controls whether the profile appears in the public loop grid.
+       - `featured_profile_mode`: ('anonymous' / 'public', default 'anonymous') controls display mode.
+     - Header badge shows `⏳ Under Review` when `show_featured_profile` is false, and `🟢 Live & Featured` when true.
+     - In `FeaturedProfileController::filter_elementor_featured_profiles()`, filtered query using `meta_query` so only approved profiles (`show_featured_profile` in `['true', '1', true]`) appear in Elementor loop grid.
+     - Updated `handle_toggle_featured_profile()` to save `featured_profile_mode` (ACF and meta) and custom alias without altering `show_featured_profile`, preserving admin approval status.
+     - Updated `PMProSync::sync_all_membership_levels()` so newly acquired featured service automatically generates the featured profile post in published status with default pending review state.
+  2. **Admin Candidate Pool "Feature" Action**:
+     - In `src/View/admin/pool/user-single.php`, added a `⭐ Feature` button (or `⭐ Edit Featured Profile` if post exists) beside the Manual Matchmaker and Auto-Match Scoring buttons.
+     - In `AdminPortal::handle_admin_actions()`, handled `action=create_featured_profile` to auto-create a featured post with defaults (`show_featured_profile = 'false'`, `featured_profile_mode = 'anonymous'`, `connected-member = $user_id`, `post_status = 'publish'`), set `mm_has_featured_profile = 1`, and redirect to `post.php?post={id}&action=edit`. If post already exists, redirects to edit screen.
+  3. **Dynamic Role Access Matrix in Settings**:
+     - Added dedicated "🔐 Role Access" tab in Settings (`settings.php`).
+     - Admins can configure menu and screen access for each non-admin role via checkboxes without touching code.
+     - Covers Matchmaker sections (`pool`, `matches`, `settings`, `logs`, `event_clicks`), Add-on menus (`events`, `forminator`), and Core menus (`posts`, `pages`, `users`, `tools`).
+     - Refactored `restrict_admin_menus_for_matchmaker_admin()` and `enforce_matchmaker_admin_screen_restrictions()` in `AdminPortal.php` to dynamically inspect `mm_role_access_matrix` with sensible defaults.
+  4. **Versioning & Cache-Busting**:
+     - Bumped plugin version to `2.17.0` across `matchmaker.php` and fallback constants in controllers.
+     - Ensured composite `2.17.0.{filemtime}` cache-busting on all enqueued CSS and JS assets.
+- **Implemented**:
+  - `matchmaker.php`: Bumped plugin version to `2.17.0`.
+  - `src/Admin/AdminPortal.php`: Added `get_role_access_matrix()`, `is_item_allowed_for_user()`, dynamic menu/screen gating, matrix settings save, and `create_featured_profile` admin action.
+  - `src/Frontend/FeaturedProfileController.php`: Added `is_profile_approved()`, `get_profile_mode()`, updated `sync_featured_post()`, `handle_toggle_featured_profile()`, and loop grid `filter_elementor_featured_profiles()`.
+  - `src/Core/PMProSync.php`: Auto-creates featured profile post in pending review state upon purchasing featured profile service.
+  - `src/View/frontend/portal/tab-profile.php`: Replaced hide/show toggle with review notice banner and approval status badge.
+  - `src/View/admin/pool/user-single.php`: Added Feature / Edit Featured Profile button.
+  - `src/View/admin/settings/settings.php`: Added 🔐 Role Access tab and permission matrix table.
+  - `assets/css/member-portal.css`: Added review notice and badge styling.
+  - `assets/css/admin-matchmaker.css`: Added role access matrix table styling.
+  - `assets/js/featured-profiles.js`: Removed hide/show toggle listener and updated AJAX save handler.
+  - `tests/Unit/FeaturedProfileTest.php`: Added test cases for query filter, approval check, mode resolution, role access matrix, and admin create featured profile action.
+- **Verification**: Complete automated test suite passed with **283/283 tests passing (0 failures, 0 errors)**.
+
 ### Task 162: Fix Circular Redirect Loops & 500/503 Errors in PMProSync and AuthController
 - **Objective**:
   1. **Fix Infinite Redirect Loop on Account Page in `PMProSync::maybe_block_cancel_page_for_active_services()`**:
