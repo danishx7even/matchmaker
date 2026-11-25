@@ -14,5 +14,3 @@
 ## Step-by-Step Checklist
 *No pending steps.*
 
-
-

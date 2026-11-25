@@ -22,8 +22,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+$repo     = $repo ?? \Matchmaker\Repository\MatchRepository::instance();
 $photo    = !empty($photos['user_photo1']) ? $photos['user_photo1'] : '';
-$name     = $user->display_name;
+$name     = $user->display_name ?? '';
 $age      = $repo->calc_age($pool['birth_date'] ?? '');
 $height   = $repo->cm_to_feet((int) ($pool['height_cm'] ?? 0));
 $smoking  = !empty($pool['smoking']) ? $pool['smoking'] : '—';
@@ -145,8 +146,9 @@ $badge_label = $repo->format_tier_label($user_type);
 
     <?php
     $has_featured_service = \Matchmaker\Core\PMProSync::instance()->has_active_featured_profile_service($user_id);
-    if ($has_featured_service) :
-        $feat_post_id        = \Matchmaker\Frontend\FeaturedProfileController::instance()->get_user_featured_post_id($user_id);
+    $feat_post_id         = \Matchmaker\Frontend\FeaturedProfileController::instance()->get_user_featured_post_id($user_id);
+    $is_admin_created     = ($feat_post_id > 0) && (bool) get_post_meta($feat_post_id, '_mm_created_by_admin', true);
+    if ($has_featured_service && !$is_admin_created) :
         $is_approved         = ($feat_post_id > 0) ? \Matchmaker\Frontend\FeaturedProfileController::instance()->is_profile_approved($feat_post_id) : false;
         $feat_visibility     = \Matchmaker\Frontend\FeaturedProfileController::instance()->get_profile_mode($feat_post_id, $user_id);
         $feat_anon_name      = (string) get_user_meta($user_id, 'mm_featured_anonymous_name', true);

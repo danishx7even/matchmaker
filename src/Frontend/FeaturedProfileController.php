@@ -314,7 +314,6 @@ final class FeaturedProfileController
         }
 
         // Store user state
-        update_user_meta($user_id, 'mm_has_featured_profile', 1);
         update_user_meta($user_id, 'mm_featured_enabled', 1);
         update_user_meta($user_id, 'mm_featured_visibility', $visibility_mode);
         update_user_meta($user_id, '_mm_featured_post_id', $post_id);
@@ -415,6 +414,11 @@ final class FeaturedProfileController
 
         $post_id = $this->get_user_featured_post_id($user_id);
         if ($post_id > 0) {
+            // Do not revoke or unpublish posts created directly by an administrator
+            if ((bool) get_post_meta($post_id, '_mm_created_by_admin', true)) {
+                return;
+            }
+
             if (function_exists('update_field')) {
                 update_field('show_featured_profile', 'false', $post_id);
             }

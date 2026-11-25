@@ -96,7 +96,7 @@ final class FeaturedProfileTest extends TestCase
         $this->assertSame('false', get_post_meta($post_id, 'show_featured_profile', true));
         $this->assertFalse($this->controller->is_profile_approved($post_id));
         $this->assertSame('anonymous', $this->controller->get_profile_mode($post_id, $user_id));
-        $this->assertSame(1, (int) get_user_meta($user_id, 'mm_has_featured_profile', true));
+        $this->assertEmpty(get_user_meta($user_id, 'mm_has_featured_profile', true));
         $this->assertSame('anonymous', get_user_meta($user_id, 'mm_featured_visibility', true));
 
         // 2. Update to Public Mode: post_status remains publish, mode becomes public, show_featured_profile preserved as false
@@ -899,10 +899,60 @@ final class FeaturedProfileTest extends TestCase
         $this->assertSame('publish', $GLOBALS['__mm_posts'][$post_id]->post_status);
         $this->assertSame('false', get_post_meta($post_id, 'show_featured_profile', true));
         $this->assertSame('anonymous', get_post_meta($post_id, 'featured_profile_mode', true));
-        $this->assertSame(1, (int) get_user_meta($user_id, 'mm_has_featured_profile', true));
+        $this->assertSame(1, (int) get_post_meta($post_id, '_mm_created_by_admin', true));
+        $this->assertEmpty(get_user_meta($user_id, 'mm_has_featured_profile', true));
+        $this->assertFalse(\Matchmaker\Core\PMProSync::instance()->has_active_featured_profile_service($user_id));
+
+        // When PMPro membership sync / revocation occurs, admin-created post must NOT be drafted
+        $this->controller->handle_service_revoked($user_id);
+        $this->assertSame('publish', $GLOBALS['__mm_posts'][$post_id]->post_status);
 
         // Clear GET
         $_GET = [];
+    }
+
+    public function test_admin_created_featured_profile_suppresses_card_and_service(): void
+    {
+        $user_id = 550;
+        $user = new \WP_User((object) ['ID' => $user_id, 'display_name' => 'Candidate 550', 'user_email' => 'cand550@example.com']);
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        // Admin features this candidate
+        $post_id = $this->controller->sync_featured_post($user_id, true, 'anonymous');
+        update_post_meta($post_id, '_mm_created_by_admin', 1);
+
+        // Ensure user meta mm_has_featured_profile is NOT set
+        $this->assertEmpty(get_user_meta($user_id, 'mm_has_featured_profile', true));
+
+        // has_active_featured_profile_service must be false
+        $this->assertFalse(\Matchmaker\Core\PMProSync::instance()->has_active_featured_profile_service($user_id));
+
+        // Verify status card is NOT rendered for this user
+        ob_start();
+        $is_admin_view = false;
+        $repo = \Matchmaker\Repository\MatchRepository::instance();
+        $user_type = 'free';
+        $is_premium = false;
+        $pool = [];
+        $photos = [];
+        $meta = [];
+        $stats = ['approved_count' => 0];
+        $unread_count = 0;
+        require __DIR__ . '/../../src/View/frontend/portal/tab-profile.php';
+        $output = ob_get_clean();
+        $this->assertStringNotContainsString('mm-featured-portal-card', $output);
+
+        // Now simulate user genuinely purchasing the Featured Profile service via PMPro
+        $feat_level_id = 99;
+        update_option('mm_featured_profile_level_id', $feat_level_id);
+        $GLOBALS['__mm_user_pmpro_levels'][$user_id] = [new \FakePMProLevel($feat_level_id, 'Featured Profile')];
+
+        // Should now be recognized as holding the active service
+        $this->assertTrue(\Matchmaker\Core\PMProSync::instance()->has_active_featured_profile_service($user_id));
+
+        // Cleanup
+        delete_option('mm_featured_profile_level_id');
+        unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
 }
 

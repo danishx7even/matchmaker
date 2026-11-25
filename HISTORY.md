@@ -3685,4 +3685,31 @@ This document maintains a chronological, step-by-step history of all features, a
   - Ran `php -l` lint check on `src/View/frontend/portal/tab-profile.php` — 0 syntax errors detected.
   - Executed automated test runner (`tests/run_tests.php`) — **all 281 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+---
+
+## 2026-11-25 — Task 168: Suppress Featured Profile Status Card and User Meta for Admin-Created Profiles
+
+- **Objective**:
+  1. Remove automatic assignment of `mm_has_featured_profile = 1` when creating/syncing a featured profile post.
+  2. Ensure that users for whom an administrator manually creates a featured profile (e.g. via Candidate Pool "Feature" action) do NOT receive `mm_has_featured_profile = 1`.
+  3. Ensure that the Featured Profile Status card on the Member Portal profile tab (`tab-profile.php`) is strictly suppressed and NOT shown to users whose profile was created by an admin without purchasing the service.
+  4. Flag admin-created featured profiles with `_mm_created_by_admin = 1` on the `featured-profile` post, and ensure PMPro sync/revocation routines do not draft or hide admin-created posts.
+  5. Update `PMProSync::has_active_featured_profile_service()` to prioritize genuine PMPro service levels and return `false` for admin-created profiles unless the member actually holds an active PMPro membership level for the service.
+- **Implemented**:
+  - `src/Frontend/FeaturedProfileController.php`:
+    - Removed `update_user_meta($user_id, 'mm_has_featured_profile', 1)` from `sync_featured_post()`.
+    - Added guard in `handle_service_revoked()`: early return if post meta `_mm_created_by_admin` is true, preventing admin-created posts from being drafted during PMPro background syncs.
+  - `src/Admin/AdminPortal.php`:
+    - In `handle_admin_actions()` under `action === 'create_featured_profile'`, set `update_post_meta($post_id, '_mm_created_by_admin', 1)` and clean up `mm_has_featured_profile` and `mm_featured_enabled` user meta.
+  - `src/Core/PMProSync.php`:
+    - In `has_active_featured_profile_service()`, prioritized genuine PMPro level/service checking first, followed by a check returning `false` if `_mm_created_by_admin` is true, before falling back to manual/test user meta.
+  - `src/View/frontend/portal/tab-profile.php`:
+    - Added `$is_admin_created = ($feat_post_id > 0) && (bool) get_post_meta($feat_post_id, '_mm_created_by_admin', true);` to the status card display condition, guaranteeing the card is never rendered for admin-created profiles.
+    - Added fallback for `$repo` and `$name` variables to ensure robust standalone rendering.
+  - `tests/Unit/FeaturedProfileTest.php`:
+    - Updated `test_sync_featured_post_creates_and_updates_post_and_acf_meta` and `test_admin_create_featured_profile_action` to assert `mm_has_featured_profile` is empty.
+    - Added `test_admin_created_featured_profile_suppresses_card_and_service` asserting full lifecycle: admin creation flags post, suppresses service and card, and only enables service if user subsequently purchases PMPro level.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 284 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
+
 

@@ -2045,14 +2045,9 @@ class PMProSync {
             return false;
         }
 
-        // Check usermeta flag (also allows manual admin toggle / mock tests)
-        if ((bool) get_user_meta($user_id, 'mm_has_featured_profile', true)) {
-            return true;
-        }
-
         $feat_level_id = $this->get_featured_profile_level_id();
 
-        // Check active services list
+        // 1. Check genuine PMPro purchase first (active services or membership level)
         $active_services = $this->get_user_active_services($user_id);
         foreach ($active_services as $asrv) {
             $asid   = (int) ($asrv['id'] ?? 0);
@@ -2071,6 +2066,17 @@ class PMProSync {
             if (pmpro_hasMembershipLevel($feat_level_id, $user_id)) {
                 return true;
             }
+        }
+
+        // 2. If the user's featured profile was created by an admin, they have not purchased the service
+        $post_id = (int) get_user_meta($user_id, '_mm_featured_post_id', true);
+        if ($post_id > 0 && (bool) get_post_meta($post_id, '_mm_created_by_admin', true)) {
+            return false;
+        }
+
+        // 3. Fallback: check usermeta flag (allows mock testing or manual toggle)
+        if ((bool) get_user_meta($user_id, 'mm_has_featured_profile', true)) {
+            return true;
         }
 
         return false;

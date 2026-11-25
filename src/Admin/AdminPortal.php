@@ -1221,6 +1221,11 @@ class AdminPortal
             if ($feat_ctrl) {
                 $existing_post_id = $feat_ctrl->get_user_featured_post_id($user_id);
                 if ($existing_post_id > 0) {
+                    if (!\Matchmaker\Core\PMProSync::instance()->has_active_featured_profile_service($user_id)) {
+                        update_post_meta($existing_post_id, '_mm_created_by_admin', 1);
+                        delete_user_meta($user_id, 'mm_has_featured_profile');
+                        delete_user_meta($user_id, 'mm_featured_enabled');
+                    }
                     wp_safe_redirect(admin_url('post.php?post=' . $existing_post_id . '&action=edit'));
                     if (!defined('MM_UNIT_TESTS')) {
                         exit;
@@ -1230,6 +1235,9 @@ class AdminPortal
 
                 $new_post_id = $feat_ctrl->sync_featured_post($user_id, true, 'anonymous');
                 if ($new_post_id > 0) {
+                    update_post_meta($new_post_id, '_mm_created_by_admin', 1);
+                    delete_user_meta($user_id, 'mm_has_featured_profile');
+                    delete_user_meta($user_id, 'mm_featured_enabled');
                     wp_safe_redirect(admin_url('post.php?post=' . $new_post_id . '&action=edit'));
                     if (!defined('MM_UNIT_TESTS')) {
                         exit;
