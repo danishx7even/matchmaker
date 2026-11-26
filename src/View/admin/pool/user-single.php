@@ -79,10 +79,20 @@ $user_photos_attr = !empty($user_photos) ? esc_attr(implode(',', $user_photos)) 
         $featured_post_id = class_exists(\Matchmaker\Frontend\FeaturedProfileController::class)
             ? \Matchmaker\Frontend\FeaturedProfileController::instance()->get_user_featured_post_id($user_id)
             : 0;
-        if ($featured_post_id > 0) : ?>
+        if ($featured_post_id > 0) : 
+            $is_admin_featured = (bool) get_post_meta($featured_post_id, '_mm_created_by_admin', true);
+        ?>
             <a href="<?php echo esc_url(admin_url('post.php?post=' . $featured_post_id . '&action=edit')); ?>" class="button button-secondary" style="margin-right:8px;">
                 ⭐ <?php esc_html_e('Edit Featured Profile', 'matchmaker'); ?>
             </a>
+            <?php if ($is_admin_featured) : ?>
+                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&user_id=' . $user_id . '&view_user=' . $user_id . '&action=revoke_featured_profile'), 'mm_revoke_featured_' . $user_id)); ?>" 
+                   class="button button-secondary" 
+                   style="color:#d63638; border-color:#d63638; margin-right:8px;"
+                   onclick="return confirm('<?php echo esc_js(__('Are you sure you want to revoke this featured profile? This will permanently delete the post and remove featured status.', 'matchmaker')); ?>');">
+                    ✕ <?php esc_html_e('Revoke Featured', 'matchmaker'); ?>
+                </a>
+            <?php endif; ?>
         <?php else : ?>
             <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin.php?page=matchmaking-pool&user_id=' . $user_id . '&view_user=' . $user_id . '&action=create_featured_profile'), 'mm_create_featured_' . $user_id)); ?>" class="button button-secondary" style="margin-right:8px;">
                 ⭐ <?php esc_html_e('Feature', 'matchmaker'); ?>

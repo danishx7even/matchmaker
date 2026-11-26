@@ -954,5 +954,106 @@ final class FeaturedProfileTest extends TestCase
         delete_option('mm_featured_profile_level_id');
         unset($GLOBALS['__mm_user_pmpro_levels'][$user_id]);
     }
+
+    public function test_revoke_admin_featured_profile_deletes_post_and_cleans_usermeta(): void
+    {
+        $user_id = 560;
+        $user = new \WP_User((object) ['ID' => $user_id, 'display_name' => 'Candidate 560']);
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        // Admin features candidate
+        $post_id = $this->controller->sync_featured_post($user_id, true, 'anonymous');
+        update_post_meta($post_id, '_mm_created_by_admin', 1);
+
+        $this->assertGreaterThan(0, $this->controller->get_user_featured_post_id($user_id));
+        $this->assertSame($post_id, (int) get_user_meta($user_id, '_mm_featured_post_id', true));
+
+        // Revoke as admin
+        $revoked = $this->controller->revoke_admin_featured_profile($user_id);
+        $this->assertTrue($revoked);
+
+        // Verify post deleted
+        $this->assertArrayNotHasKey($post_id, $GLOBALS['__mm_posts']);
+
+        // Verify all 5 usermetas cleared
+        $this->assertEmpty(get_user_meta($user_id, '_mm_featured_post_id', true));
+        $this->assertEmpty(get_user_meta($user_id, 'mm_featured_enabled', true));
+        $this->assertEmpty(get_user_meta($user_id, 'mm_featured_visibility', true));
+        $this->assertEmpty(get_user_meta($user_id, 'mm_featured_anonymous_name', true));
+        $this->assertEmpty(get_user_meta($user_id, 'mm_has_featured_profile', true));
+
+        // Controller get_user_featured_post_id returns 0
+        $this->assertSame(0, $this->controller->get_user_featured_post_id($user_id));
+    }
+
+    public function test_revoke_admin_featured_profile_blocks_non_admin_created_profiles(): void
+    {
+        $user_id = 561;
+        $user = new \WP_User((object) ['ID' => $user_id, 'display_name' => 'Purchased User 561']);
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        // Non-admin created (e.g. member purchased service)
+        $post_id = $this->controller->sync_featured_post($user_id, true, 'anonymous');
+        delete_post_meta($post_id, '_mm_created_by_admin');
+
+        $revoked = $this->controller->revoke_admin_featured_profile($user_id);
+        $this->assertFalse($revoked);
+
+        // Post must NOT be deleted
+        $this->assertArrayHasKey($post_id, $GLOBALS['__mm_posts']);
+    }
+
+    public function test_admin_action_revoke_featured_profile_redirects_and_renders_notice(): void
+    {
+        $user_id = 562;
+        $user = new \WP_User((object) ['ID' => $user_id, 'display_name' => 'Candidate 562']);
+        $GLOBALS['__mm_users'][$user_id] = $user;
+
+        $admin_user = new \WP_User((object) ['ID' => 1, 'roles' => ['administrator']]);
+        $GLOBALS['__mm_users'][1] = $admin_user;
+        wp_set_current_user(1);
+
+        $post_id = $this->controller->sync_featured_post($user_id, true, 'anonymous');
+        update_post_meta($post_id, '_mm_created_by_admin', 1);
+
+        $_GET = [
+            'page'     => 'matchmaking-pool',
+            'action'   => 'revoke_featured_profile',
+            'user_id'  => (string) $user_id,
+            '_wpnonce' => wp_create_nonce('mm_revoke_featured_' . $user_id),
+        ];
+
+        $GLOBALS['__mm_last_redirect'] = '';
+        \Matchmaker\Admin\AdminPortal::instance()->handle_admin_actions();
+
+        $this->assertStringContainsString('mm_notice=featured_revoked', $GLOBALS['__mm_last_redirect'] ?? '');
+        $this->assertSame(0, $this->controller->get_user_featured_post_id($user_id));
+
+        // Test notice rendered on pool page
+        \Matchmaker\Repository\MatchRepository::instance()->upsert_pool([
+            'user_id'   => $user_id,
+            'user_type' => 'free',
+            'gender'    => 'male',
+        ]);
+
+        $_GET = [
+            'page'      => 'matchmaking-pool',
+            'view_user' => (string) $user_id,
+            'mm_notice' => 'featured_revoked',
+        ];
+
+        ob_start();
+        \Matchmaker\Admin\AdminPortal::instance()->render_admin_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('Featured profile has been revoked and removed successfully', $output);
+        // Verify "Feature" button is shown and "Edit Featured Profile" / "Revoke Featured" are absent
+        $this->assertStringContainsString('action=create_featured_profile', $output);
+        $this->assertStringNotContainsString('Edit Featured Profile', $output);
+        $this->assertStringNotContainsString('Revoke Featured', $output);
+
+        // Clear GET
+        $_GET = [];
+    }
 }
 

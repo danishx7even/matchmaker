@@ -3712,4 +3712,30 @@ This document maintains a chronological, step-by-step history of all features, a
 - **Verification**:
   - Executed automated test runner (`tests/run_tests.php`) — **all 284 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.
 
+---
 
+## 2026-11-26 — Task 169: Add Revoke Featured Profile Action for Admin-Created Profiles
+
+- **Objective**:
+  1. Add a "Revoke Featured" action and button on the Candidate Pool single view (`user-single.php`) beside "Edit Featured Profile".
+  2. Prompt the administrator with a confirmation dialog before proceeding.
+  3. When confirmed, permanently delete the `featured-profile` post (`wp_delete_post($post_id, true)`) and clean up all associated usermetas (`_mm_featured_post_id`, `mm_featured_enabled`, `mm_featured_visibility`, `mm_featured_anonymous_name`, `mm_has_featured_profile`).
+  4. Ensure the revocation capability is strictly restricted to profiles created by an administrator (`_mm_created_by_admin == 1`).
+  5. Once revoked, remove the "Edit Featured Profile" and "Revoke Featured" buttons and dynamically re-display the "⭐ Feature" button.
+- **Implemented**:
+  - `src/Frontend/FeaturedProfileController.php`:
+    - Added `revoke_admin_featured_profile(int $user_id): bool` to delete the post permanently, clean up usermeta, and log the action.
+    - Updated `get_user_featured_post_id()` cache check to self-heal when a post is deleted or trashed.
+  - `src/Admin/AdminPortal.php`:
+    - Added `action === 'revoke_featured_profile'` action handler in `handle_admin_actions()` with nonce check and redirection with `mm_notice=featured_revoked`.
+    - Added notice rendering in `render_admin_page()` to display *"Featured profile has been revoked and removed successfully."*
+  - `src/View/admin/pool/user-single.php`:
+    - Rendered the `✕ Revoke Featured` button beside `⭐ Edit Featured Profile` when `_mm_created_by_admin` is true, styled with `color:#d63638; border-color:#d63638;` and a JavaScript confirmation prompt.
+  - `tests/bootstrap.php`:
+    - Added mock functions for `wp_delete_post()` and `settings_errors()`.
+  - `tests/Unit/FeaturedProfileTest.php`:
+    - Added unit test `test_revoke_admin_featured_profile_deletes_post_and_cleans_usermeta()`.
+    - Added unit test `test_revoke_admin_featured_profile_blocks_non_admin_created_profiles()`.
+    - Added unit test `test_admin_action_revoke_featured_profile_redirects_and_renders_notice()`.
+- **Verification**:
+  - Executed automated test runner (`tests/run_tests.php`) — **all 287 unit and integration tests passed with 100% success rate (0 failures, 0 errors)**.

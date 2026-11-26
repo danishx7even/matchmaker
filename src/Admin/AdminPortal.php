@@ -1250,6 +1250,24 @@ class AdminPortal
             return;
         }
 
+        // --- REVOKE FEATURED PROFILE POST ---
+        if ($action === 'revoke_featured_profile' && $user_id > 0 && wp_verify_nonce($nonce, 'mm_revoke_featured_' . $user_id)) {
+            $feat_ctrl = class_exists(\Matchmaker\Frontend\FeaturedProfileController::class)
+                ? \Matchmaker\Frontend\FeaturedProfileController::instance()
+                : null;
+
+            if ($feat_ctrl && $feat_ctrl->revoke_admin_featured_profile($user_id)) {
+                wp_safe_redirect(admin_url('admin.php?page=matchmaking-pool&view_user=' . $user_id . '&mm_notice=featured_revoked'));
+                if (!defined('MM_UNIT_TESTS')) {
+                    exit;
+                }
+                return;
+            }
+
+            add_settings_error('mm_admin_notices', 'revoke_feature_error', __('Could not revoke featured profile. Only admin-created profiles can be revoked.', 'matchmaker'), 'error');
+            return;
+        }
+
         // --- EVENT CLICKS CSV EXPORT ---
         if ($page === 'matchmaking-event-clicks' && $action === 'export_event_clicks' && $nonce !== '') {
             if (wp_verify_nonce($nonce, 'mm_export_event_clicks')) {
@@ -1280,6 +1298,10 @@ class AdminPortal
     {
         $view_user    = isset($_GET['view_user']) ? (int) $_GET['view_user'] : 0;
         $manual_match = isset($_GET['manual_match']) ? (int) $_GET['manual_match'] : 0;
+
+        if (isset($_GET['mm_notice']) && $_GET['mm_notice'] === 'featured_revoked') {
+            add_settings_error('mm_admin_notices', 'featured_revoked', __('Featured profile has been revoked and removed successfully.', 'matchmaker'), 'updated');
+        }
 
         echo '<div class="wrap mm-admin-wrap">';
         settings_errors('mm_admin_notices');

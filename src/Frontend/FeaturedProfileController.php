@@ -187,7 +187,11 @@ final class FeaturedProfileController
 
         $cached_id = (int) get_user_meta($user_id, '_mm_featured_post_id', true);
         if ($cached_id > 0) {
-            return $cached_id;
+            $post = get_post($cached_id);
+            if ($post && $post->post_type === 'featured-profile' && $post->post_status !== 'trash') {
+                return $cached_id;
+            }
+            delete_user_meta($user_id, '_mm_featured_post_id');
         }
 
         $args = [
@@ -221,6 +225,57 @@ final class FeaturedProfileController
         }
 
         return 0;
+    }
+
+    /**
+     * Revokes an admin-created featured profile by permanently deleting the CPT post
+     * and erasing all relevant usermeta.
+     *
+     * Only applies if the profile was created by an admin (_mm_created_by_admin = 1).
+     *
+     * @param int $user_id
+     * @return bool True if revoked successfully, false otherwise.
+     */
+    public function revoke_admin_featured_profile(int $user_id): bool
+    {
+        if ($user_id <= 0) {
+            return false;
+        }
+
+        $post_id = $this->get_user_featured_post_id($user_id);
+        if ($post_id <= 0) {
+            $post_id = (int) get_user_meta($user_id, '_mm_featured_post_id', true);
+        }
+
+        if ($post_id <= 0) {
+            return false;
+        }
+
+        // Strictly verify this post was created by an administrator
+        $is_admin_created = (bool) get_post_meta($post_id, '_mm_created_by_admin', true);
+        if (!$is_admin_created) {
+            return false;
+        }
+
+        // Permanently delete post (force delete bypasses trash)
+        $deleted = wp_delete_post($post_id, true);
+
+        // Clean up all associated usermeta
+        delete_user_meta($user_id, '_mm_featured_post_id');
+        delete_user_meta($user_id, 'mm_featured_enabled');
+        delete_user_meta($user_id, 'mm_featured_visibility');
+        delete_user_meta($user_id, 'mm_featured_anonymous_name');
+        delete_user_meta($user_id, 'mm_has_featured_profile');
+
+        if (class_exists(FileLoggerService::class)) {
+            FileLoggerService::info(
+                'Admin revoked featured profile for user #' . $user_id . ' (post #' . $post_id . ' permanently deleted).',
+                ['user_id' => $user_id, 'post_id' => $post_id],
+                'profile'
+            );
+        }
+
+        return !empty($deleted);
     }
 
     /**

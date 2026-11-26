@@ -715,6 +715,18 @@ if (!function_exists('wp_update_post')) {
     }
 }
 
+if (!function_exists('wp_delete_post')) {
+    function wp_delete_post(int $postid = 0, bool $force_delete = false) {
+        if ($postid && isset($GLOBALS['__mm_posts'][$postid])) {
+            $post = $GLOBALS['__mm_posts'][$postid];
+            unset($GLOBALS['__mm_posts'][$postid]);
+            unset($GLOBALS['__mm_post_meta'][$postid]);
+            return $post;
+        }
+        return false;
+    }
+}
+
 function get_the_title($post = 0): string {
     return $GLOBALS['post']->post_title ?? '';
 }
@@ -780,6 +792,17 @@ function get_settings_errors(string $setting = '', bool $sanitize = false): arra
         return $errors;
     }
     return array_values(array_filter($errors, fn($err) => ($err['setting'] ?? '') === $setting));
+}
+
+function settings_errors(string $setting = '', bool $sanitize = false, bool $hide_on_update = false): void {
+    $errors = get_settings_errors($setting, $sanitize);
+    if (empty($errors)) {
+        return;
+    }
+    foreach ($errors as $error) {
+        $class = 'notice notice-' . ($error['type'] === 'updated' ? 'success' : $error['type']);
+        echo '<div class="' . esc_attr($class) . '"><p>' . esc_html($error['message']) . '</p></div>';
+    }
 }
 
 function has_post_thumbnail($post = null): bool {
